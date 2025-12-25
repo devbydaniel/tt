@@ -24,6 +24,11 @@ func Open(path string) (*DB, error) {
 		return nil, err
 	}
 
+	// Enable foreign keys for CASCADE support
+	if _, err := conn.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		return nil, err
+	}
+
 	return &DB{Conn: conn}, nil
 }
 

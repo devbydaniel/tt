@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/devbydaniel/t/internal/domain/area"
+	"github.com/devbydaniel/t/internal/domain/project"
 	"github.com/devbydaniel/t/internal/domain/task"
 )
 
@@ -49,4 +51,42 @@ func (f *Formatter) Logbook(tasks []task.Task) {
 		}
 		fmt.Fprintf(f.w, "%d  %s  %s\n", t.ID, completedAt, t.Title)
 	}
+}
+
+func (f *Formatter) AreaCreated(a *area.Area) {
+	fmt.Fprintf(f.w, "Created area: %s\n", a.Name)
+}
+
+func (f *Formatter) AreaList(areas []area.Area) {
+	if len(areas) == 0 {
+		fmt.Fprintln(f.w, "No areas")
+		return
+	}
+
+	for _, a := range areas {
+		fmt.Fprintln(f.w, a.Name)
+	}
+}
+
+func (f *Formatter) AreaDeleted(a *area.Area) {
+	fmt.Fprintf(f.w, "Deleted area: %s\n", a.Name)
+}
+
+func (f *Formatter) ProjectCreated(p *project.Project) {
+	fmt.Fprintf(f.w, "Created project: %s\n", p.Name)
+}
+
+func (f *Formatter) ProjectList(projects []project.Project) {
+	if len(projects) == 0 {
+		fmt.Fprintln(f.w, "No projects")
+		return
+	}
+
+	for _, p := range projects {
+		fmt.Fprintln(f.w, p.Name)
+	}
+}
+
+func (f *Formatter) ProjectDeleted(p *project.Project) {
+	fmt.Fprintf(f.w, "Deleted project: %s\n", p.Name)
 }

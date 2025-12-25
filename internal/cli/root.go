@@ -3,13 +3,17 @@ package cli
 import (
 	"os"
 
+	"github.com/devbydaniel/t/internal/domain/area"
+	"github.com/devbydaniel/t/internal/domain/project"
 	"github.com/devbydaniel/t/internal/domain/task"
 	"github.com/devbydaniel/t/internal/output"
 	"github.com/spf13/cobra"
 )
 
 type Dependencies struct {
-	TaskService *task.Service
+	TaskService    *task.Service
+	AreaService    *area.Service
+	ProjectService *project.Service
 }
 
 func NewRootCmd(deps *Dependencies) *cobra.Command {
@@ -25,6 +29,8 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd.AddCommand(NewListCmd(deps))
 	rootCmd.AddCommand(NewDoneCmd(deps))
 	rootCmd.AddCommand(NewLogCmd(deps))
+	rootCmd.AddCommand(NewAreaCmd(deps))
+	rootCmd.AddCommand(NewProjectCmd(deps))
 
 	return rootCmd
 }
