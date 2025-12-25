@@ -28,18 +28,50 @@ func Open(path string) (*DB, error) {
 }
 
 func (db *DB) Migrate() error {
+	// Create migrations tracking table
+	if _, err := db.Conn.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version TEXT PRIMARY KEY,
+			applied_at TEXT NOT NULL
+		)
+	`); err != nil {
+		return err
+	}
+
 	entries, err := migrations.ReadDir("migrations")
 	if err != nil {
 		return err
 	}
 
 	for _, entry := range entries {
-		content, err := migrations.ReadFile("migrations/" + entry.Name())
+		name := entry.Name()
+
+		// Check if migration already applied
+		var count int
+		if err := db.Conn.QueryRow(
+			`SELECT COUNT(*) FROM schema_migrations WHERE version = ?`,
+			name,
+		).Scan(&count); err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+
+		content, err := migrations.ReadFile("migrations/" + name)
 		if err != nil {
 			return err
 		}
 
 		if _, err := db.Conn.Exec(string(content)); err != nil {
+			return err
+		}
+
+		// Record migration as applied
+		if _, err := db.Conn.Exec(
+			`INSERT INTO schema_migrations (version, applied_at) VALUES (?, datetime('now'))`,
+			name,
+		); err != nil {
 			return err
 		}
 	}

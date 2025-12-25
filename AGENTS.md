@@ -1,5 +1,7 @@
 # AGENTS.md
 
+CLI & TUI task management
+
 ## Architecture
 
 Layered: `cmd/` → `internal/cli/` → `internal/domain/*/` → `internal/database/`
