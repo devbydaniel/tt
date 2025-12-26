@@ -108,6 +108,23 @@ func (r *Repository) Complete(id int64, completedAt time.Time) error {
 	return nil
 }
 
+func (r *Repository) Delete(id int64) error {
+	result, err := r.db.Conn.Exec(`DELETE FROM tasks WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrTaskNotFound
+	}
+
+	return nil
+}
+
 func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 	var rows *sql.Rows
 	var err error

@@ -38,6 +38,12 @@ func (f *Formatter) TasksCompleted(tasks []task.Task) {
 	}
 }
 
+func (f *Formatter) TasksDeleted(tasks []task.Task) {
+	for _, t := range tasks {
+		fmt.Fprintf(f.w, "Deleted #%d: %s\n", t.ID, t.Title)
+	}
+}
+
 func (f *Formatter) Logbook(tasks []task.Task) {
 	if len(tasks) == 0 {
 		fmt.Fprintln(f.w, "No completed tasks")

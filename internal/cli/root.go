@@ -28,6 +28,7 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd.AddCommand(NewAddCmd(deps))
 	rootCmd.AddCommand(NewListCmd(deps))
 	rootCmd.AddCommand(NewDoneCmd(deps))
+	rootCmd.AddCommand(NewDeleteCmd(deps))
 	rootCmd.AddCommand(NewLogCmd(deps))
 	rootCmd.AddCommand(NewAreaCmd(deps))
 	rootCmd.AddCommand(NewProjectCmd(deps))

@@ -1,0 +1,37 @@
+package cli
+
+import (
+	"errors"
+	"os"
+	"strconv"
+
+	"github.com/devbydaniel/t/internal/output"
+	"github.com/spf13/cobra"
+)
+
+func NewDeleteCmd(deps *Dependencies) *cobra.Command {
+	return &cobra.Command{
+		Use:   "delete <id> [id...]",
+		Short: "Delete task(s)",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ids := make([]int64, 0, len(args))
+			for _, arg := range args {
+				id, err := strconv.ParseInt(arg, 10, 64)
+				if err != nil {
+					return errors.New("invalid task ID: " + arg)
+				}
+				ids = append(ids, id)
+			}
+
+			deleted, err := deps.TaskService.Delete(ids)
+			if err != nil {
+				return err
+			}
+
+			formatter := output.NewFormatter(os.Stdout)
+			formatter.TasksDeleted(deleted)
+			return nil
+		},
+	}
+}

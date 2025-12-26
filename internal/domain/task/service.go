@@ -1,6 +1,8 @@
 package task
 
 import (
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/devbydaniel/t/internal/domain/area"
@@ -105,6 +107,26 @@ func (s *Service) Complete(ids []int64) ([]Task, error) {
 	}
 
 	return completed, nil
+}
+
+func (s *Service) Delete(ids []int64) ([]Task, error) {
+	var deleted []Task
+
+	for _, id := range ids {
+		task, err := s.repo.GetByID(id)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return deleted, ErrTaskNotFound
+			}
+			return deleted, err
+		}
+		if err := s.repo.Delete(id); err != nil {
+			return deleted, err
+		}
+		deleted = append(deleted, *task)
+	}
+
+	return deleted, nil
 }
 
 func (s *Service) ListCompleted(since *time.Time) ([]Task, error) {
