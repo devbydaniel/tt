@@ -27,6 +27,7 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 
 	rootCmd.AddCommand(NewAddCmd(deps))
 	rootCmd.AddCommand(NewListCmd(deps))
+	rootCmd.AddCommand(NewEditCmd(deps))
 	rootCmd.AddCommand(NewDoneCmd(deps))
 	rootCmd.AddCommand(NewDeleteCmd(deps))
 	rootCmd.AddCommand(NewLogCmd(deps))
@@ -35,6 +36,7 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd.AddCommand(NewPlanCmd(deps))
 	rootCmd.AddCommand(NewDueCmd(deps))
 	rootCmd.AddCommand(NewRecurCmd(deps))
+	rootCmd.AddCommand(NewTagCmd(deps))
 
 	return rootCmd
 }

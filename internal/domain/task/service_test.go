@@ -549,3 +549,267 @@ func TestClearRecurrence(t *testing.T) {
 		t.Error("RecurRule should be nil after clearing")
 	}
 }
+
+func TestTaskWithTags(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	created, err := taskSvc.Create("Tagged task", &task.CreateOptions{
+		Tags: []string{"work", "urgent"},
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	if len(created.Tags) != 2 {
+		t.Errorf("got %d tags, want 2", len(created.Tags))
+	}
+	// Tags are in insertion order
+	if created.Tags[0] != "work" || created.Tags[1] != "urgent" {
+		t.Errorf("Tags = %v, want [work, urgent]", created.Tags)
+	}
+}
+
+func TestAddTag(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	created, _ := taskSvc.Create("Task without tags", nil)
+
+	updated, err := taskSvc.AddTag(created.ID, "important")
+	if err != nil {
+		t.Fatalf("AddTag() error = %v", err)
+	}
+
+	if len(updated.Tags) != 1 {
+		t.Errorf("got %d tags, want 1", len(updated.Tags))
+	}
+	if updated.Tags[0] != "important" {
+		t.Errorf("Tags[0] = %q, want %q", updated.Tags[0], "important")
+	}
+}
+
+func TestRemoveTag(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	created, _ := taskSvc.Create("Tagged task", &task.CreateOptions{
+		Tags: []string{"work", "urgent"},
+	})
+
+	updated, err := taskSvc.RemoveTag(created.ID, "work")
+	if err != nil {
+		t.Fatalf("RemoveTag() error = %v", err)
+	}
+
+	if len(updated.Tags) != 1 {
+		t.Errorf("got %d tags, want 1", len(updated.Tags))
+	}
+	if updated.Tags[0] != "urgent" {
+		t.Errorf("Tags[0] = %q, want %q", updated.Tags[0], "urgent")
+	}
+}
+
+func TestListTags(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	taskSvc.Create("Task 1", &task.CreateOptions{Tags: []string{"work", "urgent"}})
+	taskSvc.Create("Task 2", &task.CreateOptions{Tags: []string{"personal", "urgent"}})
+
+	tags, err := taskSvc.ListTags()
+	if err != nil {
+		t.Fatalf("ListTags() error = %v", err)
+	}
+
+	if len(tags) != 3 {
+		t.Errorf("got %d unique tags, want 3", len(tags))
+	}
+}
+
+func TestFilterByTag(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	taskSvc.Create("Work task 1", &task.CreateOptions{Tags: []string{"work"}})
+	taskSvc.Create("Work task 2", &task.CreateOptions{Tags: []string{"work", "urgent"}})
+	taskSvc.Create("Personal task", &task.CreateOptions{Tags: []string{"personal"}})
+	taskSvc.Create("Untagged task", nil)
+
+	// Filter by work tag
+	workTasks, err := taskSvc.List(&task.ListOptions{TagName: "work"})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(workTasks) != 2 {
+		t.Errorf("got %d work tasks, want 2", len(workTasks))
+	}
+
+	// All tasks should include tags
+	allTasks, _ := taskSvc.List(&task.ListOptions{All: true})
+	if len(allTasks) != 4 {
+		t.Errorf("got %d total tasks, want 4", len(allTasks))
+	}
+}
+
+func TestAddTagNonexistentTask(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	_, err := taskSvc.AddTag(999, "tag")
+	if err != task.ErrTaskNotFound {
+		t.Errorf("AddTag() error = %v, want ErrTaskNotFound", err)
+	}
+}
+
+func TestRemoveTagNonexistentTask(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	_, err := taskSvc.RemoveTag(999, "tag")
+	if err != task.ErrTaskNotFound {
+		t.Errorf("RemoveTag() error = %v, want ErrTaskNotFound", err)
+	}
+}
+
+func TestRecurringTaskCopyTags(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	// Create a recurring task with tags
+	recurType := task.RecurTypeFixed
+	recurRule := `{"interval":1,"unit":"day"}`
+	created, _ := taskSvc.Create("Daily standup", &task.CreateOptions{
+		RecurType: &recurType,
+		RecurRule: &recurRule,
+		Tags:      []string{"work", "meeting"},
+	})
+
+	// Complete the recurring task
+	results, err := taskSvc.Complete([]int64{created.ID})
+	if err != nil {
+		t.Fatalf("Complete() error = %v", err)
+	}
+
+	if results[0].NextTask == nil {
+		t.Fatal("NextTask should be set for recurring task")
+	}
+
+	// Check that tags were copied
+	if len(results[0].NextTask.Tags) != 2 {
+		t.Errorf("NextTask.Tags length = %d, want 2", len(results[0].NextTask.Tags))
+	}
+}
+
+func TestSetTitle(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	created, _ := taskSvc.Create("Original title", nil)
+
+	updated, err := taskSvc.SetTitle(created.ID, "New title")
+	if err != nil {
+		t.Fatalf("SetTitle() error = %v", err)
+	}
+
+	if updated.Title != "New title" {
+		t.Errorf("Title = %q, want %q", updated.Title, "New title")
+	}
+}
+
+func TestSetProject(t *testing.T) {
+	taskSvc, projectSvc, _ := setupServices(t)
+
+	projectSvc.Create("Work", "")
+	created, _ := taskSvc.Create("Task", nil)
+
+	updated, err := taskSvc.SetProject(created.ID, "Work")
+	if err != nil {
+		t.Fatalf("SetProject() error = %v", err)
+	}
+
+	if updated.ProjectID == nil {
+		t.Fatal("ProjectID should be set")
+	}
+}
+
+func TestSetProjectClearsArea(t *testing.T) {
+	taskSvc, projectSvc, areaSvc := setupServices(t)
+
+	areaSvc.Create("Health")
+	projectSvc.Create("Work", "")
+
+	created, _ := taskSvc.Create("Task", &task.CreateOptions{AreaName: "Health"})
+
+	updated, err := taskSvc.SetProject(created.ID, "Work")
+	if err != nil {
+		t.Fatalf("SetProject() error = %v", err)
+	}
+
+	if updated.ProjectID == nil {
+		t.Fatal("ProjectID should be set")
+	}
+	if updated.AreaID != nil {
+		t.Error("AreaID should be cleared when setting project")
+	}
+}
+
+func TestSetArea(t *testing.T) {
+	taskSvc, _, areaSvc := setupServices(t)
+
+	areaSvc.Create("Health")
+	created, _ := taskSvc.Create("Task", nil)
+
+	updated, err := taskSvc.SetArea(created.ID, "Health")
+	if err != nil {
+		t.Fatalf("SetArea() error = %v", err)
+	}
+
+	if updated.AreaID == nil {
+		t.Fatal("AreaID should be set")
+	}
+}
+
+func TestSetAreaClearsProject(t *testing.T) {
+	taskSvc, projectSvc, areaSvc := setupServices(t)
+
+	projectSvc.Create("Work", "")
+	areaSvc.Create("Health")
+
+	created, _ := taskSvc.Create("Task", &task.CreateOptions{ProjectName: "Work"})
+
+	updated, err := taskSvc.SetArea(created.ID, "Health")
+	if err != nil {
+		t.Fatalf("SetArea() error = %v", err)
+	}
+
+	if updated.AreaID == nil {
+		t.Fatal("AreaID should be set")
+	}
+	if updated.ProjectID != nil {
+		t.Error("ProjectID should be cleared when setting area")
+	}
+}
+
+func TestClearProject(t *testing.T) {
+	taskSvc, projectSvc, _ := setupServices(t)
+
+	projectSvc.Create("Work", "")
+	created, _ := taskSvc.Create("Task", &task.CreateOptions{ProjectName: "Work"})
+
+	updated, err := taskSvc.SetProject(created.ID, "")
+	if err != nil {
+		t.Fatalf("SetProject() error = %v", err)
+	}
+
+	if updated.ProjectID != nil {
+		t.Error("ProjectID should be nil after clearing")
+	}
+}
+
+func TestClearArea(t *testing.T) {
+	taskSvc, _, areaSvc := setupServices(t)
+
+	areaSvc.Create("Health")
+	created, _ := taskSvc.Create("Task", &task.CreateOptions{AreaName: "Health"})
+
+	updated, err := taskSvc.SetArea(created.ID, "")
+	if err != nil {
+		t.Fatalf("SetArea() error = %v", err)
+	}
+
+	if updated.AreaID != nil {
+		t.Error("AreaID should be nil after clearing")
+	}
+}

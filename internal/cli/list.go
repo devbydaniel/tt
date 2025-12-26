@@ -11,6 +11,7 @@ import (
 func NewListCmd(deps *Dependencies) *cobra.Command {
 	var projectName string
 	var areaName string
+	var tagName string
 	var today bool
 	var upcoming bool
 	var someday bool
@@ -23,6 +24,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 			opts := &task.ListOptions{
 				ProjectName: projectName,
 				AreaName:    areaName,
+				TagName:     tagName,
 				Today:       today,
 				Upcoming:    upcoming,
 				Someday:     someday,
@@ -47,6 +49,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 
 	cmd.Flags().StringVarP(&projectName, "project", "p", "", "Filter by project name")
 	cmd.Flags().StringVarP(&areaName, "area", "a", "", "Filter by area name")
+	cmd.Flags().StringVar(&tagName, "tag", "", "Filter by tag")
 	cmd.Flags().BoolVar(&today, "today", false, "Show tasks planned for today or overdue")
 	cmd.Flags().BoolVar(&upcoming, "upcoming", false, "Show tasks with future dates")
 	cmd.Flags().BoolVar(&someday, "someday", false, "Show someday tasks")

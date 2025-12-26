@@ -20,6 +20,7 @@ func NewAddCmd(deps *Dependencies) *cobra.Command {
 	var someday bool
 	var recurStr string
 	var recurEndStr string
+	var tags []string
 
 	cmd := &cobra.Command{
 		Use:   "add [title]",
@@ -39,6 +40,7 @@ func NewAddCmd(deps *Dependencies) *cobra.Command {
 				ProjectName: projectName,
 				AreaName:    areaName,
 				Someday:     someday,
+				Tags:        tags,
 			}
 
 			if plannedStr != "" {
@@ -99,6 +101,7 @@ func NewAddCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().BoolVar(&someday, "someday", false, "Create task in someday state")
 	cmd.Flags().StringVarP(&recurStr, "recur", "r", "", "Recurrence pattern (e.g., daily, every monday, 3d after done)")
 	cmd.Flags().StringVar(&recurEndStr, "recur-end", "", "Recurrence end date")
+	cmd.Flags().StringArrayVarP(&tags, "tag", "t", nil, "Add tag (repeatable)")
 
 	return cmd
 }

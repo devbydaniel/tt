@@ -59,40 +59,53 @@ type ListFilter struct {
 	State     string // filter by state (active, someday)
 	Today     bool   // planned_date = today OR overdue
 	Upcoming  bool   // future planned/due dates
+	TagName   string // filter by tag
 }
 
 func (r *Repository) List(filter *ListFilter) ([]Task, error) {
-	query := `SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE status = ?`
-	args := []any{StatusTodo}
+	query := `SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id FROM tasks t`
+	args := []any{}
+
+	// Join with task_tags if filtering by tag
+	if filter != nil && filter.TagName != "" {
+		query += ` INNER JOIN task_tags tt ON t.id = tt.task_id`
+	}
+
+	query += ` WHERE t.status = ?`
+	args = append(args, StatusTodo)
 
 	if filter != nil {
+		if filter.TagName != "" {
+			query += ` AND tt.tag_name = ?`
+			args = append(args, filter.TagName)
+		}
 		if filter.ProjectID != nil {
-			query += ` AND project_id = ?`
+			query += ` AND t.project_id = ?`
 			args = append(args, *filter.ProjectID)
 		}
 		if filter.AreaID != nil {
-			query += ` AND area_id = ?`
+			query += ` AND t.area_id = ?`
 			args = append(args, *filter.AreaID)
 		}
 		if filter.State != "" {
-			query += ` AND state = ?`
+			query += ` AND t.state = ?`
 			args = append(args, filter.State)
 		}
 		if filter.Today {
 			// planned_date = today OR planned_date < today (overdue)
 			today := time.Now().Format("2006-01-02")
-			query += ` AND (date(planned_date) <= ? OR date(due_date) <= ?)`
+			query += ` AND (date(t.planned_date) <= ? OR date(t.due_date) <= ?)`
 			args = append(args, today, today)
 		}
 		if filter.Upcoming {
 			// future planned_date or due_date
 			today := time.Now().Format("2006-01-02")
-			query += ` AND (date(planned_date) > ? OR date(due_date) > ?)`
+			query += ` AND (date(t.planned_date) > ? OR date(t.due_date) > ?)`
 			args = append(args, today, today)
 		}
 	}
 
-	query += ` ORDER BY id`
+	query += ` ORDER BY t.id`
 
 	rows, err := r.db.Conn.Query(query, args...)
 	if err != nil {
@@ -100,7 +113,17 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 	}
 	defer rows.Close()
 
-	return scanTasks(rows)
+	tasks, err := scanTasks(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load tags for all tasks
+	if err := r.loadTagsForTasks(tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
 func (r *Repository) GetByID(id int64) (*Task, error) {
@@ -134,6 +157,13 @@ func (r *Repository) GetByID(id int64) (*Task, error) {
 		parsed, _ := time.Parse(dateFormat, *recurEnd)
 		t.RecurEnd = &parsed
 	}
+
+	// Load tags
+	tags, err := r.getTagsForTask(id)
+	if err != nil {
+		return nil, err
+	}
+	t.Tags = tags
 
 	return &t, nil
 }
@@ -201,7 +231,17 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 	}
 	defer rows.Close()
 
-	return scanTasks(rows)
+	tasks, err := scanTasks(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load tags for all tasks
+	if err := r.loadTagsForTasks(tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
 func (r *Repository) Update(task *Task) error {
@@ -270,4 +310,121 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 	}
 
 	return tasks, rows.Err()
+}
+
+// getTagsForTask returns all tag names for a single task
+func (r *Repository) getTagsForTask(taskID int64) ([]string, error) {
+	rows, err := r.db.Conn.Query(`SELECT tag_name FROM task_tags WHERE task_id = ? ORDER BY tag_name`, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return nil, err
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+// loadTagsForTasks loads tags for multiple tasks efficiently
+func (r *Repository) loadTagsForTasks(tasks []Task) error {
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	// Build task ID list and index map
+	ids := make([]any, len(tasks))
+	idxMap := make(map[int64]int)
+	for i := range tasks {
+		ids[i] = tasks[i].ID
+		idxMap[tasks[i].ID] = i
+	}
+
+	// Build placeholder string
+	placeholders := "?"
+	for i := 1; i < len(ids); i++ {
+		placeholders += ",?"
+	}
+
+	rows, err := r.db.Conn.Query(
+		`SELECT task_id, tag_name FROM task_tags WHERE task_id IN (`+placeholders+`) ORDER BY tag_name`,
+		ids...,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var taskID int64
+		var tagName string
+		if err := rows.Scan(&taskID, &tagName); err != nil {
+			return err
+		}
+		if idx, ok := idxMap[taskID]; ok {
+			tasks[idx].Tags = append(tasks[idx].Tags, tagName)
+		}
+	}
+	return rows.Err()
+}
+
+// AddTag adds a tag to a task
+func (r *Repository) AddTag(taskID int64, tagName string) error {
+	_, err := r.db.Conn.Exec(
+		`INSERT OR IGNORE INTO task_tags (task_id, tag_name) VALUES (?, ?)`,
+		taskID, tagName,
+	)
+	return err
+}
+
+// RemoveTag removes a tag from a task
+func (r *Repository) RemoveTag(taskID int64, tagName string) error {
+	_, err := r.db.Conn.Exec(
+		`DELETE FROM task_tags WHERE task_id = ? AND tag_name = ?`,
+		taskID, tagName,
+	)
+	return err
+}
+
+// ListTags returns all unique tags in use
+func (r *Repository) ListTags() ([]string, error) {
+	rows, err := r.db.Conn.Query(`SELECT DISTINCT tag_name FROM task_tags ORDER BY tag_name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return nil, err
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+// SetTags replaces all tags on a task
+func (r *Repository) SetTags(taskID int64, tags []string) error {
+	// Delete existing tags
+	if _, err := r.db.Conn.Exec(`DELETE FROM task_tags WHERE task_id = ?`, taskID); err != nil {
+		return err
+	}
+
+	// Insert new tags
+	for _, tag := range tags {
+		if _, err := r.db.Conn.Exec(
+			`INSERT INTO task_tags (task_id, tag_name) VALUES (?, ?)`,
+			taskID, tag,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -30,7 +30,8 @@ type CreateOptions struct {
 	AreaName    string
 	PlannedDate *time.Time
 	DueDate     *time.Time
-	Someday     bool // if true, create in someday state
+	Someday     bool     // if true, create in someday state
+	Tags        []string // tags to assign
 
 	// Recurrence options
 	RecurType     *string    // "fixed" or "relative"
@@ -85,12 +86,23 @@ func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
 		return nil, err
 	}
 
+	// Save tags if provided
+	if opts != nil && len(opts.Tags) > 0 {
+		for _, tag := range opts.Tags {
+			if err := s.repo.AddTag(task.ID, tag); err != nil {
+				return nil, err
+			}
+		}
+		task.Tags = opts.Tags
+	}
+
 	return task, nil
 }
 
 type ListOptions struct {
 	ProjectName string
 	AreaName    string
+	TagName     string // filter by tag
 	Today       bool   // show today + overdue
 	Upcoming    bool   // show future dates
 	Someday     bool   // show someday tasks
@@ -116,6 +128,9 @@ func (s *Service) List(opts *ListOptions) ([]Task, error) {
 				return nil, err
 			}
 			filter.AreaID = &a.ID
+		}
+		if opts.TagName != "" {
+			filter.TagName = opts.TagName
 		}
 
 		if opts.Someday {
@@ -238,6 +253,16 @@ func (s *Service) regenerateTask(task *Task, completedAt time.Time) *Task {
 		return nil
 	}
 
+	// Copy tags from original task
+	if len(task.Tags) > 0 {
+		for _, tag := range task.Tags {
+			if err := s.repo.AddTag(nextTask.ID, tag); err != nil {
+				return nil
+			}
+		}
+		nextTask.Tags = task.Tags
+	}
+
 	return nextTask
 }
 
@@ -348,6 +373,83 @@ func (s *Service) SetDueDate(id int64, date *time.Time) (*Task, error) {
 	return task, nil
 }
 
+// SetProject assigns or clears the project for a task.
+func (s *Service) SetProject(id int64, projectName string) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	if projectName == "" {
+		task.ProjectID = nil
+	} else {
+		p, err := s.projectService.GetByName(projectName)
+		if err != nil {
+			return nil, err
+		}
+		task.ProjectID = &p.ID
+		// Clear area when setting project (mutual exclusivity)
+		task.AreaID = nil
+	}
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+// SetArea assigns or clears the area for a task.
+func (s *Service) SetArea(id int64, areaName string) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	if areaName == "" {
+		task.AreaID = nil
+	} else {
+		a, err := s.areaService.GetByName(areaName)
+		if err != nil {
+			return nil, err
+		}
+		task.AreaID = &a.ID
+		// Clear project when setting area (mutual exclusivity)
+		task.ProjectID = nil
+	}
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+// SetTitle updates the title of a task.
+func (s *Service) SetTitle(id int64, title string) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.Title = title
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
 // SetRecurrence sets or clears the recurrence rule for a task.
 func (s *Service) SetRecurrence(id int64, recurType, recurRule *string, recurEnd *time.Time) (*Task, error) {
 	task, err := s.repo.GetByID(id)
@@ -441,4 +543,45 @@ func (s *Service) GetByID(id int64) (*Task, error) {
 		return nil, err
 	}
 	return task, nil
+}
+
+// AddTag adds a tag to a task.
+func (s *Service) AddTag(id int64, tagName string) (*Task, error) {
+	// Verify task exists
+	if _, err := s.repo.GetByID(id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	if err := s.repo.AddTag(id, tagName); err != nil {
+		return nil, err
+	}
+
+	// Reload to get updated tags
+	return s.repo.GetByID(id)
+}
+
+// RemoveTag removes a tag from a task.
+func (s *Service) RemoveTag(id int64, tagName string) (*Task, error) {
+	// Verify task exists
+	if _, err := s.repo.GetByID(id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	if err := s.repo.RemoveTag(id, tagName); err != nil {
+		return nil, err
+	}
+
+	// Reload to get updated tags
+	return s.repo.GetByID(id)
+}
+
+// ListTags returns all unique tags in use.
+func (s *Service) ListTags() ([]string, error) {
+	return s.repo.ListTags()
 }

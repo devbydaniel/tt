@@ -32,7 +32,8 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 	for _, t := range tasks {
 		dateStr := formatTaskDate(t.PlannedDate, t.DueDate)
 		recurIndicator := formatRecurIndicator(&t)
-		title := t.Title + recurIndicator
+		tagIndicator := formatTagIndicator(t.Tags)
+		title := t.Title + recurIndicator + tagIndicator
 
 		if dateStr != "" {
 			fmt.Fprintf(f.w, "%d  %-10s  %s\n", t.ID, dateStr, title)
@@ -50,6 +51,17 @@ func formatRecurIndicator(t *task.Task) string {
 		return " [paused]"
 	}
 	return " [recurs]"
+}
+
+func formatTagIndicator(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	result := ""
+	for _, tag := range tags {
+		result += " #" + tag
+	}
+	return result
 }
 
 func formatTaskDate(planned, due *time.Time) string {
@@ -242,4 +254,70 @@ func (f *Formatter) TaskRecurrenceInfo(t *task.Task) {
 	}
 
 	fmt.Fprintf(f.w, "#%d: %s\n  Recurs: %s%s%s\n", t.ID, t.Title, ruleStr, endStr, status)
+}
+
+func (f *Formatter) TagList(tags []string) {
+	if len(tags) == 0 {
+		fmt.Fprintln(f.w, "No tags")
+		return
+	}
+
+	for _, tag := range tags {
+		fmt.Fprintln(f.w, tag)
+	}
+}
+
+func (f *Formatter) TaskTagAdded(t *task.Task, tagName string) {
+	fmt.Fprintf(f.w, "Added tag '%s' to #%d: %s\n", tagName, t.ID, t.Title)
+}
+
+func (f *Formatter) TaskTagRemoved(t *task.Task, tagName string) {
+	fmt.Fprintf(f.w, "Removed tag '%s' from #%d: %s\n", tagName, t.ID, t.Title)
+}
+
+func (f *Formatter) TaskEdited(id int64, changes []string) {
+	fmt.Fprintf(f.w, "Updated #%d: %s\n", id, joinChanges(changes))
+}
+
+func joinChanges(changes []string) string {
+	if len(changes) == 0 {
+		return "no changes"
+	}
+	if len(changes) == 1 {
+		return changes[0]
+	}
+	if len(changes) == 2 {
+		return changes[0] + " and " + changes[1]
+	}
+	return fmt.Sprintf("%s, and %s",
+		fmt.Sprintf("%s", changes[0:len(changes)-1])[1:len(fmt.Sprintf("%s", changes[0:len(changes)-1]))-1],
+		changes[len(changes)-1])
+}
+
+func (f *Formatter) TaskDetails(t *task.Task) {
+	fmt.Fprintf(f.w, "#%d: %s\n", t.ID, t.Title)
+
+	if t.PlannedDate != nil {
+		fmt.Fprintf(f.w, "  Planned: %s\n", t.PlannedDate.Format("Jan 2, 2006"))
+	}
+	if t.DueDate != nil {
+		fmt.Fprintf(f.w, "  Due: %s\n", t.DueDate.Format("Jan 2, 2006"))
+	}
+	if t.State == task.StateSomeday {
+		fmt.Fprintln(f.w, "  State: someday")
+	}
+	if len(t.Tags) > 0 {
+		fmt.Fprintf(f.w, "  Tags: %s\n", formatTagList(t.Tags))
+	}
+}
+
+func formatTagList(tags []string) string {
+	result := ""
+	for i, tag := range tags {
+		if i > 0 {
+			result += ", "
+		}
+		result += "#" + tag
+	}
+	return result
 }
