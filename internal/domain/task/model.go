@@ -7,6 +7,7 @@ type Task struct {
 	UUID        string
 	Title       string
 	ProjectID   *int64
+	AreaID      *int64
 	Status      string
 	CreatedAt   time.Time
 	CompletedAt *time.Time

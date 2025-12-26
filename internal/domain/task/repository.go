@@ -20,8 +20,8 @@ func NewRepository(db *database.DB) *Repository {
 
 func (r *Repository) Create(task *Task) error {
 	result, err := r.db.Conn.Exec(
-		`INSERT INTO tasks (uuid, title, project_id, status, created_at) VALUES (?, ?, ?, ?, ?)`,
-		task.UUID, task.Title, task.ProjectID, task.Status, task.CreatedAt.Format(time.RFC3339),
+		`INSERT INTO tasks (uuid, title, project_id, area_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		task.UUID, task.Title, task.ProjectID, task.AreaID, task.Status, task.CreatedAt.Format(time.RFC3339),
 	)
 	if err != nil {
 		return err
@@ -36,11 +36,29 @@ func (r *Repository) Create(task *Task) error {
 	return nil
 }
 
-func (r *Repository) List() ([]Task, error) {
-	rows, err := r.db.Conn.Query(
-		`SELECT id, uuid, title, project_id, status, created_at, completed_at FROM tasks WHERE status = ? ORDER BY id`,
-		StatusTodo,
-	)
+type ListFilter struct {
+	ProjectID *int64
+	AreaID    *int64
+}
+
+func (r *Repository) List(filter *ListFilter) ([]Task, error) {
+	query := `SELECT id, uuid, title, project_id, area_id, status, created_at, completed_at FROM tasks WHERE status = ?`
+	args := []any{StatusTodo}
+
+	if filter != nil {
+		if filter.ProjectID != nil {
+			query += ` AND project_id = ?`
+			args = append(args, *filter.ProjectID)
+		}
+		if filter.AreaID != nil {
+			query += ` AND area_id = ?`
+			args = append(args, *filter.AreaID)
+		}
+	}
+
+	query += ` ORDER BY id`
+
+	rows, err := r.db.Conn.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,14 +69,14 @@ func (r *Repository) List() ([]Task, error) {
 
 func (r *Repository) GetByID(id int64) (*Task, error) {
 	row := r.db.Conn.QueryRow(
-		`SELECT id, uuid, title, project_id, status, created_at, completed_at FROM tasks WHERE id = ?`,
+		`SELECT id, uuid, title, project_id, area_id, status, created_at, completed_at FROM tasks WHERE id = ?`,
 		id,
 	)
 
 	var t Task
 	var createdAt string
 	var completedAt *string
-	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.Status, &createdAt, &completedAt); err != nil {
+	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &t.Status, &createdAt, &completedAt); err != nil {
 		return nil, err
 	}
 	t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
@@ -96,7 +114,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 
 	if since != nil {
 		rows, err = r.db.Conn.Query(
-			`SELECT id, uuid, title, project_id, status, created_at, completed_at
+			`SELECT id, uuid, title, project_id, area_id, status, created_at, completed_at
 			 FROM tasks
 			 WHERE status = ? AND completed_at >= ?
 			 ORDER BY completed_at DESC`,
@@ -104,7 +122,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 		)
 	} else {
 		rows, err = r.db.Conn.Query(
-			`SELECT id, uuid, title, project_id, status, created_at, completed_at
+			`SELECT id, uuid, title, project_id, area_id, status, created_at, completed_at
 			 FROM tasks
 			 WHERE status = ?
 			 ORDER BY completed_at DESC`,
@@ -125,7 +143,7 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 		var t Task
 		var createdAt string
 		var completedAt *string
-		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.Status, &createdAt, &completedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &t.Status, &createdAt, &completedAt); err != nil {
 			return nil, err
 		}
 		t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)

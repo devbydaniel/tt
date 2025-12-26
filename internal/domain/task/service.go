@@ -3,23 +3,53 @@ package task
 import (
 	"time"
 
+	"github.com/devbydaniel/t/internal/domain/area"
+	"github.com/devbydaniel/t/internal/domain/project"
 	"github.com/google/uuid"
 )
 
 type Service struct {
-	repo *Repository
+	repo           *Repository
+	projectService *project.Service
+	areaService    *area.Service
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, projectService *project.Service, areaService *area.Service) *Service {
+	return &Service{
+		repo:           repo,
+		projectService: projectService,
+		areaService:    areaService,
+	}
 }
 
-func (s *Service) Create(title string) (*Task, error) {
+type CreateOptions struct {
+	ProjectName string
+	AreaName    string
+}
+
+func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
 	task := &Task{
 		UUID:      uuid.New().String(),
 		Title:     title,
 		Status:    StatusTodo,
 		CreatedAt: time.Now(),
+	}
+
+	if opts != nil {
+		if opts.ProjectName != "" {
+			p, err := s.projectService.GetByName(opts.ProjectName)
+			if err != nil {
+				return nil, err
+			}
+			task.ProjectID = &p.ID
+		}
+		if opts.AreaName != "" {
+			a, err := s.areaService.GetByName(opts.AreaName)
+			if err != nil {
+				return nil, err
+			}
+			task.AreaID = &a.ID
+		}
 	}
 
 	if err := s.repo.Create(task); err != nil {
@@ -29,8 +59,34 @@ func (s *Service) Create(title string) (*Task, error) {
 	return task, nil
 }
 
-func (s *Service) List() ([]Task, error) {
-	return s.repo.List()
+type ListOptions struct {
+	ProjectName string
+	AreaName    string
+}
+
+func (s *Service) List(opts *ListOptions) ([]Task, error) {
+	var filter *ListFilter
+
+	if opts != nil && (opts.ProjectName != "" || opts.AreaName != "") {
+		filter = &ListFilter{}
+
+		if opts.ProjectName != "" {
+			p, err := s.projectService.GetByName(opts.ProjectName)
+			if err != nil {
+				return nil, err
+			}
+			filter.ProjectID = &p.ID
+		}
+		if opts.AreaName != "" {
+			a, err := s.areaService.GetByName(opts.AreaName)
+			if err != nil {
+				return nil, err
+			}
+			filter.AreaID = &a.ID
+		}
+	}
+
+	return s.repo.List(filter)
 }
 
 func (s *Service) Complete(ids []int64) ([]Task, error) {

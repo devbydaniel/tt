@@ -36,7 +36,7 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 }
 
 func runList(deps *Dependencies) error {
-	tasks, err := deps.TaskService.List()
+	tasks, err := deps.TaskService.List(nil)
 	if err != nil {
 		return err
 	}
