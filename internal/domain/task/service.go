@@ -7,6 +7,7 @@ import (
 
 	"github.com/devbydaniel/t/internal/domain/area"
 	"github.com/devbydaniel/t/internal/domain/project"
+	"github.com/devbydaniel/t/internal/recurparse"
 	"github.com/google/uuid"
 )
 
@@ -30,6 +31,12 @@ type CreateOptions struct {
 	PlannedDate *time.Time
 	DueDate     *time.Time
 	Someday     bool // if true, create in someday state
+
+	// Recurrence options
+	RecurType     *string    // "fixed" or "relative"
+	RecurRule     *string    // JSON rule
+	RecurEnd      *time.Time // optional end date
+	RecurParentID *int64     // for linking regenerated tasks
 }
 
 func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
@@ -58,6 +65,12 @@ func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
 		}
 		task.PlannedDate = opts.PlannedDate
 		task.DueDate = opts.DueDate
+
+		// Recurrence fields
+		task.RecurType = opts.RecurType
+		task.RecurRule = opts.RecurRule
+		task.RecurEnd = opts.RecurEnd
+		task.RecurParentID = opts.RecurParentID
 
 		if opts.Someday {
 			// If someday is requested but dates are provided, stay active
@@ -118,22 +131,114 @@ func (s *Service) List(opts *ListOptions) ([]Task, error) {
 	return s.repo.List(filter)
 }
 
-func (s *Service) Complete(ids []int64) ([]Task, error) {
+// CompleteResult represents the result of completing a task.
+type CompleteResult struct {
+	Completed Task
+	NextTask  *Task // non-nil if a recurring task was regenerated
+}
+
+func (s *Service) Complete(ids []int64) ([]CompleteResult, error) {
 	completedAt := time.Now()
-	var completed []Task
+	var results []CompleteResult
 
 	for _, id := range ids {
 		if err := s.repo.Complete(id, completedAt); err != nil {
-			return completed, err
+			return results, err
 		}
 		task, err := s.repo.GetByID(id)
 		if err != nil {
-			return completed, err
+			return results, err
 		}
-		completed = append(completed, *task)
+
+		result := CompleteResult{Completed: *task}
+
+		// Check if task should regenerate
+		if task.RecurType != nil && task.RecurRule != nil && !task.RecurPaused {
+			nextTask := s.regenerateTask(task, completedAt)
+			if nextTask != nil {
+				result.NextTask = nextTask
+			}
+		}
+
+		results = append(results, result)
 	}
 
-	return completed, nil
+	return results, nil
+}
+
+// regenerateTask creates the next occurrence of a recurring task.
+func (s *Service) regenerateTask(task *Task, completedAt time.Time) *Task {
+	// Check if past end date
+	if task.RecurEnd != nil && time.Now().After(*task.RecurEnd) {
+		return nil
+	}
+
+	// Parse the recurrence rule
+	rule, err := recurparse.FromJSON(*task.RecurRule)
+	if err != nil {
+		return nil
+	}
+
+	// Calculate next occurrence
+	recurrenceType := recurparse.TypeFixed
+	if *task.RecurType == RecurTypeRelative {
+		recurrenceType = recurparse.TypeRelative
+	}
+
+	var fromDate time.Time
+	if recurrenceType == recurparse.TypeRelative {
+		fromDate = completedAt
+	} else {
+		fromDate = time.Now()
+	}
+	nextDate := recurparse.NextOccurrence(rule, recurrenceType, fromDate)
+
+	// Determine which date field to set based on original task
+	var plannedDate, dueDate *time.Time
+	if task.DueDate != nil {
+		dueDate = &nextDate
+	} else {
+		plannedDate = &nextDate
+	}
+
+	// Determine the parent ID for linking
+	parentID := task.RecurParentID
+	if parentID == nil {
+		parentID = &task.ID
+	}
+
+	// Create the next task
+	opts := &CreateOptions{
+		PlannedDate:   plannedDate,
+		DueDate:       dueDate,
+		RecurType:     task.RecurType,
+		RecurRule:     task.RecurRule,
+		RecurEnd:      task.RecurEnd,
+		RecurParentID: parentID,
+	}
+
+	// Copy project/area by ID directly
+	nextTask := &Task{
+		UUID:          uuid.New().String(),
+		Title:         task.Title,
+		ProjectID:     task.ProjectID,
+		AreaID:        task.AreaID,
+		PlannedDate:   plannedDate,
+		DueDate:       dueDate,
+		State:         StateActive,
+		Status:        StatusTodo,
+		CreatedAt:     time.Now(),
+		RecurType:     opts.RecurType,
+		RecurRule:     opts.RecurRule,
+		RecurEnd:      opts.RecurEnd,
+		RecurParentID: opts.RecurParentID,
+	}
+
+	if err := s.repo.Create(nextTask); err != nil {
+		return nil
+	}
+
+	return nextTask
 }
 
 func (s *Service) Delete(ids []int64) ([]Task, error) {
@@ -240,5 +345,100 @@ func (s *Service) SetDueDate(id int64, date *time.Time) (*Task, error) {
 		return nil, err
 	}
 
+	return task, nil
+}
+
+// SetRecurrence sets or clears the recurrence rule for a task.
+func (s *Service) SetRecurrence(id int64, recurType, recurRule *string, recurEnd *time.Time) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.RecurType = recurType
+	task.RecurRule = recurRule
+	task.RecurEnd = recurEnd
+
+	// If setting recurrence, unpause
+	if recurType != nil {
+		task.RecurPaused = false
+	}
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+// PauseRecurrence pauses recurrence without clearing the rule.
+func (s *Service) PauseRecurrence(id int64) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.RecurPaused = true
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+// ResumeRecurrence resumes a paused recurrence.
+func (s *Service) ResumeRecurrence(id int64) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.RecurPaused = false
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+// SetRecurrenceEnd sets or clears the end date for recurrence.
+func (s *Service) SetRecurrenceEnd(id int64, endDate *time.Time) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.RecurEnd = endDate
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+// GetByID returns a task by its ID.
+func (s *Service) GetByID(id int64) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
 	return task, nil
 }

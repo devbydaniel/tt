@@ -67,10 +67,10 @@ func TestTaskComplete(t *testing.T) {
 	if len(completed) != 1 {
 		t.Fatalf("got %d completed tasks, want 1", len(completed))
 	}
-	if completed[0].Status != task.StatusDone {
-		t.Errorf("Status = %q, want %q", completed[0].Status, task.StatusDone)
+	if completed[0].Completed.Status != task.StatusDone {
+		t.Errorf("Status = %q, want %q", completed[0].Completed.Status, task.StatusDone)
 	}
-	if completed[0].CompletedAt == nil {
+	if completed[0].Completed.CompletedAt == nil {
 		t.Error("CompletedAt should be set")
 	}
 
@@ -418,5 +418,134 @@ func TestProjectWithNonexistentArea(t *testing.T) {
 	_, err := projectSvc.Create("Project", "Nonexistent")
 	if err == nil {
 		t.Error("Create() should error for nonexistent area")
+	}
+}
+
+func TestRecurringTaskRegeneration(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	// Create a recurring task
+	recurType := task.RecurTypeFixed
+	recurRule := `{"interval":1,"unit":"day"}`
+	created, err := taskSvc.Create("Daily standup", &task.CreateOptions{
+		RecurType: &recurType,
+		RecurRule: &recurRule,
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	if created.RecurType == nil || *created.RecurType != task.RecurTypeFixed {
+		t.Error("RecurType should be set to fixed")
+	}
+
+	// Complete the recurring task
+	results, err := taskSvc.Complete([]int64{created.ID})
+	if err != nil {
+		t.Fatalf("Complete() error = %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+
+	// Check that a new task was generated
+	if results[0].NextTask == nil {
+		t.Fatal("NextTask should be set for recurring task")
+	}
+
+	nextTask := results[0].NextTask
+	if nextTask.Title != created.Title {
+		t.Errorf("NextTask.Title = %q, want %q", nextTask.Title, created.Title)
+	}
+	if nextTask.RecurType == nil || *nextTask.RecurType != recurType {
+		t.Error("NextTask should inherit recurrence type")
+	}
+	if nextTask.Status != task.StatusTodo {
+		t.Errorf("NextTask.Status = %q, want %q", nextTask.Status, task.StatusTodo)
+	}
+}
+
+func TestNonRecurringTaskNoRegeneration(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	created, _ := taskSvc.Create("One-time task", nil)
+
+	results, err := taskSvc.Complete([]int64{created.ID})
+	if err != nil {
+		t.Fatalf("Complete() error = %v", err)
+	}
+
+	if results[0].NextTask != nil {
+		t.Error("NextTask should be nil for non-recurring task")
+	}
+}
+
+func TestPausedRecurrenceNoRegeneration(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	recurType := task.RecurTypeFixed
+	recurRule := `{"interval":1,"unit":"day"}`
+	created, _ := taskSvc.Create("Paused task", &task.CreateOptions{
+		RecurType: &recurType,
+		RecurRule: &recurRule,
+	})
+
+	// Pause the recurrence
+	taskSvc.PauseRecurrence(created.ID)
+
+	// Complete the task
+	results, err := taskSvc.Complete([]int64{created.ID})
+	if err != nil {
+		t.Fatalf("Complete() error = %v", err)
+	}
+
+	if results[0].NextTask != nil {
+		t.Error("NextTask should be nil for paused recurring task")
+	}
+}
+
+func TestSetRecurrence(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	created, _ := taskSvc.Create("Task to recur", nil)
+
+	recurType := task.RecurTypeRelative
+	recurRule := `{"interval":3,"unit":"day"}`
+
+	updated, err := taskSvc.SetRecurrence(created.ID, &recurType, &recurRule, nil)
+	if err != nil {
+		t.Fatalf("SetRecurrence() error = %v", err)
+	}
+
+	if updated.RecurType == nil || *updated.RecurType != recurType {
+		t.Errorf("RecurType = %v, want %v", updated.RecurType, recurType)
+	}
+	if updated.RecurRule == nil || *updated.RecurRule != recurRule {
+		t.Errorf("RecurRule = %v, want %v", updated.RecurRule, recurRule)
+	}
+}
+
+func TestClearRecurrence(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	recurType := task.RecurTypeFixed
+	recurRule := `{"interval":1,"unit":"week"}`
+	created, _ := taskSvc.Create("Recurring task", &task.CreateOptions{
+		RecurType: &recurType,
+		RecurRule: &recurRule,
+	})
+
+	// Clear recurrence
+	updated, err := taskSvc.SetRecurrence(created.ID, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("SetRecurrence() error = %v", err)
+	}
+
+	if updated.RecurType != nil {
+		t.Error("RecurType should be nil after clearing")
+	}
+	if updated.RecurRule != nil {
+		t.Error("RecurRule should be nil after clearing")
 	}
 }

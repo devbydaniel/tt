@@ -21,7 +21,7 @@ func NewRepository(db *database.DB) *Repository {
 const dateFormat = "2006-01-02"
 
 func (r *Repository) Create(task *Task) error {
-	var plannedDate, dueDate *string
+	var plannedDate, dueDate, recurEnd *string
 	if task.PlannedDate != nil {
 		s := task.PlannedDate.Format(dateFormat)
 		plannedDate = &s
@@ -30,10 +30,15 @@ func (r *Repository) Create(task *Task) error {
 		s := task.DueDate.Format(dateFormat)
 		dueDate = &s
 	}
+	if task.RecurEnd != nil {
+		s := task.RecurEnd.Format(dateFormat)
+		recurEnd = &s
+	}
 
 	result, err := r.db.Conn.Exec(
-		`INSERT INTO tasks (uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO tasks (uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		task.UUID, task.Title, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.Status, task.CreatedAt.Format(time.RFC3339),
+		task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.RecurParentID,
 	)
 	if err != nil {
 		return err
@@ -57,7 +62,7 @@ type ListFilter struct {
 }
 
 func (r *Repository) List(filter *ListFilter) ([]Task, error) {
-	query := `SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at FROM tasks WHERE status = ?`
+	query := `SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE status = ?`
 	args := []any{StatusTodo}
 
 	if filter != nil {
@@ -100,7 +105,7 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 
 func (r *Repository) GetByID(id int64) (*Task, error) {
 	row := r.db.Conn.QueryRow(
-		`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at FROM tasks WHERE id = ?`,
+		`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE id = ?`,
 		id,
 	)
 
@@ -108,7 +113,8 @@ func (r *Repository) GetByID(id int64) (*Task, error) {
 	var plannedDate, dueDate *string
 	var createdAt string
 	var completedAt *string
-	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt); err != nil {
+	var recurEnd *string
+	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
 		return nil, err
 	}
 	if plannedDate != nil {
@@ -123,6 +129,10 @@ func (r *Repository) GetByID(id int64) (*Task, error) {
 	if completedAt != nil {
 		parsed, _ := time.Parse(time.RFC3339, *completedAt)
 		t.CompletedAt = &parsed
+	}
+	if recurEnd != nil {
+		parsed, _ := time.Parse(dateFormat, *recurEnd)
+		t.RecurEnd = &parsed
 	}
 
 	return &t, nil
@@ -171,7 +181,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 
 	if since != nil {
 		rows, err = r.db.Conn.Query(
-			`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at
+			`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id
 			 FROM tasks
 			 WHERE status = ? AND completed_at >= ?
 			 ORDER BY completed_at DESC`,
@@ -179,7 +189,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 		)
 	} else {
 		rows, err = r.db.Conn.Query(
-			`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at
+			`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id
 			 FROM tasks
 			 WHERE status = ?
 			 ORDER BY completed_at DESC`,
@@ -195,7 +205,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 }
 
 func (r *Repository) Update(task *Task) error {
-	var plannedDate, dueDate *string
+	var plannedDate, dueDate, recurEnd *string
 	if task.PlannedDate != nil {
 		s := task.PlannedDate.Format(dateFormat)
 		plannedDate = &s
@@ -204,10 +214,14 @@ func (r *Repository) Update(task *Task) error {
 		s := task.DueDate.Format(dateFormat)
 		dueDate = &s
 	}
+	if task.RecurEnd != nil {
+		s := task.RecurEnd.Format(dateFormat)
+		recurEnd = &s
+	}
 
 	result, err := r.db.Conn.Exec(
-		`UPDATE tasks SET title = ?, project_id = ?, area_id = ?, planned_date = ?, due_date = ?, state = ? WHERE id = ?`,
-		task.Title, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.ID,
+		`UPDATE tasks SET title = ?, project_id = ?, area_id = ?, planned_date = ?, due_date = ?, state = ?, recur_type = ?, recur_rule = ?, recur_end = ?, recur_paused = ? WHERE id = ?`,
+		task.Title, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.ID,
 	)
 	if err != nil {
 		return err
@@ -231,7 +245,8 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 		var plannedDate, dueDate *string
 		var createdAt string
 		var completedAt *string
-		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt); err != nil {
+		var recurEnd *string
+		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
 			return nil, err
 		}
 		if plannedDate != nil {
@@ -246,6 +261,10 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 		if completedAt != nil {
 			parsed, _ := time.Parse(time.RFC3339, *completedAt)
 			t.CompletedAt = &parsed
+		}
+		if recurEnd != nil {
+			parsed, _ := time.Parse(dateFormat, *recurEnd)
+			t.RecurEnd = &parsed
 		}
 		tasks = append(tasks, t)
 	}

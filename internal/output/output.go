@@ -8,6 +8,7 @@ import (
 	"github.com/devbydaniel/t/internal/domain/area"
 	"github.com/devbydaniel/t/internal/domain/project"
 	"github.com/devbydaniel/t/internal/domain/task"
+	"github.com/devbydaniel/t/internal/recurparse"
 )
 
 type Formatter struct {
@@ -30,12 +31,25 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 
 	for _, t := range tasks {
 		dateStr := formatTaskDate(t.PlannedDate, t.DueDate)
+		recurIndicator := formatRecurIndicator(&t)
+		title := t.Title + recurIndicator
+
 		if dateStr != "" {
-			fmt.Fprintf(f.w, "%d  %-10s  %s\n", t.ID, dateStr, t.Title)
+			fmt.Fprintf(f.w, "%d  %-10s  %s\n", t.ID, dateStr, title)
 		} else {
-			fmt.Fprintf(f.w, "%d  %s\n", t.ID, t.Title)
+			fmt.Fprintf(f.w, "%d  %s\n", t.ID, title)
 		}
 	}
+}
+
+func formatRecurIndicator(t *task.Task) string {
+	if t.RecurType == nil {
+		return ""
+	}
+	if t.RecurPaused {
+		return " [paused]"
+	}
+	return " [recurs]"
 }
 
 func formatTaskDate(planned, due *time.Time) string {
@@ -84,9 +98,20 @@ func formatTaskDate(planned, due *time.Time) string {
 	return d.Format("Jan 2")
 }
 
-func (f *Formatter) TasksCompleted(tasks []task.Task) {
-	for _, t := range tasks {
-		fmt.Fprintf(f.w, "Completed #%d: %s\n", t.ID, t.Title)
+func (f *Formatter) TasksCompleted(results []task.CompleteResult) {
+	for _, r := range results {
+		fmt.Fprintf(f.w, "Completed #%d: %s\n", r.Completed.ID, r.Completed.Title)
+		if r.NextTask != nil {
+			nextDate := r.NextTask.PlannedDate
+			if nextDate == nil {
+				nextDate = r.NextTask.DueDate
+			}
+			if nextDate != nil {
+				fmt.Fprintf(f.w, "  Next: #%d on %s\n", r.NextTask.ID, nextDate.Format("Jan 2"))
+			} else {
+				fmt.Fprintf(f.w, "  Next: #%d\n", r.NextTask.ID)
+			}
+		}
 	}
 }
 
@@ -163,4 +188,58 @@ func (f *Formatter) TaskDueDateSet(t *task.Task) {
 	} else {
 		fmt.Fprintf(f.w, "Cleared due date for #%d: %s\n", t.ID, t.Title)
 	}
+}
+
+func (f *Formatter) TaskRecurrenceSet(t *task.Task) {
+	if t.RecurRule != nil {
+		rule, err := recurparse.FromJSON(*t.RecurRule)
+		if err != nil {
+			fmt.Fprintf(f.w, "Set recurrence for #%d: %s\n", t.ID, t.Title)
+			return
+		}
+		fmt.Fprintf(f.w, "Set recurrence for #%d (%s): %s\n", t.ID, rule.Format(), t.Title)
+	} else {
+		fmt.Fprintf(f.w, "Cleared recurrence for #%d: %s\n", t.ID, t.Title)
+	}
+}
+
+func (f *Formatter) TaskRecurrencePaused(t *task.Task) {
+	fmt.Fprintf(f.w, "Paused recurrence for #%d: %s\n", t.ID, t.Title)
+}
+
+func (f *Formatter) TaskRecurrenceResumed(t *task.Task) {
+	fmt.Fprintf(f.w, "Resumed recurrence for #%d: %s\n", t.ID, t.Title)
+}
+
+func (f *Formatter) TaskRecurrenceEndSet(t *task.Task) {
+	if t.RecurEnd != nil {
+		fmt.Fprintf(f.w, "Set recurrence end date for #%d to %s: %s\n", t.ID, t.RecurEnd.Format("Jan 2"), t.Title)
+	} else {
+		fmt.Fprintf(f.w, "Cleared recurrence end date for #%d: %s\n", t.ID, t.Title)
+	}
+}
+
+func (f *Formatter) TaskRecurrenceInfo(t *task.Task) {
+	if t.RecurRule == nil {
+		fmt.Fprintf(f.w, "#%d: %s (no recurrence)\n", t.ID, t.Title)
+		return
+	}
+
+	rule, err := recurparse.FromJSON(*t.RecurRule)
+	ruleStr := "unknown"
+	if err == nil {
+		ruleStr = rule.Format()
+	}
+
+	status := ""
+	if t.RecurPaused {
+		status = " (paused)"
+	}
+
+	endStr := ""
+	if t.RecurEnd != nil {
+		endStr = fmt.Sprintf(" until %s", t.RecurEnd.Format("Jan 2, 2006"))
+	}
+
+	fmt.Fprintf(f.w, "#%d: %s\n  Recurs: %s%s%s\n", t.ID, t.Title, ruleStr, endStr, status)
 }
