@@ -29,3 +29,8 @@ Layered: `cmd/` → `internal/cli/` → `internal/domain/*/` → `internal/datab
 
 - Use `internal/output/Formatter` for all user-facing output
 - Add new methods to formatter, don't print directly in commands
+
+## Testing
+
+- Test functionality, not coverage. Focus on business logic and edge cases.
+- Use `internal/testutil.NewTestDB(t)` for in-memory SQLite with migrations
