@@ -8,6 +8,9 @@ type Task struct {
 	Title       string
 	ProjectID   *int64
 	AreaID      *int64
+	PlannedDate *time.Time
+	DueDate     *time.Time
+	State       string
 	Status      string
 	CreatedAt   time.Time
 	CompletedAt *time.Time
@@ -16,4 +19,7 @@ type Task struct {
 const (
 	StatusTodo = "todo"
 	StatusDone = "done"
+
+	StateActive  = "active"
+	StateSomeday = "someday"
 )

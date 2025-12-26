@@ -27,12 +27,16 @@ func NewService(repo *Repository, projectService *project.Service, areaService *
 type CreateOptions struct {
 	ProjectName string
 	AreaName    string
+	PlannedDate *time.Time
+	DueDate     *time.Time
+	Someday     bool // if true, create in someday state
 }
 
 func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
 	task := &Task{
 		UUID:      uuid.New().String(),
 		Title:     title,
+		State:     StateActive,
 		Status:    StatusTodo,
 		CreatedAt: time.Now(),
 	}
@@ -52,6 +56,16 @@ func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
 			}
 			task.AreaID = &a.ID
 		}
+		task.PlannedDate = opts.PlannedDate
+		task.DueDate = opts.DueDate
+
+		if opts.Someday {
+			// If someday is requested but dates are provided, stay active
+			// (adding dates to someday → active)
+			if opts.PlannedDate == nil && opts.DueDate == nil {
+				task.State = StateSomeday
+			}
+		}
 	}
 
 	if err := s.repo.Create(task); err != nil {
@@ -64,14 +78,18 @@ func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
 type ListOptions struct {
 	ProjectName string
 	AreaName    string
+	Today       bool   // show today + overdue
+	Upcoming    bool   // show future dates
+	Someday     bool   // show someday tasks
+	All         bool   // show all active (no date filter)
 }
 
 func (s *Service) List(opts *ListOptions) ([]Task, error) {
-	var filter *ListFilter
+	filter := &ListFilter{
+		State: StateActive, // default to active tasks
+	}
 
-	if opts != nil && (opts.ProjectName != "" || opts.AreaName != "") {
-		filter = &ListFilter{}
-
+	if opts != nil {
 		if opts.ProjectName != "" {
 			p, err := s.projectService.GetByName(opts.ProjectName)
 			if err != nil {
@@ -86,6 +104,15 @@ func (s *Service) List(opts *ListOptions) ([]Task, error) {
 			}
 			filter.AreaID = &a.ID
 		}
+
+		if opts.Someday {
+			filter.State = StateSomeday
+		} else if opts.Today {
+			filter.Today = true
+		} else if opts.Upcoming {
+			filter.Upcoming = true
+		}
+		// opts.All means no date filter, just state = active (default)
 	}
 
 	return s.repo.List(filter)
@@ -131,4 +158,41 @@ func (s *Service) Delete(ids []int64) ([]Task, error) {
 
 func (s *Service) ListCompleted(since *time.Time) ([]Task, error) {
 	return s.repo.ListCompleted(since)
+}
+
+func (s *Service) Defer(id int64) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.State = StateSomeday
+	task.PlannedDate = nil // clear planned date when deferring
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+func (s *Service) Activate(id int64) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.State = StateActive
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
 }

@@ -1,0 +1,3 @@
+ALTER TABLE tasks ADD COLUMN planned_date TEXT;
+ALTER TABLE tasks ADD COLUMN due_date TEXT;
+ALTER TABLE tasks ADD COLUMN state TEXT NOT NULL DEFAULT 'active';

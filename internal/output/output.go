@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/devbydaniel/t/internal/domain/area"
 	"github.com/devbydaniel/t/internal/domain/project"
@@ -28,8 +29,59 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 	}
 
 	for _, t := range tasks {
-		fmt.Fprintf(f.w, "%d  %s\n", t.ID, t.Title)
+		dateStr := formatTaskDate(t.PlannedDate, t.DueDate)
+		if dateStr != "" {
+			fmt.Fprintf(f.w, "%d  %-10s  %s\n", t.ID, dateStr, t.Title)
+		} else {
+			fmt.Fprintf(f.w, "%d  %s\n", t.ID, t.Title)
+		}
 	}
+}
+
+func formatTaskDate(planned, due *time.Time) string {
+	now := time.Now()
+	todayYear, todayMonth, todayDay := now.Date()
+
+	// Prefer planned date, fall back to due date
+	var d *time.Time
+	if planned != nil {
+		d = planned
+	} else if due != nil {
+		d = due
+	}
+
+	if d == nil {
+		return ""
+	}
+
+	dateYear, dateMonth, dateDay := d.Date()
+
+	// Compare dates without time component
+	if dateYear == todayYear && dateMonth == todayMonth && dateDay == todayDay {
+		return "today"
+	}
+
+	tomorrow := now.AddDate(0, 0, 1)
+	tomorrowYear, tomorrowMonth, tomorrowDay := tomorrow.Date()
+	if dateYear == tomorrowYear && dateMonth == tomorrowMonth && dateDay == tomorrowDay {
+		return "tomorrow"
+	}
+
+	// Check if overdue (before today)
+	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.UTC)
+	dateOnly := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.UTC)
+	if dateOnly.Before(today) {
+		return "overdue"
+	}
+
+	// Within 7 days, show weekday
+	weekFromNow := today.AddDate(0, 0, 7)
+	if dateOnly.Before(weekFromNow) {
+		return d.Format("Mon")
+	}
+
+	// Show date
+	return d.Format("Jan 2")
 }
 
 func (f *Formatter) TasksCompleted(tasks []task.Task) {
