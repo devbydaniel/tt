@@ -32,6 +32,8 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd.AddCommand(NewLogCmd(deps))
 	rootCmd.AddCommand(NewAreaCmd(deps))
 	rootCmd.AddCommand(NewProjectCmd(deps))
+	rootCmd.AddCommand(NewPlanCmd(deps))
+	rootCmd.AddCommand(NewDueCmd(deps))
 
 	return rootCmd
 }

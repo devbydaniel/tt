@@ -196,3 +196,49 @@ func (s *Service) Activate(id int64) (*Task, error) {
 
 	return task, nil
 }
+
+func (s *Service) SetPlannedDate(id int64, date *time.Time) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.PlannedDate = date
+
+	// Setting a planned date activates a someday task
+	if date != nil && task.State == StateSomeday {
+		task.State = StateActive
+	}
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+func (s *Service) SetDueDate(id int64, date *time.Time) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.DueDate = date
+
+	// Setting a due date activates a someday task
+	if date != nil && task.State == StateSomeday {
+		task.State = StateActive
+	}
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}

@@ -148,3 +148,19 @@ func (f *Formatter) ProjectList(projects []project.Project) {
 func (f *Formatter) ProjectDeleted(p *project.Project) {
 	fmt.Fprintf(f.w, "Deleted project: %s\n", p.Name)
 }
+
+func (f *Formatter) TaskPlannedDateSet(t *task.Task) {
+	if t.PlannedDate != nil {
+		fmt.Fprintf(f.w, "Planned #%d for %s: %s\n", t.ID, t.PlannedDate.Format("Jan 2"), t.Title)
+	} else {
+		fmt.Fprintf(f.w, "Cleared planned date for #%d: %s\n", t.ID, t.Title)
+	}
+}
+
+func (f *Formatter) TaskDueDateSet(t *task.Task) {
+	if t.DueDate != nil {
+		fmt.Fprintf(f.w, "Due #%d on %s: %s\n", t.ID, t.DueDate.Format("Jan 2"), t.Title)
+	} else {
+		fmt.Fprintf(f.w, "Cleared due date for #%d: %s\n", t.ID, t.Title)
+	}
+}
