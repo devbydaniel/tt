@@ -5,10 +5,10 @@ import (
 	"io"
 	"time"
 
-	"github.com/devbydaniel/t/internal/domain/area"
-	"github.com/devbydaniel/t/internal/domain/project"
-	"github.com/devbydaniel/t/internal/domain/task"
-	"github.com/devbydaniel/t/internal/recurparse"
+	"github.com/devbydaniel/tt/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/project"
+	"github.com/devbydaniel/tt/internal/domain/task"
+	"github.com/devbydaniel/tt/internal/recurparse"
 )
 
 type Formatter struct {

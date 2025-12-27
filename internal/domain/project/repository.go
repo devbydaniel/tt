@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/devbydaniel/t/internal/database"
+	"github.com/devbydaniel/tt/internal/database"
 )
 
 var ErrProjectNotFound = errors.New("project not found")

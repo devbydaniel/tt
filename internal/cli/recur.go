@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devbydaniel/t/internal/dateparse"
-	"github.com/devbydaniel/t/internal/output"
-	"github.com/devbydaniel/t/internal/recurparse"
+	"github.com/devbydaniel/tt/internal/dateparse"
+	"github.com/devbydaniel/tt/internal/output"
+	"github.com/devbydaniel/tt/internal/recurparse"
 	"github.com/spf13/cobra"
 )
 

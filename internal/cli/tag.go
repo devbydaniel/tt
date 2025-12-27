@@ -5,14 +5,15 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/devbydaniel/t/internal/output"
+	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
 
 func NewTagCmd(deps *Dependencies) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "tag",
-		Short: "Manage tags",
+		Use:     "tag",
+		Aliases: []string{"t"},
+		Short:   "Manage tags",
 	}
 
 	cmd.AddCommand(newTagListCmd(deps))

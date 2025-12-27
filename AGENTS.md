@@ -17,7 +17,7 @@ Layered: `cmd/` → `internal/cli/` → `internal/domain/*/` → `internal/datab
 1. Create `internal/domain/<entity>/model.go` - struct + constants
 2. Create `repository.go` - SQL queries, takes `*database.DB`
 3. Create `service.go` - business logic, takes repository
-4. Wire in `cmd/t/main.go` and add to `cli.Dependencies`
+4. Wire in `cmd/tt/main.go` and add to `cli.Dependencies`
 
 ## Database
 
@@ -34,3 +34,10 @@ Layered: `cmd/` → `internal/cli/` → `internal/domain/*/` → `internal/datab
 
 - Test functionality, not coverage. Focus on business logic and edge cases.
 - Use `internal/testutil.NewTestDB(t)` for in-memory SQLite with migrations
+
+## Development
+
+- Use `make dev` to run with a local dev database (`./dev-data/tasks.db`)
+- Set `TT_DATA_DIR` env var to use a custom database directory
+- Config file: `~/.config/tt/config.toml` with `data_dir = "/path"`
+- Priority: env var > config file > default (`~/.local/share/tt/`)

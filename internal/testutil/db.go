@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/devbydaniel/t/internal/database"
+	"github.com/devbydaniel/tt/internal/database"
 )
 
 // NewTestDB creates an in-memory SQLite database with all migrations applied.

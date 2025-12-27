@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/devbydaniel/t/internal/database"
+	"github.com/devbydaniel/tt/internal/database"
 )
 
 var ErrTaskNotFound = errors.New("task not found")
@@ -59,11 +59,15 @@ type ListFilter struct {
 	State     string // filter by state (active, someday)
 	Today     bool   // planned_date = today OR overdue
 	Upcoming  bool   // future planned/due dates
+	Anytime   bool   // no planned_date and no due_date (active only)
+	Inbox     bool   // no project, no area, no dates
 	TagName   string // filter by tag
 }
 
 func (r *Repository) List(filter *ListFilter) ([]Task, error) {
-	query := `SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id FROM tasks t`
+	query := `SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, a.name FROM tasks t`
+	query += ` LEFT JOIN projects p ON t.project_id = p.id`
+	query += ` LEFT JOIN areas a ON t.area_id = a.id`
 	args := []any{}
 
 	// Join with task_tags if filtering by tag
@@ -102,6 +106,14 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 			today := time.Now().Format("2006-01-02")
 			query += ` AND (date(t.planned_date) > ? OR date(t.due_date) > ?)`
 			args = append(args, today, today)
+		}
+		if filter.Anytime {
+			// no planned_date and no due_date
+			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL`
+		}
+		if filter.Inbox {
+			// no project, no area, no planned_date, no due_date
+			query += ` AND t.project_id IS NULL AND t.area_id IS NULL AND t.planned_date IS NULL AND t.due_date IS NULL`
 		}
 	}
 
@@ -211,18 +223,22 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 
 	if since != nil {
 		rows, err = r.db.Conn.Query(
-			`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id
-			 FROM tasks
-			 WHERE status = ? AND completed_at >= ?
-			 ORDER BY completed_at DESC`,
+			`SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, a.name
+			 FROM tasks t
+			 LEFT JOIN projects p ON t.project_id = p.id
+			 LEFT JOIN areas a ON t.area_id = a.id
+			 WHERE t.status = ? AND t.completed_at >= ?
+			 ORDER BY t.completed_at DESC`,
 			StatusDone, since.Format(time.RFC3339),
 		)
 	} else {
 		rows, err = r.db.Conn.Query(
-			`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id
-			 FROM tasks
-			 WHERE status = ?
-			 ORDER BY completed_at DESC`,
+			`SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, a.name
+			 FROM tasks t
+			 LEFT JOIN projects p ON t.project_id = p.id
+			 LEFT JOIN areas a ON t.area_id = a.id
+			 WHERE t.status = ?
+			 ORDER BY t.completed_at DESC`,
 			StatusDone,
 		)
 	}

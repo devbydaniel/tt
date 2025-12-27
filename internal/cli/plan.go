@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/devbydaniel/t/internal/dateparse"
-	"github.com/devbydaniel/t/internal/output"
+	"github.com/devbydaniel/tt/internal/dateparse"
+	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -14,8 +14,9 @@ func NewPlanCmd(deps *Dependencies) *cobra.Command {
 	var clear bool
 
 	cmd := &cobra.Command{
-		Use:   "plan <task-id> [date]",
-		Short: "Set the planned date of a task",
+		Use:     "plan <task-id> [date]",
+		Aliases: []string{"p"},
+		Short:   "Set the planned date of a task",
 		Long: `Set the planned date of a task.
 
 Examples:

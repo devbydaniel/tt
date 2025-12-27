@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/devbydaniel/t/internal/domain/area"
-	"github.com/devbydaniel/t/internal/domain/project"
-	"github.com/devbydaniel/t/internal/recurparse"
+	"github.com/devbydaniel/tt/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/project"
+	"github.com/devbydaniel/tt/internal/recurparse"
 	"github.com/google/uuid"
 )
 
@@ -106,6 +106,8 @@ type ListOptions struct {
 	Today       bool   // show today + overdue
 	Upcoming    bool   // show future dates
 	Someday     bool   // show someday tasks
+	Anytime     bool   // show active tasks with no dates
+	Inbox       bool   // show tasks with no project/area/dates
 	All         bool   // show all active (no date filter)
 }
 
@@ -139,6 +141,10 @@ func (s *Service) List(opts *ListOptions) ([]Task, error) {
 			filter.Today = true
 		} else if opts.Upcoming {
 			filter.Upcoming = true
+		} else if opts.Anytime {
+			filter.Anytime = true
+		} else if opts.Inbox {
+			filter.Inbox = true
 		}
 		// opts.All means no date filter, just state = active (default)
 	}

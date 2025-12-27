@@ -24,6 +24,10 @@ type Task struct {
 
 	// Tags
 	Tags []string
+
+	// Display fields (populated by queries with JOINs, not persisted)
+	ProjectName *string
+	AreaName    *string
 }
 
 // Recurrence type constants

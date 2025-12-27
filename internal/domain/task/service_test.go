@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devbydaniel/t/internal/domain/area"
-	"github.com/devbydaniel/t/internal/domain/project"
-	"github.com/devbydaniel/t/internal/domain/task"
-	"github.com/devbydaniel/t/internal/testutil"
+	"github.com/devbydaniel/tt/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/project"
+	"github.com/devbydaniel/tt/internal/domain/task"
+	"github.com/devbydaniel/tt/internal/testutil"
 )
 
 func setupServices(t *testing.T) (*task.Service, *project.Service, *area.Service) {

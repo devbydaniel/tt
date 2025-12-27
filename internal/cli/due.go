@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/devbydaniel/t/internal/dateparse"
-	"github.com/devbydaniel/t/internal/output"
+	"github.com/devbydaniel/tt/internal/dateparse"
+	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -14,8 +14,9 @@ func NewDueCmd(deps *Dependencies) *cobra.Command {
 	var clear bool
 
 	cmd := &cobra.Command{
-		Use:   "due <task-id> [date]",
-		Short: "Set the due date of a task",
+		Use:     "due <task-id> [date]",
+		Aliases: []string{"d"},
+		Short:   "Set the due date of a task",
 		Long: `Set the due date of a task.
 
 Examples:

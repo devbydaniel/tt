@@ -3,10 +3,10 @@ package cli
 import (
 	"os"
 
-	"github.com/devbydaniel/t/internal/domain/area"
-	"github.com/devbydaniel/t/internal/domain/project"
-	"github.com/devbydaniel/t/internal/domain/task"
-	"github.com/devbydaniel/t/internal/output"
+	"github.com/devbydaniel/tt/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/project"
+	"github.com/devbydaniel/tt/internal/domain/task"
+	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +18,7 @@ type Dependencies struct {
 
 func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "t",
+		Use:   "tt",
 		Short: "A CLI task manager",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runList(deps)
@@ -37,6 +37,13 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd.AddCommand(NewDueCmd(deps))
 	rootCmd.AddCommand(NewRecurCmd(deps))
 	rootCmd.AddCommand(NewTagCmd(deps))
+
+	// Shorthand list commands
+	rootCmd.AddCommand(NewInboxCmd(deps))
+	rootCmd.AddCommand(NewTodayCmd(deps))
+	rootCmd.AddCommand(NewUpcomingCmd(deps))
+	rootCmd.AddCommand(NewAnytimeCmd(deps))
+	rootCmd.AddCommand(NewSomedayCmd(deps))
 
 	return rootCmd
 }

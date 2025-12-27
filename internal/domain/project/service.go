@@ -1,7 +1,7 @@
 package project
 
 import (
-	"github.com/devbydaniel/t/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/area"
 )
 
 type Service struct {

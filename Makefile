@@ -1,13 +1,16 @@
-.PHONY: build run test clean
+.PHONY: build run dev test clean
 
 build:
-	go build -o t ./cmd/t
+	go build -o tt ./cmd/tt
 
 run: build
-	./t
+	./tt
+
+dev: build
+	TT_DATA_DIR=./dev-data ./tt
 
 test:
 	go test ./...
 
 clean:
-	rm -f t
+	rm -f tt

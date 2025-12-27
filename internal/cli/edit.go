@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/devbydaniel/t/internal/dateparse"
-	"github.com/devbydaniel/t/internal/output"
+	"github.com/devbydaniel/tt/internal/dateparse"
+	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -24,13 +24,15 @@ func NewEditCmd(deps *Dependencies) *cobra.Command {
 	var clearArea bool
 
 	cmd := &cobra.Command{
-		Use:   "edit <task-id>",
-		Short: "Edit a task",
-		Long: `Edit a task's properties.
+		Use:     "edit <task-id>...",
+		Aliases: []string{"e"},
+		Short:   "Edit one or more tasks",
+		Long: `Edit task properties. Supports multiple task IDs.
 
 Examples:
   t edit 1 --title "New title"
   t edit 1 --project Work
+  t edit 1 2 3 --project Work
   t edit 1 --area Health
   t edit 1 --due tomorrow
   t edit 1 --planned +3d
@@ -38,11 +40,16 @@ Examples:
   t edit 1 --untag old-tag
   t edit 1 --clear-project
   t edit 1 --clear-due`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return errors.New("invalid task ID")
+			// Parse all task IDs first
+			var ids []int64
+			for _, arg := range args {
+				id, err := strconv.ParseInt(arg, 10, 64)
+				if err != nil {
+					return errors.New("invalid task ID: " + arg)
+				}
+				ids = append(ids, id)
 			}
 
 			// Validate mutual exclusivity
@@ -63,132 +70,128 @@ Examples:
 			}
 
 			formatter := output.NewFormatter(os.Stdout)
-			var task interface{}
-			var changes []string
 
-			// Apply title change
-			if title != "" {
-				t, err := deps.TaskService.SetTitle(id, title)
-				if err != nil {
-					return err
+			// If no changes specified and single task, show details
+			hasChanges := title != "" || projectName != "" || areaName != "" ||
+				plannedStr != "" || dueStr != "" || clearPlanned || clearDue ||
+				clearProject || clearArea || len(addTags) > 0 || len(removeTags) > 0
+
+			if !hasChanges {
+				if len(ids) == 1 {
+					t, err := deps.TaskService.GetByID(ids[0])
+					if err != nil {
+						return err
+					}
+					formatter.TaskDetails(t)
+				} else {
+					return errors.New("no changes specified")
 				}
-				task = t
+				return nil
+			}
+
+			// Build changes list once (same for all tasks)
+			var changes []string
+			if title != "" {
 				changes = append(changes, "title")
 			}
-
-			// Apply project change
 			if projectName != "" {
-				t, err := deps.TaskService.SetProject(id, projectName)
-				if err != nil {
-					return err
-				}
-				task = t
 				changes = append(changes, "project")
 			} else if clearProject {
-				t, err := deps.TaskService.SetProject(id, "")
-				if err != nil {
-					return err
-				}
-				task = t
 				changes = append(changes, "project cleared")
 			}
-
-			// Apply area change
 			if areaName != "" {
-				t, err := deps.TaskService.SetArea(id, areaName)
-				if err != nil {
-					return err
-				}
-				task = t
 				changes = append(changes, "area")
 			} else if clearArea {
-				t, err := deps.TaskService.SetArea(id, "")
-				if err != nil {
-					return err
-				}
-				task = t
 				changes = append(changes, "area cleared")
 			}
-
-			// Apply planned date change
 			if plannedStr != "" {
-				planned, err := dateparse.Parse(plannedStr)
-				if err != nil {
-					return err
-				}
-				t, err := deps.TaskService.SetPlannedDate(id, &planned)
-				if err != nil {
-					return err
-				}
-				task = t
 				changes = append(changes, "planned date")
 			} else if clearPlanned {
-				t, err := deps.TaskService.SetPlannedDate(id, nil)
-				if err != nil {
-					return err
-				}
-				task = t
 				changes = append(changes, "planned date cleared")
 			}
-
-			// Apply due date change
 			if dueStr != "" {
-				due, err := dateparse.Parse(dueStr)
-				if err != nil {
-					return err
-				}
-				t, err := deps.TaskService.SetDueDate(id, &due)
-				if err != nil {
-					return err
-				}
-				task = t
 				changes = append(changes, "due date")
 			} else if clearDue {
-				t, err := deps.TaskService.SetDueDate(id, nil)
-				if err != nil {
-					return err
-				}
-				task = t
 				changes = append(changes, "due date cleared")
-			}
-
-			// Apply tag additions
-			for _, tag := range addTags {
-				t, err := deps.TaskService.AddTag(id, tag)
-				if err != nil {
-					return err
-				}
-				task = t
 			}
 			if len(addTags) > 0 {
 				changes = append(changes, "tags added")
-			}
-
-			// Apply tag removals
-			for _, tag := range removeTags {
-				t, err := deps.TaskService.RemoveTag(id, tag)
-				if err != nil {
-					return err
-				}
-				task = t
 			}
 			if len(removeTags) > 0 {
 				changes = append(changes, "tags removed")
 			}
 
-			// If no changes were made, show current task
-			if len(changes) == 0 {
-				t, err := deps.TaskService.GetByID(id)
-				if err != nil {
-					return err
+			// Apply changes to all tasks
+			for _, id := range ids {
+				if title != "" {
+					if _, err := deps.TaskService.SetTitle(id, title); err != nil {
+						return err
+					}
 				}
-				formatter.TaskDetails(t)
-				return nil
+
+				if projectName != "" {
+					if _, err := deps.TaskService.SetProject(id, projectName); err != nil {
+						return err
+					}
+				} else if clearProject {
+					if _, err := deps.TaskService.SetProject(id, ""); err != nil {
+						return err
+					}
+				}
+
+				if areaName != "" {
+					if _, err := deps.TaskService.SetArea(id, areaName); err != nil {
+						return err
+					}
+				} else if clearArea {
+					if _, err := deps.TaskService.SetArea(id, ""); err != nil {
+						return err
+					}
+				}
+
+				if plannedStr != "" {
+					planned, err := dateparse.Parse(plannedStr)
+					if err != nil {
+						return err
+					}
+					if _, err := deps.TaskService.SetPlannedDate(id, &planned); err != nil {
+						return err
+					}
+				} else if clearPlanned {
+					if _, err := deps.TaskService.SetPlannedDate(id, nil); err != nil {
+						return err
+					}
+				}
+
+				if dueStr != "" {
+					due, err := dateparse.Parse(dueStr)
+					if err != nil {
+						return err
+					}
+					if _, err := deps.TaskService.SetDueDate(id, &due); err != nil {
+						return err
+					}
+				} else if clearDue {
+					if _, err := deps.TaskService.SetDueDate(id, nil); err != nil {
+						return err
+					}
+				}
+
+				for _, tag := range addTags {
+					if _, err := deps.TaskService.AddTag(id, tag); err != nil {
+						return err
+					}
+				}
+
+				for _, tag := range removeTags {
+					if _, err := deps.TaskService.RemoveTag(id, tag); err != nil {
+						return err
+					}
+				}
+
+				formatter.TaskEdited(id, changes)
 			}
 
-			// Show confirmation
-			formatter.TaskEdited(id, changes)
-			_ = task // last task state after all changes
 			return nil
 		},
 	}
