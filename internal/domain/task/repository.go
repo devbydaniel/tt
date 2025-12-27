@@ -302,7 +302,7 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 		var createdAt string
 		var completedAt *string
 		var recurEnd *string
-		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
+		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID, &t.ProjectName, &t.AreaName); err != nil {
 			return nil, err
 		}
 		if plannedDate != nil {

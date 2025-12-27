@@ -5,6 +5,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/project"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -29,18 +31,58 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 		return
 	}
 
-	for _, t := range tasks {
-		dateStr := formatTaskDate(t.PlannedDate, t.DueDate)
-		recurIndicator := formatRecurIndicator(&t)
-		tagIndicator := formatTagIndicator(t.Tags)
-		title := t.Title + recurIndicator + tagIndicator
+	// Styles
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	starStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
+	flagStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 
-		if dateStr != "" {
-			fmt.Fprintf(f.w, "%d  %-10s  %s\n", t.ID, dateStr, title)
-		} else {
-			fmt.Fprintf(f.w, "%d  %s\n", t.ID, title)
+	// Build table rows
+	rows := make([][]string, 0, len(tasks))
+	for _, t := range tasks {
+		// Prefix: red flag for due (precedence), yellow star for planned today
+		prefix := "  "
+		if isDueOrOverdue(&t) {
+			prefix = flagStyle.Render("⚑") + " "
+		} else if isPlannedForToday(&t) {
+			prefix = starStyle.Render("★") + " "
 		}
+
+		// Scope: project name if present, else area name
+		scope := ""
+		if t.ProjectName != nil {
+			scope = *t.ProjectName
+		} else if t.AreaName != nil {
+			scope = *t.AreaName
+		}
+
+		// Task title with recurrence indicator, dates, and tags
+		title := formatTaskTitle(&t)
+		if t.PlannedDate != nil {
+			title += " " + mutedStyle.Render("📅 "+t.PlannedDate.Format("Jan 2"))
+		}
+		if t.DueDate != nil {
+			title += " " + mutedStyle.Render("⚑ "+t.DueDate.Format("Jan 2"))
+		}
+		if len(t.Tags) > 0 {
+			title += " " + mutedStyle.Render(formatTagsForTable(t.Tags))
+		}
+
+		rows = append(rows, []string{
+			prefix + fmt.Sprintf("%d", t.ID),
+			scope,
+			title,
+		})
 	}
+
+	// Create minimal table (no borders, no headers)
+	tbl := table.New().
+		Rows(rows...).
+		Border(lipgloss.HiddenBorder()).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			return lipgloss.NewStyle().PaddingRight(2)
+		})
+
+	fmt.Fprintln(f.w, tbl.Render())
 }
 
 func formatRecurIndicator(t *task.Task) string {
@@ -60,6 +102,51 @@ func formatTagIndicator(tags []string) string {
 	result := ""
 	for _, tag := range tags {
 		result += " #" + tag
+	}
+	return result
+}
+
+func formatTaskTitle(t *task.Task) string {
+	title := t.Title
+
+	// Add recurrence indicator
+	title += formatRecurIndicator(t)
+
+	return title
+}
+
+func isPlannedForToday(t *task.Task) bool {
+	if t.PlannedDate == nil {
+		return false
+	}
+	now := time.Now()
+	todayYear, todayMonth, todayDay := now.Date()
+	dateYear, dateMonth, dateDay := t.PlannedDate.Date()
+	return dateYear == todayYear && dateMonth == todayMonth && dateDay == todayDay
+}
+
+func isDueOrOverdue(t *task.Task) bool {
+	if t.DueDate == nil {
+		return false
+	}
+	now := time.Now()
+	todayYear, todayMonth, todayDay := now.Date()
+	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
+	dateYear, dateMonth, dateDay := t.DueDate.Date()
+	dueDate := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.Local)
+	return !dueDate.After(today)
+}
+
+func formatTagsForTable(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	result := ""
+	for i, tag := range tags {
+		if i > 0 {
+			result += " "
+		}
+		result += "#" + tag
 	}
 	return result
 }
