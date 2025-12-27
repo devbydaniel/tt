@@ -9,8 +9,9 @@ import (
 )
 
 type Config struct {
-	Database string
-	Grouping GroupingConfig
+	Database    string
+	DefaultList string // default view: today, upcoming, anytime, someday, inbox, all
+	Grouping    GroupingConfig
 }
 
 // GroupingConfig holds grouping settings with global default and per-command overrides
@@ -53,8 +54,9 @@ func (g GroupingConfig) GetForCommand(cmd string) string {
 
 // fileConfig represents the TOML config file structure
 type fileConfig struct {
-	DataDir  string         `toml:"data_dir"`
-	Grouping GroupingConfig `toml:"grouping"`
+	DataDir     string         `toml:"data_dir"`
+	DefaultList string         `toml:"default_list"`
+	Grouping    GroupingConfig `toml:"grouping"`
 }
 
 func Load() (*Config, error) {
@@ -64,18 +66,21 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	// Load grouping config from file
+	// Load config from file
+	var defaultList string
 	var grouping GroupingConfig
 	if configPath := configFilePath(); configPath != "" {
 		var fc fileConfig
 		if _, err := toml.DecodeFile(configPath, &fc); err == nil {
+			defaultList = fc.DefaultList
 			grouping = fc.Grouping
 		}
 	}
 
 	return &Config{
-		Database: filepath.Join(dataDir, "tasks.db"),
-		Grouping: grouping,
+		Database:    filepath.Join(dataDir, "tasks.db"),
+		DefaultList: defaultList,
+		Grouping:    grouping,
 	}, nil
 }
 

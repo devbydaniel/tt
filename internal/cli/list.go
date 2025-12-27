@@ -36,9 +36,29 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				All:         all,
 			}
 
-			// Default to --today if no filter specified
+			// Apply default_list config if no view filter specified
+			viewCmd := "list"
 			if !today && !upcoming && !someday && !anytime && !inbox && !all {
-				opts.Today = true
+				switch deps.Config.DefaultList {
+				case "upcoming":
+					opts.Upcoming = true
+					viewCmd = "upcoming"
+				case "anytime":
+					opts.Anytime = true
+					viewCmd = "anytime"
+				case "someday":
+					opts.Someday = true
+					viewCmd = "someday"
+				case "inbox":
+					opts.Inbox = true
+					viewCmd = "inbox"
+				case "all":
+					opts.All = true
+					viewCmd = "all"
+				default:
+					opts.Today = true
+					viewCmd = "today"
+				}
 			}
 
 			tasks, err := deps.TaskService.List(opts)
@@ -46,10 +66,10 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			// Resolve grouping: flag > config > none
+			// Resolve grouping: flag > config for view > config for list > none
 			groupBy := group
 			if groupBy == "" {
-				groupBy = deps.Config.Grouping.GetForCommand("list")
+				groupBy = deps.Config.Grouping.GetForCommand(viewCmd)
 			}
 
 			formatter := output.NewFormatter(os.Stdout)

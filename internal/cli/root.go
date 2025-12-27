@@ -11,6 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// validDefaultLists are the allowed values for default_list config
+var validDefaultLists = map[string]bool{
+	"today": true, "upcoming": true, "anytime": true,
+	"someday": true, "inbox": true, "all": true,
+}
+
 type Dependencies struct {
 	TaskService    *task.Service
 	AreaService    *area.Service
@@ -51,12 +57,36 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 }
 
 func runList(deps *Dependencies) error {
-	tasks, err := deps.TaskService.List(nil)
+	// Build options based on default_list config (defaults to "today")
+	defaultList := deps.Config.DefaultList
+	if !validDefaultLists[defaultList] {
+		defaultList = "today"
+	}
+
+	opts := &task.ListOptions{}
+	switch defaultList {
+	case "today":
+		opts.Today = true
+	case "upcoming":
+		opts.Upcoming = true
+	case "anytime":
+		opts.Anytime = true
+	case "someday":
+		opts.Someday = true
+	case "inbox":
+		opts.Inbox = true
+	case "all":
+		opts.All = true
+	}
+
+	tasks, err := deps.TaskService.List(opts)
 	if err != nil {
 		return err
 	}
 
+	groupBy := deps.Config.Grouping.GetForCommand(defaultList)
+
 	formatter := output.NewFormatter(os.Stdout)
-	formatter.TaskList(tasks)
+	formatter.GroupedTaskList(tasks, groupBy)
 	return nil
 }

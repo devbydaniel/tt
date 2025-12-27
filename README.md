@@ -234,6 +234,10 @@ Configuration file location: `~/.config/tt/config.toml` (or `$XDG_CONFIG_HOME/tt
 # Custom data directory (optional)
 data_dir = "/path/to/data"
 
+# Default view for `tt` and `tt list` commands
+# Options: today, upcoming, anytime, someday, inbox, all
+default_list = "today"
+
 # Default grouping for list commands
 [grouping]
 default = "project"    # Global default: project, area, date, none
@@ -242,7 +246,7 @@ upcoming = "date"      # Override for upcoming command
 log = "date"           # Override for log command
 ```
 
-The `--group` flag always overrides config settings.
+The `--group` flag always overrides config settings. View flags like `--today` or `--upcoming` override `default_list`.
 
 ## Data Storage
 
