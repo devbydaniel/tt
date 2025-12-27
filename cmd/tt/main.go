@@ -48,6 +48,7 @@ func run() error {
 		TaskService:    taskService,
 		AreaService:    areaService,
 		ProjectService: projectService,
+		Config:         cfg,
 	}
 
 	return cli.NewRootCmd(deps).Execute()

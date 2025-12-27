@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"sort"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -83,6 +84,241 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 		})
 
 	fmt.Fprintln(f.w, tbl.Render())
+}
+
+// GroupedTaskList displays tasks grouped by the specified field.
+// groupBy can be: "project", "area", "date", or "none" (falls back to TaskList)
+func (f *Formatter) GroupedTaskList(tasks []task.Task, groupBy string) {
+	if groupBy == "none" || groupBy == "" {
+		f.TaskList(tasks)
+		return
+	}
+
+	if len(tasks) == 0 {
+		fmt.Fprintln(f.w, "No tasks")
+		return
+	}
+
+	switch groupBy {
+	case "project":
+		f.groupedByProject(tasks)
+	case "area":
+		f.groupedByArea(tasks)
+	case "date":
+		f.groupedByDate(tasks)
+	default:
+		f.TaskList(tasks)
+	}
+}
+
+// groupedByProject displays tasks grouped by "Area > Project"
+func (f *Formatter) groupedByProject(tasks []task.Task) {
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	// Group tasks by combined "Area > Project" key
+	noProjectTasks := make([]task.Task, 0)
+	groups := make(map[string][]task.Task)
+
+	for _, t := range tasks {
+		if t.ProjectName == nil {
+			noProjectTasks = append(noProjectTasks, t)
+			continue
+		}
+
+		// Build header: "Area > Project" or just "Project"
+		header := *t.ProjectName
+		if t.AreaName != nil {
+			header = *t.AreaName + " > " + *t.ProjectName
+		}
+		groups[header] = append(groups[header], t)
+	}
+
+	// Render: No Project first
+	if len(noProjectTasks) > 0 {
+		fmt.Fprintln(f.w, headerStyle.Render("No Project"))
+		f.renderTaskRows(noProjectTasks, 0, false)
+		fmt.Fprintln(f.w)
+	}
+
+	// Render groups alphabetically
+	headers := make([]string, 0, len(groups))
+	for h := range groups {
+		headers = append(headers, h)
+	}
+	sort.Strings(headers)
+
+	for _, header := range headers {
+		fmt.Fprintln(f.w, headerStyle.Render(header))
+		f.renderTaskRows(groups[header], 0, false)
+		fmt.Fprintln(f.w)
+	}
+}
+
+// groupedByArea displays tasks grouped by area
+func (f *Formatter) groupedByArea(tasks []task.Task) {
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	// Group by area
+	noAreaTasks := make([]task.Task, 0)
+	areaGroups := make(map[string][]task.Task)
+
+	for _, t := range tasks {
+		if t.AreaName == nil {
+			noAreaTasks = append(noAreaTasks, t)
+		} else {
+			areaGroups[*t.AreaName] = append(areaGroups[*t.AreaName], t)
+		}
+	}
+
+	// Render: No Area first
+	if len(noAreaTasks) > 0 {
+		fmt.Fprintln(f.w, headerStyle.Render("No Area"))
+		f.renderTaskRows(noAreaTasks, 0, true)
+		fmt.Fprintln(f.w)
+	}
+
+	// Render areas alphabetically
+	areaNames := make([]string, 0, len(areaGroups))
+	for name := range areaGroups {
+		areaNames = append(areaNames, name)
+	}
+	sort.Strings(areaNames)
+
+	for _, aName := range areaNames {
+		fmt.Fprintln(f.w, headerStyle.Render(aName))
+		f.renderTaskRows(areaGroups[aName], 0, true)
+		fmt.Fprintln(f.w)
+	}
+}
+
+// groupedByDate displays tasks grouped by date categories
+func (f *Formatter) groupedByDate(tasks []task.Task) {
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	// Define date categories
+	dateGroups := map[string][]task.Task{
+		"Overdue":   {},
+		"Today":     {},
+		"Tomorrow":  {},
+		"This Week": {},
+		"Next Week": {},
+		"Later":     {},
+		"No Date":   {},
+	}
+	orderedCategories := []string{"Overdue", "Today", "Tomorrow", "This Week", "Next Week", "Later", "No Date"}
+
+	now := time.Now()
+	todayYear, todayMonth, todayDay := now.Date()
+	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
+	tomorrow := today.AddDate(0, 0, 1)
+	endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
+	endOfNextWeek := endOfWeek.AddDate(0, 0, 7)
+
+	for _, t := range tasks {
+		category := getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfNextWeek)
+		dateGroups[category] = append(dateGroups[category], t)
+	}
+
+	// Render each category
+	for _, category := range orderedCategories {
+		if len(dateGroups[category]) > 0 {
+			fmt.Fprintln(f.w, headerStyle.Render(category))
+			f.renderTaskRows(dateGroups[category], 0, true)
+			fmt.Fprintln(f.w)
+		}
+	}
+}
+
+func getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfNextWeek time.Time) string {
+	var d *time.Time
+	if planned != nil {
+		d = planned
+	} else if due != nil {
+		d = due
+	}
+
+	if d == nil {
+		return "No Date"
+	}
+
+	dateYear, dateMonth, dateDay := d.Date()
+	dateOnly := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.Local)
+
+	if dateOnly.Before(today) {
+		return "Overdue"
+	}
+	if dateOnly.Equal(today) {
+		return "Today"
+	}
+	if dateOnly.Equal(tomorrow) {
+		return "Tomorrow"
+	}
+	if dateOnly.Before(endOfWeek) || dateOnly.Equal(endOfWeek) {
+		return "This Week"
+	}
+	if dateOnly.Before(endOfNextWeek) || dateOnly.Equal(endOfNextWeek) {
+		return "Next Week"
+	}
+	return "Later"
+}
+
+// renderTaskRows renders task rows with optional indentation
+func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool) {
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	starStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
+	flagStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+
+	rows := make([][]string, 0, len(tasks))
+	for _, t := range tasks {
+		prefix := "  "
+		if isDueOrOverdue(&t) {
+			prefix = flagStyle.Render("⚑") + " "
+		} else if isPlannedForToday(&t) {
+			prefix = starStyle.Render("★") + " "
+		}
+
+		scope := ""
+		if showScope {
+			if t.ProjectName != nil {
+				scope = *t.ProjectName
+			} else if t.AreaName != nil {
+				scope = *t.AreaName
+			}
+		}
+
+		title := formatTaskTitle(&t)
+		if t.PlannedDate != nil {
+			title += " " + mutedStyle.Render("📅 "+t.PlannedDate.Format("Jan 2"))
+		}
+		if t.DueDate != nil {
+			title += " " + mutedStyle.Render("⚑ "+t.DueDate.Format("Jan 2"))
+		}
+		if len(t.Tags) > 0 {
+			title += " " + mutedStyle.Render(formatTagsForTable(t.Tags))
+		}
+
+		rows = append(rows, []string{
+			prefix + fmt.Sprintf("%d", t.ID),
+			scope,
+			title,
+		})
+	}
+
+	tbl := table.New().
+		Rows(rows...).
+		Border(lipgloss.HiddenBorder()).
+		BorderTop(false).
+		BorderBottom(false).
+		BorderHeader(false).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			style := lipgloss.NewStyle().PaddingRight(2)
+			if col == 0 && indent > 0 {
+				style = style.PaddingLeft(indent)
+			}
+			return style
+		})
+
+	fmt.Fprint(f.w, tbl.Render())
 }
 
 func formatRecurIndicator(t *task.Task) string {
@@ -232,6 +468,140 @@ func (f *Formatter) Logbook(tasks []task.Task) {
 			completedAt = t.CompletedAt.Format("2006-01-02 15:04")
 		}
 		fmt.Fprintf(f.w, "%d  %s  %s\n", t.ID, completedAt, t.Title)
+	}
+}
+
+// GroupedLogbook displays completed tasks grouped by the specified field.
+// For date grouping, it uses CompletedAt instead of PlannedDate.
+func (f *Formatter) GroupedLogbook(tasks []task.Task, groupBy string) {
+	if groupBy == "none" || groupBy == "" {
+		f.Logbook(tasks)
+		return
+	}
+
+	if len(tasks) == 0 {
+		fmt.Fprintln(f.w, "No completed tasks")
+		return
+	}
+
+	switch groupBy {
+	case "project":
+		f.logbookByProject(tasks)
+	case "area":
+		f.logbookByArea(tasks)
+	case "date":
+		f.logbookByDate(tasks)
+	default:
+		f.Logbook(tasks)
+	}
+}
+
+func (f *Formatter) logbookByProject(tasks []task.Task) {
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	noProjectTasks := make([]task.Task, 0)
+	groups := make(map[string][]task.Task)
+
+	for _, t := range tasks {
+		if t.ProjectName == nil {
+			noProjectTasks = append(noProjectTasks, t)
+			continue
+		}
+
+		header := *t.ProjectName
+		if t.AreaName != nil {
+			header = *t.AreaName + " > " + *t.ProjectName
+		}
+		groups[header] = append(groups[header], t)
+	}
+
+	if len(noProjectTasks) > 0 {
+		fmt.Fprintln(f.w, headerStyle.Render("No Project"))
+		f.renderLogbookRows(noProjectTasks)
+		fmt.Fprintln(f.w)
+	}
+
+	headers := make([]string, 0, len(groups))
+	for h := range groups {
+		headers = append(headers, h)
+	}
+	sort.Strings(headers)
+
+	for _, header := range headers {
+		fmt.Fprintln(f.w, headerStyle.Render(header))
+		f.renderLogbookRows(groups[header])
+		fmt.Fprintln(f.w)
+	}
+}
+
+func (f *Formatter) logbookByArea(tasks []task.Task) {
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	noAreaTasks := make([]task.Task, 0)
+	areaGroups := make(map[string][]task.Task)
+
+	for _, t := range tasks {
+		if t.AreaName == nil {
+			noAreaTasks = append(noAreaTasks, t)
+		} else {
+			areaGroups[*t.AreaName] = append(areaGroups[*t.AreaName], t)
+		}
+	}
+
+	if len(noAreaTasks) > 0 {
+		fmt.Fprintln(f.w, headerStyle.Render("No Area"))
+		f.renderLogbookRows(noAreaTasks)
+		fmt.Fprintln(f.w)
+	}
+
+	areaNames := make([]string, 0, len(areaGroups))
+	for name := range areaGroups {
+		areaNames = append(areaNames, name)
+	}
+	sort.Strings(areaNames)
+
+	for _, aName := range areaNames {
+		fmt.Fprintln(f.w, headerStyle.Render(aName))
+		f.renderLogbookRows(areaGroups[aName])
+		fmt.Fprintln(f.w)
+	}
+}
+
+func (f *Formatter) logbookByDate(tasks []task.Task) {
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	// Group by completed date
+	dateGroups := make(map[string][]task.Task)
+
+	for _, t := range tasks {
+		dateKey := "Unknown"
+		if t.CompletedAt != nil {
+			dateKey = t.CompletedAt.Format("2006-01-02")
+		}
+		dateGroups[dateKey] = append(dateGroups[dateKey], t)
+	}
+
+	// Sort dates in reverse order (most recent first)
+	dates := make([]string, 0, len(dateGroups))
+	for d := range dateGroups {
+		dates = append(dates, d)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(dates)))
+
+	for _, date := range dates {
+		fmt.Fprintln(f.w, headerStyle.Render(date))
+		f.renderLogbookRows(dateGroups[date])
+		fmt.Fprintln(f.w)
+	}
+}
+
+func (f *Formatter) renderLogbookRows(tasks []task.Task) {
+	for _, t := range tasks {
+		completedAt := ""
+		if t.CompletedAt != nil {
+			completedAt = t.CompletedAt.Format("15:04")
+		}
+		fmt.Fprintf(f.w, "  %d  %s  %s\n", t.ID, completedAt, t.Title)
 	}
 }
 

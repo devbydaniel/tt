@@ -18,6 +18,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	var anytime bool
 	var inbox bool
 	var all bool
+	var group string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -45,8 +46,14 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			// Resolve grouping: flag > config > none
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.Grouping.GetForCommand("list")
+			}
+
 			formatter := output.NewFormatter(os.Stdout)
-			formatter.TaskList(tasks)
+			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},
 	}
@@ -60,6 +67,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().BoolVar(&anytime, "anytime", false, "Show active tasks with no dates")
 	cmd.Flags().BoolVar(&inbox, "inbox", false, "Show tasks with no project, area, or dates")
 	cmd.Flags().BoolVar(&all, "all", false, "Show all active tasks")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
 
 	return cmd
 }

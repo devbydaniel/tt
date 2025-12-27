@@ -26,7 +26,9 @@ func NewInboxCmd(deps *Dependencies) *cobra.Command {
 }
 
 func NewTodayCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	var group string
+
+	cmd := &cobra.Command{
 		Use:   "today",
 		Short: "List tasks planned for today or overdue",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,15 +37,25 @@ func NewTodayCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.Grouping.GetForCommand("today")
+			}
+
 			formatter := output.NewFormatter(os.Stdout)
-			formatter.TaskList(tasks)
+			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	return cmd
 }
 
 func NewUpcomingCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	var group string
+
+	cmd := &cobra.Command{
 		Use:   "upcoming",
 		Short: "List tasks with future dates",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,15 +64,25 @@ func NewUpcomingCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.Grouping.GetForCommand("upcoming")
+			}
+
 			formatter := output.NewFormatter(os.Stdout)
-			formatter.TaskList(tasks)
+			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	return cmd
 }
 
 func NewAnytimeCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	var group string
+
+	cmd := &cobra.Command{
 		Use:   "anytime",
 		Short: "List active tasks with no specific dates",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -69,15 +91,25 @@ func NewAnytimeCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.Grouping.GetForCommand("anytime")
+			}
+
 			formatter := output.NewFormatter(os.Stdout)
-			formatter.TaskList(tasks)
+			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	return cmd
 }
 
 func NewSomedayCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	var group string
+
+	cmd := &cobra.Command{
 		Use:   "someday",
 		Short: "List tasks deferred to someday",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -86,9 +118,17 @@ func NewSomedayCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.Grouping.GetForCommand("someday")
+			}
+
 			formatter := output.NewFormatter(os.Stdout)
-			formatter.TaskList(tasks)
+			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	return cmd
 }

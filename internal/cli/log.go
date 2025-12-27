@@ -10,6 +10,7 @@ import (
 
 func NewLogCmd(deps *Dependencies) *cobra.Command {
 	var sinceStr string
+	var group string
 
 	cmd := &cobra.Command{
 		Use:   "log",
@@ -29,13 +30,19 @@ func NewLogCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.Grouping.GetForCommand("log")
+			}
+
 			formatter := output.NewFormatter(os.Stdout)
-			formatter.Logbook(tasks)
+			formatter.GroupedLogbook(tasks, groupBy)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&sinceStr, "since", "", "Show tasks completed since date (YYYY-MM-DD)")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
 
 	return cmd
 }

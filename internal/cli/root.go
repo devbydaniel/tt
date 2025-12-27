@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 
+	"github.com/devbydaniel/tt/config"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/project"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -14,6 +15,7 @@ type Dependencies struct {
 	TaskService    *task.Service
 	AreaService    *area.Service
 	ProjectService *project.Service
+	Config         *config.Config
 }
 
 func NewRootCmd(deps *Dependencies) *cobra.Command {

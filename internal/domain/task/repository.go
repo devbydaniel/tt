@@ -65,9 +65,10 @@ type ListFilter struct {
 }
 
 func (r *Repository) List(filter *ListFilter) ([]Task, error) {
-	query := `SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, a.name FROM tasks t`
+	query := `SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name) FROM tasks t`
 	query += ` LEFT JOIN projects p ON t.project_id = p.id`
 	query += ` LEFT JOIN areas a ON t.area_id = a.id`
+	query += ` LEFT JOIN areas pa ON p.area_id = pa.id`
 	args := []any{}
 
 	// Join with task_tags if filtering by tag
@@ -223,20 +224,22 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 
 	if since != nil {
 		rows, err = r.db.Conn.Query(
-			`SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, a.name
+			`SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name)
 			 FROM tasks t
 			 LEFT JOIN projects p ON t.project_id = p.id
 			 LEFT JOIN areas a ON t.area_id = a.id
+			 LEFT JOIN areas pa ON p.area_id = pa.id
 			 WHERE t.status = ? AND t.completed_at >= ?
 			 ORDER BY t.completed_at DESC`,
 			StatusDone, since.Format(time.RFC3339),
 		)
 	} else {
 		rows, err = r.db.Conn.Query(
-			`SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, a.name
+			`SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name)
 			 FROM tasks t
 			 LEFT JOIN projects p ON t.project_id = p.id
 			 LEFT JOIN areas a ON t.area_id = a.id
+			 LEFT JOIN areas pa ON p.area_id = pa.id
 			 WHERE t.status = ?
 			 ORDER BY t.completed_at DESC`,
 			StatusDone,

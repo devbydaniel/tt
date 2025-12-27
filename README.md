@@ -97,6 +97,12 @@ tt list --all             # All incomplete tasks
 tt list --project Work
 tt list --area Health
 tt list --tag urgent
+
+# Group output
+tt list --all --group=project   # Group by Area > Project
+tt list --all --group=area      # Group by area
+tt list --all --group=date      # Group by date (Overdue, Today, Tomorrow, etc.)
+tt list --all --group=none      # Flat list (default)
 ```
 
 **Shorthand commands** for quick access:
@@ -108,6 +114,8 @@ tt upcoming               # Future planned tasks
 tt anytime                # Active tasks with no dates
 tt someday                # Someday/maybe tasks
 ```
+
+All list commands support the `--group` / `-g` flag.
 
 ### Completing Tasks
 
@@ -218,12 +226,34 @@ tt delete 1
 tt delete 1 2 3
 ```
 
+## Configuration
+
+Configuration file location: `~/.config/tt/config.toml` (or `$XDG_CONFIG_HOME/tt/config.toml`)
+
+```toml
+# Custom data directory (optional)
+data_dir = "/path/to/data"
+
+# Default grouping for list commands
+[grouping]
+default = "project"    # Global default: project, area, date, none
+today = "project"      # Override for today command
+upcoming = "date"      # Override for upcoming command
+log = "date"           # Override for log command
+```
+
+The `--group` flag always overrides config settings.
+
 ## Data Storage
 
 Your tasks are stored in a local SQLite database:
 
-- **Linux/macOS**: `~/.local/share/tt/tasks.db`
+- **Default**: `~/.local/share/tt/tasks.db`
 - **With XDG**: `$XDG_DATA_HOME/tt/tasks.db`
+- **With config**: Path specified in `data_dir`
+- **With env var**: `$TT_DATA_DIR/tasks.db`
+
+Priority: env var > config file > default
 
 The database is created automatically on first run.
 
