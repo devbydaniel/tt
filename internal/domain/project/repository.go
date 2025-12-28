@@ -123,6 +123,30 @@ func (r *Repository) ListByArea(areaID int64) ([]Project, error) {
 	return scanProjects(rows)
 }
 
+func (r *Repository) ListWithArea() ([]ProjectWithArea, error) {
+	rows, err := r.db.Conn.Query(`
+		SELECT p.id, p.name, p.area_id, a.name
+		FROM projects p
+		LEFT JOIN areas a ON p.area_id = a.id
+		ORDER BY COALESCE(a.name, ''), p.name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []ProjectWithArea
+	for rows.Next() {
+		var p ProjectWithArea
+		if err := rows.Scan(&p.ID, &p.Name, &p.AreaID, &p.AreaName); err != nil {
+			return nil, err
+		}
+		projects = append(projects, p)
+	}
+
+	return projects, rows.Err()
+}
+
 func scanProjects(rows *sql.Rows) ([]Project, error) {
 	var projects []Project
 	for rows.Next() {

@@ -23,21 +23,42 @@ func NewProjectCmd(deps *Dependencies) *cobra.Command {
 }
 
 func newProjectListCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	var group string
+
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all projects",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			formatter := output.NewFormatter(os.Stdout)
+
+			// Use flag if provided, otherwise use config
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.Grouping.GetForCommand("project-list")
+			}
+
+			if groupBy == "area" {
+				projects, err := deps.ProjectService.ListWithArea()
+				if err != nil {
+					return err
+				}
+				formatter.ProjectListGrouped(projects, groupBy)
+				return nil
+			}
+
 			projects, err := deps.ProjectService.List()
 			if err != nil {
 				return err
 			}
-
-			formatter := output.NewFormatter(os.Stdout)
 			formatter.ProjectList(projects)
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group projects by: area")
+
+	return cmd
 }
 
 func newProjectAddCmd(deps *Dependencies) *cobra.Command {
@@ -69,7 +90,7 @@ func newProjectAddCmd(deps *Dependencies) *cobra.Command {
 }
 
 func newProjectDeleteCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "delete <name>",
 		Short: "Delete a project",
 		Args:  cobra.ExactArgs(1),
@@ -84,6 +105,12 @@ func newProjectDeleteCmd(deps *Dependencies) *cobra.Command {
 			return nil
 		},
 	}
+
+	// Register project name completion
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.ProjectCompletion()
+
+	return cmd
 }
 
 func newProjectRenameCmd(deps *Dependencies) *cobra.Command {

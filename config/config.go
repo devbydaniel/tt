@@ -16,13 +16,14 @@ type Config struct {
 
 // GroupingConfig holds grouping settings with global default and per-command overrides
 type GroupingConfig struct {
-	Default  string `toml:"default"`  // global default: project, area, date, none
-	List     string `toml:"list"`     // override for list command
-	Today    string `toml:"today"`    // override for today command
-	Upcoming string `toml:"upcoming"` // override for upcoming command
-	Anytime  string `toml:"anytime"`  // override for anytime command
-	Someday  string `toml:"someday"`  // override for someday command
-	Log      string `toml:"log"`      // override for log command
+	Default     string `toml:"default"`      // global default: project, area, date, none
+	List        string `toml:"list"`         // override for list command
+	Today       string `toml:"today"`        // override for today command
+	Upcoming    string `toml:"upcoming"`     // override for upcoming command
+	Anytime     string `toml:"anytime"`      // override for anytime command
+	Someday     string `toml:"someday"`      // override for someday command
+	Log         string `toml:"log"`          // override for log command
+	ProjectList string `toml:"project_list"` // override for project list command (area, none)
 }
 
 // GetForCommand returns the grouping setting for a specific command.
@@ -42,9 +43,15 @@ func (g GroupingConfig) GetForCommand(cmd string) string {
 		cmdSetting = g.Someday
 	case "log":
 		cmdSetting = g.Log
+	case "project-list":
+		cmdSetting = g.ProjectList
 	}
 	if cmdSetting != "" {
 		return cmdSetting
+	}
+	// Don't apply global default to project-list (it uses different grouping options)
+	if cmd == "project-list" {
+		return "none"
 	}
 	if g.Default != "" {
 		return g.Default

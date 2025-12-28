@@ -58,7 +58,7 @@ func newAreaAddCmd(deps *Dependencies) *cobra.Command {
 }
 
 func newAreaDeleteCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "delete <name>",
 		Short: "Delete an area",
 		Args:  cobra.ExactArgs(1),
@@ -73,6 +73,12 @@ func newAreaDeleteCmd(deps *Dependencies) *cobra.Command {
 			return nil
 		},
 	}
+
+	// Register area name completion
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.AreaCompletion()
+
+	return cmd
 }
 
 func newAreaRenameCmd(deps *Dependencies) *cobra.Command {

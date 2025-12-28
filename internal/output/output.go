@@ -669,6 +669,61 @@ func (f *Formatter) ProjectList(projects []project.Project) {
 	}
 }
 
+func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, groupBy string) {
+	if groupBy != "area" || groupBy == "" {
+		// Fall back to simple list
+		if len(projects) == 0 {
+			fmt.Fprintln(f.w, "No projects")
+			return
+		}
+		for _, p := range projects {
+			fmt.Fprintln(f.w, p.Name)
+		}
+		return
+	}
+
+	if len(projects) == 0 {
+		fmt.Fprintln(f.w, "No projects")
+		return
+	}
+
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	// Group projects by area
+	noAreaProjects := make([]project.ProjectWithArea, 0)
+	areaGroups := make(map[string][]project.ProjectWithArea)
+
+	for _, p := range projects {
+		if p.AreaName == nil {
+			noAreaProjects = append(noAreaProjects, p)
+		} else {
+			areaGroups[*p.AreaName] = append(areaGroups[*p.AreaName], p)
+		}
+	}
+
+	// Render: No Area first
+	if len(noAreaProjects) > 0 {
+		fmt.Fprintln(f.w, headerStyle.Render("No Area"))
+		for _, p := range noAreaProjects {
+			fmt.Fprintf(f.w, "  %s\n", p.Name)
+		}
+	}
+
+	// Render areas alphabetically
+	areaNames := make([]string, 0, len(areaGroups))
+	for name := range areaGroups {
+		areaNames = append(areaNames, name)
+	}
+	sort.Strings(areaNames)
+
+	for _, aName := range areaNames {
+		fmt.Fprintln(f.w, headerStyle.Render(aName))
+		for _, p := range areaGroups[aName] {
+			fmt.Fprintf(f.w, "  %s\n", p.Name)
+		}
+	}
+}
+
 func (f *Formatter) ProjectDeleted(p *project.Project) {
 	fmt.Fprintf(f.w, "Deleted project: %s\n", p.Name)
 }

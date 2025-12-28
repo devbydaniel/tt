@@ -203,6 +203,8 @@ tt area delete Work
 
 ```bash
 tt project list
+tt project list --group area    # Group by area
+tt project list -g area         # Shorthand
 tt project add "Q1 Goals"
 tt project add "Home Renovation" --area Home
 tt project rename "Q1 Goals" "Q1 Objectives"
@@ -251,6 +253,7 @@ default = "project"    # Global default: project, area, date, none
 today = "project"      # Override for today command
 upcoming = "date"      # Override for upcoming command
 log = "date"           # Override for log command
+project_list = "area"  # Override for project list command (area, none)
 ```
 
 The `--group` flag always overrides config settings. View flags like `--today` or `--upcoming` override `default_list`.

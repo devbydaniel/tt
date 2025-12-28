@@ -40,6 +40,10 @@ func (s *Service) List() ([]Project, error) {
 	return s.repo.List()
 }
 
+func (s *Service) ListWithArea() ([]ProjectWithArea, error) {
+	return s.repo.ListWithArea()
+}
+
 func (s *Service) GetByName(name string) (*Project, error) {
 	return s.repo.GetByName(name)
 }
