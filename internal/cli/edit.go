@@ -84,7 +84,7 @@ Examples:
 				return errors.New("cannot specify both --description and --clear-description")
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 
 			// If no changes specified and single task, show details
 			hasChanges := title != "" || description != "" || projectName != "" || areaName != "" ||

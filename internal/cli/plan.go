@@ -38,7 +38,7 @@ Examples:
 				if err != nil {
 					return err
 				}
-				formatter := output.NewFormatter(os.Stdout)
+				formatter := output.NewFormatter(os.Stdout, deps.Theme)
 				formatter.TaskPlannedDateSet(t)
 				return nil
 			}
@@ -57,7 +57,7 @@ Examples:
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TaskPlannedDateSet(t)
 			return nil
 		},

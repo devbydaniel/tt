@@ -18,10 +18,14 @@ import (
 type Formatter struct {
 	w               io.Writer
 	hidePlannedDate bool
+	theme           *Theme
 }
 
-func NewFormatter(w io.Writer) *Formatter {
-	return &Formatter{w: w}
+func NewFormatter(w io.Writer, theme *Theme) *Formatter {
+	if theme == nil {
+		theme = DefaultTheme()
+	}
+	return &Formatter{w: w, theme: theme}
 }
 
 func (f *Formatter) SetHidePlannedDate(hide bool) {
@@ -38,20 +42,15 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 		return
 	}
 
-	// Styles
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	starStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
-	flagStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-
 	// Build table rows
 	rows := make([][]string, 0, len(tasks))
 	for _, t := range tasks {
 		// Prefix: red flag for due (precedence), yellow star for planned today or earlier
 		prefix := "  "
 		if isDueOrOverdue(&t) {
-			prefix = flagStyle.Render("⚑") + " "
+			prefix = f.theme.Warning.Render(f.theme.Icons.Due) + " "
 		} else if isPlannedForToday(&t) {
-			prefix = starStyle.Render("★") + " "
+			prefix = f.theme.Accent.Render(f.theme.Icons.Planned) + " "
 		}
 
 		// Scope: project name if present, else area name
@@ -65,13 +64,13 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 		// Task title with recurrence indicator, dates, and tags
 		title := formatTaskTitle(&t)
 		if t.PlannedDate != nil && !f.hidePlannedDate {
-			title += " " + mutedStyle.Render("📅 "+t.PlannedDate.Format("Jan 2"))
+			title += " " + f.theme.Muted.Render(f.theme.Icons.Date+" "+t.PlannedDate.Format("Jan 2"))
 		}
 		if t.DueDate != nil {
-			title += " " + mutedStyle.Render("⚑ "+t.DueDate.Format("Jan 2"))
+			title += " " + f.theme.Muted.Render(f.theme.Icons.Due+" "+t.DueDate.Format("Jan 2"))
 		}
 		if len(t.Tags) > 0 {
-			title += " " + mutedStyle.Render(formatTagsForTable(t.Tags))
+			title += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
 		}
 
 		rows = append(rows, []string{
@@ -122,7 +121,6 @@ func (f *Formatter) GroupedTaskList(tasks []task.Task, groupBy string) {
 // Tasks with area but no project appear under just the area name,
 // sorted before "Area > Project" groups (alphabetically, area-only headers come first)
 func (f *Formatter) groupedByProject(tasks []task.Task) {
-	headerStyle := lipgloss.NewStyle().Bold(true)
 	idWidth := maxIDWidth(tasks)
 
 	// Group tasks:
@@ -153,7 +151,7 @@ func (f *Formatter) groupedByProject(tasks []task.Task) {
 
 	// Render: No Project (no area) first
 	if len(noProjectNoAreaTasks) > 0 {
-		fmt.Fprintln(f.w, headerStyle.Render("No Project"))
+		fmt.Fprintln(f.w, f.theme.Header.Render("No Project"))
 		f.renderTaskRows(noProjectNoAreaTasks, 0, false, idWidth)
 	}
 
@@ -166,14 +164,13 @@ func (f *Formatter) groupedByProject(tasks []task.Task) {
 	sort.Strings(headers)
 
 	for _, header := range headers {
-		fmt.Fprintln(f.w, headerStyle.Render(header))
+		fmt.Fprintln(f.w, f.theme.Header.Render(header))
 		f.renderTaskRows(groups[header], 0, false, idWidth)
 	}
 }
 
 // groupedByArea displays tasks grouped by area
 func (f *Formatter) groupedByArea(tasks []task.Task) {
-	headerStyle := lipgloss.NewStyle().Bold(true)
 	idWidth := maxIDWidth(tasks)
 
 	// Group by area
@@ -190,7 +187,7 @@ func (f *Formatter) groupedByArea(tasks []task.Task) {
 
 	// Render: No Area first
 	if len(noAreaTasks) > 0 {
-		fmt.Fprintln(f.w, headerStyle.Render("No Area"))
+		fmt.Fprintln(f.w, f.theme.Header.Render("No Area"))
 		f.renderTaskRows(noAreaTasks, 0, true, idWidth)
 	}
 
@@ -202,14 +199,13 @@ func (f *Formatter) groupedByArea(tasks []task.Task) {
 	sort.Strings(areaNames)
 
 	for _, aName := range areaNames {
-		fmt.Fprintln(f.w, headerStyle.Render(aName))
+		fmt.Fprintln(f.w, f.theme.Header.Render(aName))
 		f.renderTaskRows(areaGroups[aName], 0, true, idWidth)
 	}
 }
 
 // groupedByDate displays tasks grouped by date categories
 func (f *Formatter) groupedByDate(tasks []task.Task) {
-	headerStyle := lipgloss.NewStyle().Bold(true)
 	idWidth := maxIDWidth(tasks)
 
 	// Define date categories
@@ -239,7 +235,7 @@ func (f *Formatter) groupedByDate(tasks []task.Task) {
 	// Render each category
 	for _, category := range orderedCategories {
 		if len(dateGroups[category]) > 0 {
-			fmt.Fprintln(f.w, headerStyle.Render(category))
+			fmt.Fprintln(f.w, f.theme.Header.Render(category))
 			f.renderTaskRows(dateGroups[category], 0, true, idWidth)
 		}
 	}
@@ -292,17 +288,13 @@ func maxIDWidth(tasks []task.Task) int {
 
 // renderTaskRows renders task rows with optional indentation
 func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool, idWidth int) {
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	starStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
-	flagStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-
 	rows := make([][]string, 0, len(tasks))
 	for _, t := range tasks {
 		prefix := "  "
 		if isDueOrOverdue(&t) {
-			prefix = flagStyle.Render("⚑") + " "
+			prefix = f.theme.Warning.Render(f.theme.Icons.Due) + " "
 		} else if isPlannedForToday(&t) {
-			prefix = starStyle.Render("★") + " "
+			prefix = f.theme.Accent.Render(f.theme.Icons.Planned) + " "
 		}
 
 		scope := ""
@@ -316,13 +308,13 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 
 		title := formatTaskTitle(&t)
 		if t.PlannedDate != nil && !f.hidePlannedDate {
-			title += " " + mutedStyle.Render("📅 "+t.PlannedDate.Format("Jan 2"))
+			title += " " + f.theme.Muted.Render(f.theme.Icons.Date+" "+t.PlannedDate.Format("Jan 2"))
 		}
 		if t.DueDate != nil {
-			title += " " + mutedStyle.Render("⚑ "+t.DueDate.Format("Jan 2"))
+			title += " " + f.theme.Muted.Render(f.theme.Icons.Due+" "+t.DueDate.Format("Jan 2"))
 		}
 		if len(t.Tags) > 0 {
-			title += " " + mutedStyle.Render(formatTagsForTable(t.Tags))
+			title += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
 		}
 
 		rows = append(rows, []string{
@@ -528,8 +520,6 @@ func (f *Formatter) GroupedLogbook(tasks []task.Task, groupBy string) {
 }
 
 func (f *Formatter) logbookByProject(tasks []task.Task) {
-	headerStyle := lipgloss.NewStyle().Bold(true)
-
 	noProjectNoAreaTasks := make([]task.Task, 0)
 	groups := make(map[string][]task.Task)
 
@@ -551,7 +541,7 @@ func (f *Formatter) logbookByProject(tasks []task.Task) {
 	}
 
 	if len(noProjectNoAreaTasks) > 0 {
-		fmt.Fprintln(f.w, headerStyle.Render("No Project"))
+		fmt.Fprintln(f.w, f.theme.Header.Render("No Project"))
 		f.renderLogbookRows(noProjectNoAreaTasks)
 	}
 
@@ -562,14 +552,12 @@ func (f *Formatter) logbookByProject(tasks []task.Task) {
 	sort.Strings(headers)
 
 	for _, header := range headers {
-		fmt.Fprintln(f.w, headerStyle.Render(header))
+		fmt.Fprintln(f.w, f.theme.Header.Render(header))
 		f.renderLogbookRows(groups[header])
 	}
 }
 
 func (f *Formatter) logbookByArea(tasks []task.Task) {
-	headerStyle := lipgloss.NewStyle().Bold(true)
-
 	noAreaTasks := make([]task.Task, 0)
 	areaGroups := make(map[string][]task.Task)
 
@@ -582,7 +570,7 @@ func (f *Formatter) logbookByArea(tasks []task.Task) {
 	}
 
 	if len(noAreaTasks) > 0 {
-		fmt.Fprintln(f.w, headerStyle.Render("No Area"))
+		fmt.Fprintln(f.w, f.theme.Header.Render("No Area"))
 		f.renderLogbookRows(noAreaTasks)
 	}
 
@@ -593,14 +581,12 @@ func (f *Formatter) logbookByArea(tasks []task.Task) {
 	sort.Strings(areaNames)
 
 	for _, aName := range areaNames {
-		fmt.Fprintln(f.w, headerStyle.Render(aName))
+		fmt.Fprintln(f.w, f.theme.Header.Render(aName))
 		f.renderLogbookRows(areaGroups[aName])
 	}
 }
 
 func (f *Formatter) logbookByDate(tasks []task.Task) {
-	headerStyle := lipgloss.NewStyle().Bold(true)
-
 	// Group by completed date
 	dateGroups := make(map[string][]task.Task)
 
@@ -620,7 +606,7 @@ func (f *Formatter) logbookByDate(tasks []task.Task) {
 	sort.Sort(sort.Reverse(sort.StringSlice(dates)))
 
 	for _, date := range dates {
-		fmt.Fprintln(f.w, headerStyle.Render(date))
+		fmt.Fprintln(f.w, f.theme.Header.Render(date))
 		f.renderLogbookRows(dateGroups[date])
 	}
 }
@@ -687,8 +673,6 @@ func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, group
 		return
 	}
 
-	headerStyle := lipgloss.NewStyle().Bold(true)
-
 	// Group projects by area
 	noAreaProjects := make([]project.ProjectWithArea, 0)
 	areaGroups := make(map[string][]project.ProjectWithArea)
@@ -703,7 +687,7 @@ func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, group
 
 	// Render: No Area first
 	if len(noAreaProjects) > 0 {
-		fmt.Fprintln(f.w, headerStyle.Render("No Area"))
+		fmt.Fprintln(f.w, f.theme.Header.Render("No Area"))
 		for _, p := range noAreaProjects {
 			fmt.Fprintf(f.w, "  %s\n", p.Name)
 		}
@@ -717,7 +701,7 @@ func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, group
 	sort.Strings(areaNames)
 
 	for _, aName := range areaNames {
-		fmt.Fprintln(f.w, headerStyle.Render(aName))
+		fmt.Fprintln(f.w, f.theme.Header.Render(aName))
 		for _, p := range areaGroups[aName] {
 			fmt.Fprintf(f.w, "  %s\n", p.Name)
 		}

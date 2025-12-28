@@ -32,7 +32,7 @@ func newAreaListCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.AreaList(areas)
 			return nil
 		},
@@ -50,7 +50,7 @@ func newAreaAddCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.AreaCreated(area)
 			return nil
 		},
@@ -68,7 +68,7 @@ func newAreaDeleteCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.AreaDeleted(area)
 			return nil
 		},
@@ -95,7 +95,7 @@ func newAreaRenameCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.AreaRenamed(oldName, newName)
 			return nil
 		},

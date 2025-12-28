@@ -30,7 +30,7 @@ func newProjectListCmd(deps *Dependencies) *cobra.Command {
 		Short: "List all projects",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 
 			// Use flag if provided, otherwise use config
 			groupBy := group
@@ -74,7 +74,7 @@ func newProjectAddCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.ProjectCreated(project)
 			return nil
 		},
@@ -100,7 +100,7 @@ func newProjectDeleteCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.ProjectDeleted(project)
 			return nil
 		},
@@ -127,7 +127,7 @@ func newProjectRenameCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.ProjectRenamed(oldName, newName)
 			return nil
 		},
@@ -150,7 +150,7 @@ func newProjectMoveCmd(deps *Dependencies) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			projectName := args[0]
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 
 			if clearArea {
 				project, err := deps.ProjectService.ClearArea(projectName)

@@ -13,6 +13,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	var areaName string
 	var tagName string
 	var search string
+	var sortStr string
 	var today bool
 	var upcoming bool
 	var someday bool
@@ -25,11 +26,17 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 		Use:   "list",
 		Short: "List tasks",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			sortOpts, err := task.ParseSort(sortStr)
+			if err != nil {
+				return err
+			}
+
 			opts := &task.ListOptions{
 				ProjectName: projectName,
 				AreaName:    areaName,
 				TagName:     tagName,
 				Search:      search,
+				Sort:        sortOpts,
 				Today:       today,
 				Upcoming:    upcoming,
 				Someday:     someday,
@@ -65,7 +72,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				groupBy = deps.Config.Grouping.GetForCommand(viewCmd)
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			if opts.Today {
 				formatter.SetHidePlannedDate(true)
 			}
@@ -77,7 +84,8 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().StringVarP(&projectName, "project", "p", "", "Filter by project name")
 	cmd.Flags().StringVarP(&areaName, "area", "a", "", "Filter by area name")
 	cmd.Flags().StringVar(&tagName, "tag", "", "Filter by tag")
-	cmd.Flags().StringVarP(&search, "search", "s", "", "Search task titles")
+	cmd.Flags().StringVarP(&search, "search", "S", "", "Search task titles")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area (e.g. due,title:desc)")
 	cmd.Flags().BoolVar(&today, "today", false, "Show tasks planned for today or overdue")
 	cmd.Flags().BoolVar(&upcoming, "upcoming", false, "Show tasks with future dates")
 	cmd.Flags().BoolVar(&someday, "someday", false, "Show someday tasks")

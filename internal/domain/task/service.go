@@ -106,14 +106,15 @@ func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
 type ListOptions struct {
 	ProjectName string
 	AreaName    string
-	TagName     string // filter by tag
-	Today       bool   // show today + overdue
-	Upcoming    bool   // show future dates
-	Someday     bool   // show someday tasks
-	Anytime     bool   // show active tasks with no dates
-	Inbox       bool   // show tasks with no project/area/dates
-	All         bool   // show all active (no date filter)
-	Search      string // case-insensitive title search
+	TagName     string       // filter by tag
+	Today       bool         // show today + overdue
+	Upcoming    bool         // show future dates
+	Someday     bool         // show someday tasks
+	Anytime     bool         // show active tasks with no dates
+	Inbox       bool         // show tasks with no project/area/dates
+	All         bool         // show all active (no date filter)
+	Search      string       // case-insensitive title search
+	Sort        []SortOption // sort options (default: created desc)
 }
 
 func (s *Service) List(opts *ListOptions) ([]Task, error) {
@@ -141,6 +142,9 @@ func (s *Service) List(opts *ListOptions) ([]Task, error) {
 		}
 		if opts.Search != "" {
 			filter.Search = opts.Search
+		}
+		if len(opts.Sort) > 0 {
+			filter.Sort = opts.Sort
 		}
 
 		if opts.Someday {

@@ -56,13 +56,73 @@ func (r *Repository) Create(task *Task) error {
 type ListFilter struct {
 	ProjectID *int64
 	AreaID    *int64
-	State     string // filter by state (active, someday)
-	Today     bool   // planned_date = today OR overdue
-	Upcoming  bool   // future planned/due dates
-	Anytime   bool   // no planned_date and no due_date (active only)
-	Inbox     bool   // no project, no area, no dates
-	TagName   string // filter by tag
-	Search    string // case-insensitive title search
+	State     string       // filter by state (active, someday)
+	Today     bool         // planned_date = today OR overdue
+	Upcoming  bool         // future planned/due dates
+	Anytime   bool         // no planned_date and no due_date (active only)
+	Inbox     bool         // no project, no area, no dates
+	TagName   string       // filter by tag
+	Search    string       // case-insensitive title search
+	Sort      []SortOption // sort options (default: created desc)
+}
+
+// buildOrderByClause builds the ORDER BY clause from sort options
+func buildOrderByClause(filter *ListFilter) string {
+	sortOpts := DefaultSort()
+	if filter != nil && len(filter.Sort) > 0 {
+		sortOpts = filter.Sort
+	}
+
+	clause := " ORDER BY "
+	for i, opt := range sortOpts {
+		if i > 0 {
+			clause += ", "
+		}
+		col := sortFieldToColumn(opt.Field)
+		dir := "ASC"
+		if opt.Direction == SortDesc {
+			dir = "DESC"
+		}
+		// Handle NULLs: always put NULLs last for better task management UX
+		// SQLite doesn't have NULLS FIRST/LAST, so we use a CASE expression
+		if isNullableField(opt.Field) {
+			// CASE WHEN col IS NULL THEN 1 ELSE 0 END puts NULLs last
+			clause += "CASE WHEN " + col + " IS NULL THEN 1 ELSE 0 END, " + col + " " + dir
+		} else {
+			clause += col + " " + dir
+		}
+	}
+	return clause
+}
+
+func sortFieldToColumn(f SortField) string {
+	switch f {
+	case SortByID:
+		return "t.id"
+	case SortByTitle:
+		return "t.title"
+	case SortByPlanned:
+		return "t.planned_date"
+	case SortByDue:
+		return "t.due_date"
+	case SortByCreated:
+		return "t.created_at"
+	case SortByProject:
+		return "p.name"
+	case SortByArea:
+		return "COALESCE(a.name, pa.name)"
+	default:
+		return "t.id"
+	}
+}
+
+func isNullableField(f SortField) bool {
+	switch f {
+	case SortByPlanned, SortByDue, SortByProject, SortByArea:
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *Repository) List(filter *ListFilter) ([]Task, error) {
@@ -123,7 +183,7 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 		}
 	}
 
-	query += ` ORDER BY t.id`
+	query += buildOrderByClause(filter)
 
 	rows, err := r.db.Conn.Query(query, args...)
 	if err != nil {

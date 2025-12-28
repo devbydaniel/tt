@@ -98,7 +98,7 @@ func NewAddCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TaskCreated(t)
 			return nil
 		},

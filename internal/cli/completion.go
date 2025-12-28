@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/spf13/cobra"
 )
 
@@ -66,10 +67,41 @@ func (r *CompletionRegistry) RegisterAreaFlag(cmd *cobra.Command) {
 	_ = cmd.RegisterFlagCompletionFunc("area", r.AreaCompletion())
 }
 
-// RegisterAll registers both project and area completion on a command
+// SortCompletion returns a completion function for sort fields
+func (r *CompletionRegistry) SortCompletion() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		fields := task.ValidSortFields()
+		var completions []string
+
+		// Handle multi-field completion (after comma)
+		lastComma := strings.LastIndex(toComplete, ",")
+		prefix := ""
+		search := toComplete
+		if lastComma >= 0 {
+			prefix = toComplete[:lastComma+1]
+			search = toComplete[lastComma+1:]
+		}
+
+		for _, f := range fields {
+			if strings.HasPrefix(f, strings.ToLower(search)) {
+				completions = append(completions, prefix+f)
+			}
+		}
+
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// RegisterSortFlag registers sort completion on a command's --sort flag
+func (r *CompletionRegistry) RegisterSortFlag(cmd *cobra.Command) {
+	_ = cmd.RegisterFlagCompletionFunc("sort", r.SortCompletion())
+}
+
+// RegisterAll registers project, area, and sort completion on a command
 func (r *CompletionRegistry) RegisterAll(cmd *cobra.Command) {
 	r.RegisterProjectFlag(cmd)
 	r.RegisterAreaFlag(cmd)
+	r.RegisterSortFlag(cmd)
 }
 
 // NewCompletionCmd creates the completion command for generating shell scripts

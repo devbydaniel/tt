@@ -22,6 +22,7 @@ type Dependencies struct {
 	AreaService    *area.Service
 	ProjectService *project.Service
 	Config         *config.Config
+	Theme          *output.Theme
 }
 
 func NewRootCmd(deps *Dependencies) *cobra.Command {
@@ -88,7 +89,7 @@ func runList(deps *Dependencies) error {
 
 	groupBy := deps.Config.Grouping.GetForCommand(defaultList)
 
-	formatter := output.NewFormatter(os.Stdout)
+	formatter := output.NewFormatter(os.Stdout, deps.Theme)
 	formatter.GroupedTaskList(tasks, groupBy)
 	return nil
 }

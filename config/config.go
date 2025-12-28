@@ -12,6 +12,26 @@ type Config struct {
 	Database    string
 	DefaultList string // default view: today, upcoming, anytime, someday, inbox, all
 	Grouping    GroupingConfig
+	Theme       ThemeConfig
+}
+
+// ThemeConfig holds color and icon settings for output formatting
+type ThemeConfig struct {
+	Name    string     `toml:"name"`    // preset theme name: dracula, nord, gruvbox, tokyo-night, solarized-light, catppuccin-latte
+	Muted   string     `toml:"muted"`   // color for dates, tags, secondary info
+	Accent  string     `toml:"accent"`  // color for planned-today indicator
+	Warning string     `toml:"warning"` // color for due/overdue indicator
+	Header  string     `toml:"header"`  // color for section headers (bold applied automatically)
+	ID      string     `toml:"id"`      // color for task IDs (empty = inherit from muted)
+	Scope   string     `toml:"scope"`   // color for project/area column
+	Icons   IconConfig `toml:"icons"`
+}
+
+// IconConfig holds customizable icon characters
+type IconConfig struct {
+	Planned string `toml:"planned"` // indicator for tasks planned today or earlier (default: ★)
+	Due     string `toml:"due"`     // indicator for due/overdue tasks (default: ⚑)
+	Date    string `toml:"date"`    // prefix for planned dates (default: 📅)
 }
 
 // GroupingConfig holds grouping settings with global default and per-command overrides
@@ -64,6 +84,7 @@ type fileConfig struct {
 	DataDir     string         `toml:"data_dir"`
 	DefaultList string         `toml:"default_list"`
 	Grouping    GroupingConfig `toml:"grouping"`
+	Theme       ThemeConfig    `toml:"theme"`
 }
 
 func Load() (*Config, error) {
@@ -76,11 +97,13 @@ func Load() (*Config, error) {
 	// Load config from file
 	var defaultList string
 	var grouping GroupingConfig
+	var theme ThemeConfig
 	if configPath := configFilePath(); configPath != "" {
 		var fc fileConfig
 		if _, err := toml.DecodeFile(configPath, &fc); err == nil {
 			defaultList = fc.DefaultList
 			grouping = fc.Grouping
+			theme = fc.Theme
 		}
 	}
 
@@ -88,6 +111,7 @@ func Load() (*Config, error) {
 		Database:    filepath.Join(dataDir, "tasks.db"),
 		DefaultList: defaultList,
 		Grouping:    grouping,
+		Theme:       theme,
 	}, nil
 }
 

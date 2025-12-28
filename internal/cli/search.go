@@ -27,7 +27,7 @@ func NewSearchCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TaskList(tasks)
 			return nil
 		},

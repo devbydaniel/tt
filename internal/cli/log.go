@@ -35,7 +35,7 @@ func NewLogCmd(deps *Dependencies) *cobra.Command {
 				groupBy = deps.Config.Grouping.GetForCommand("log")
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.GroupedLogbook(tasks, groupBy)
 			return nil
 		},

@@ -18,7 +18,7 @@ func NewInboxCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TaskList(tasks)
 			return nil
 		},
@@ -42,7 +42,7 @@ func NewTodayCmd(deps *Dependencies) *cobra.Command {
 				groupBy = deps.Config.Grouping.GetForCommand("today")
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.SetHidePlannedDate(true)
 			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
@@ -70,7 +70,7 @@ func NewUpcomingCmd(deps *Dependencies) *cobra.Command {
 				groupBy = deps.Config.Grouping.GetForCommand("upcoming")
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},
@@ -97,7 +97,7 @@ func NewAnytimeCmd(deps *Dependencies) *cobra.Command {
 				groupBy = deps.Config.Grouping.GetForCommand("anytime")
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},
@@ -124,7 +124,7 @@ func NewSomedayCmd(deps *Dependencies) *cobra.Command {
 				groupBy = deps.Config.Grouping.GetForCommand("someday")
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},

@@ -29,7 +29,7 @@ func NewDeleteCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TasksDeleted(deleted)
 			return nil
 		},

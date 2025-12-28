@@ -10,6 +10,7 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/project"
 	"github.com/devbydaniel/tt/internal/domain/task"
+	"github.com/devbydaniel/tt/internal/output"
 )
 
 func main() {
@@ -44,11 +45,14 @@ func run() error {
 	taskRepo := task.NewRepository(db)
 	taskService := task.NewService(taskRepo, projectService, areaService)
 
+	theme := output.NewTheme(&cfg.Theme)
+
 	deps := &cli.Dependencies{
 		TaskService:    taskService,
 		AreaService:    areaService,
 		ProjectService: projectService,
 		Config:         cfg,
+		Theme:          theme,
 	}
 
 	return cli.NewRootCmd(deps).Execute()

@@ -34,7 +34,7 @@ func newTagListCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TagList(tags)
 			return nil
 		},
@@ -62,7 +62,7 @@ func newTagAddCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TaskTagAdded(t, tagName)
 			return nil
 		},
@@ -91,7 +91,7 @@ func newTagRemoveCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TaskTagRemoved(t, tagName)
 			return nil
 		},

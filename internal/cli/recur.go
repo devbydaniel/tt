@@ -41,7 +41,7 @@ Examples:
 				return errors.New("invalid task ID: " + args[0])
 			}
 
-			formatter := output.NewFormatter(os.Stdout)
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 
 			// Handle --show
 			if show {
