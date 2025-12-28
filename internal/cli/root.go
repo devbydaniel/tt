@@ -56,6 +56,9 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd.AddCommand(NewAnytimeCmd(deps))
 	rootCmd.AddCommand(NewSomedayCmd(deps))
 
+	// Shorthand task commands
+	rootCmd.AddCommand(NewRenameCmd(deps))
+
 	return rootCmd
 }
 

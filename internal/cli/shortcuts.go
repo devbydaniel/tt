@@ -1,6 +1,11 @@
 package cli
 
 import (
+	"errors"
+	"os"
+	"strconv"
+
+	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -97,4 +102,26 @@ func NewSomedayCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
+}
+
+func NewRenameCmd(deps *Dependencies) *cobra.Command {
+	return &cobra.Command{
+		Use:   "rename <task-id> <new-title>",
+		Short: "Rename a task (shortcut for edit --title)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := strconv.ParseInt(args[0], 10, 64)
+			if err != nil {
+				return errors.New("invalid task ID: " + args[0])
+			}
+
+			if _, err := deps.TaskService.SetTitle(id, args[1]); err != nil {
+				return err
+			}
+
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
+			formatter.TaskEdited(id, []string{"title"})
+			return nil
+		},
+	}
 }
