@@ -288,22 +288,29 @@ func maxIDWidth(tasks []task.Task) int {
 
 // renderTaskRows renders task rows with optional indentation
 func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool, idWidth int) {
-	rows := make([][]string, 0, len(tasks))
+	// Calculate scope width for alignment when showing scope
+	scopeWidth := 0
+	if showScope {
+		for _, t := range tasks {
+			scope := ""
+			if t.ProjectName != nil {
+				scope = *t.ProjectName
+			} else if t.AreaName != nil {
+				scope = *t.AreaName
+			}
+			if len(scope) > scopeWidth {
+				scopeWidth = len(scope)
+			}
+		}
+	}
+
+	indentStr := strings.Repeat(" ", indent)
 	for _, t := range tasks {
 		prefix := "  "
 		if isDueOrOverdue(&t) {
 			prefix = f.theme.Warning.Render(f.theme.Icons.Due) + " "
 		} else if isPlannedForToday(&t) {
 			prefix = f.theme.Accent.Render(f.theme.Icons.Planned) + " "
-		}
-
-		scope := ""
-		if showScope {
-			if t.ProjectName != nil {
-				scope = *t.ProjectName
-			} else if t.AreaName != nil {
-				scope = *t.AreaName
-			}
 		}
 
 		title := formatTaskTitle(&t)
@@ -317,29 +324,18 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 			title += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
 		}
 
-		rows = append(rows, []string{
-			prefix + fmt.Sprintf("%*d", idWidth, t.ID),
-			scope,
-			title,
-		})
-	}
-
-	tbl := table.New().
-		Rows(rows...).
-		Border(lipgloss.HiddenBorder()).
-		BorderTop(false).
-		BorderBottom(false).
-		BorderHeader(false).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			style := lipgloss.NewStyle().PaddingRight(2)
-			if col == 0 && indent > 0 {
-				style = style.PaddingLeft(indent)
+		if showScope {
+			scope := ""
+			if t.ProjectName != nil {
+				scope = *t.ProjectName
+			} else if t.AreaName != nil {
+				scope = *t.AreaName
 			}
-			return style
-		})
-
-	// Normalize: lipgloss adds trailing \n + spaces for single-row tables
-	fmt.Fprintln(f.w, strings.TrimRight(tbl.Render(), " \n"))
+			fmt.Fprintf(f.w, "%s%s%*d  %-*s  %s\n", indentStr, prefix, idWidth, t.ID, scopeWidth, scope, title)
+		} else {
+			fmt.Fprintf(f.w, "%s%s%*d  %s\n", indentStr, prefix, idWidth, t.ID, title)
+		}
+	}
 }
 
 func formatRecurIndicator(t *task.Task) string {
