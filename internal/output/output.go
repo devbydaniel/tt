@@ -61,8 +61,11 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 			scope = *t.AreaName
 		}
 
-		// Task title with recurrence indicator, dates, and tags
+		// Task title with recurrence, dates, and tags
 		title := formatTaskTitle(&t)
+		if recur := formatRecurIndicator(&t); recur != "" {
+			title += " " + f.theme.Muted.Render(recur)
+		}
 		if t.PlannedDate != nil && !f.hidePlannedDate {
 			title += " " + f.theme.Muted.Render(f.theme.Icons.Date+" "+t.PlannedDate.Format("Jan 2"))
 		}
@@ -319,6 +322,9 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 		}
 
 		title := formatTaskTitle(&t)
+		if recur := formatRecurIndicator(&t); recur != "" {
+			title += " " + f.theme.Muted.Render(recur)
+		}
 		if t.PlannedDate != nil && !f.hidePlannedDate {
 			title += " " + f.theme.Muted.Render(f.theme.Icons.Date+" "+t.PlannedDate.Format("Jan 2"))
 		}
@@ -347,10 +353,24 @@ func formatRecurIndicator(t *task.Task) string {
 	if t.RecurType == nil {
 		return ""
 	}
-	if t.RecurPaused {
-		return " [paused]"
+
+	pattern := ""
+	if t.RecurRule != nil {
+		if rule, err := recurparse.FromJSON(*t.RecurRule); err == nil {
+			pattern = rule.Format()
+		}
 	}
-	return " [recurs]"
+
+	// Use ⏸ for paused, ↻ for active
+	symbol := "↻"
+	if t.RecurPaused {
+		symbol = "⏸"
+	}
+
+	if pattern != "" {
+		return fmt.Sprintf("%s %s", symbol, pattern)
+	}
+	return symbol
 }
 
 func formatTagIndicator(tags []string) string {
@@ -365,12 +385,7 @@ func formatTagIndicator(tags []string) string {
 }
 
 func formatTaskTitle(t *task.Task) string {
-	title := sanitizeTitle(t.Title)
-
-	// Add recurrence indicator
-	title += formatRecurIndicator(t)
-
-	return title
+	return sanitizeTitle(t.Title)
 }
 
 // sanitizeTitle removes newline characters from task titles to prevent display issues
