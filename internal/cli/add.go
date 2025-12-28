@@ -115,5 +115,9 @@ func NewAddCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().StringVar(&recurEndStr, "recur-end", "", "Recurrence end date")
 	cmd.Flags().StringArrayVarP(&tags, "tag", "t", nil, "Add tag (repeatable)")
 
+	// Register completions
+	registry := NewCompletionRegistry(deps)
+	registry.RegisterAll(cmd)
+
 	return cmd
 }

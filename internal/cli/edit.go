@@ -241,5 +241,9 @@ Examples:
 	cmd.Flags().BoolVar(&clearArea, "clear-area", false, "Remove from area")
 	cmd.Flags().BoolVar(&clearDescription, "clear-description", false, "Clear description")
 
+	// Register completions
+	registry := NewCompletionRegistry(deps)
+	registry.RegisterAll(cmd)
+
 	return cmd
 }

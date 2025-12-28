@@ -11,6 +11,7 @@ Built for people who live in the terminal and want a simple, powerful way to man
 - **Natural dates** - Use `tomorrow`, `friday`, `+3d`, or `2025-01-15`
 - **Smart recurrence** - `every monday`, `daily`, or `3d after done`
 - **Flexible organization** - Areas, projects, and tags
+- **Shell completion** - Tab completion for bash, zsh, and fish
 - **Fast** - Instant startup, instant results
 
 ## Installation
@@ -269,6 +270,44 @@ The database is created automatically on first run.
 make build    # Build the binary
 make test     # Run tests
 make clean    # Remove binary
+```
+
+## Shell Completion
+
+Enable tab completion for commands, flags, and dynamic values like project and area names.
+
+### Bash
+
+```bash
+# Add to ~/.bashrc:
+source <(tt completion bash)
+```
+
+### Zsh
+
+```bash
+# Add to ~/.zshrc:
+source <(tt completion zsh)
+```
+
+If completion isn't working, ensure compinit is enabled:
+
+```bash
+autoload -U compinit; compinit
+```
+
+### Fish
+
+```bash
+tt completion fish > ~/.config/fish/completions/tt.fish
+```
+
+After enabling, restart your shell or source the config file. Then use Tab to complete:
+
+```bash
+tt add --project <TAB>    # Shows available projects
+tt list --area <TAB>      # Shows available areas
+tt edit 1 -p W<TAB>       # Completes to "Work" if it exists
 ```
 
 ## Architecture

@@ -95,5 +95,9 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().BoolVar(&all, "all", false, "Show all active tasks")
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
 
+	// Register completions
+	registry := NewCompletionRegistry(deps)
+	registry.RegisterAll(cmd)
+
 	return cmd
 }

@@ -59,6 +59,10 @@ func newProjectAddCmd(deps *Dependencies) *cobra.Command {
 
 	cmd.Flags().StringVar(&areaName, "area", "", "Assign to area")
 
+	// Register area completion
+	registry := NewCompletionRegistry(deps)
+	registry.RegisterAreaFlag(cmd)
+
 	return cmd
 }
 
