@@ -210,25 +210,27 @@ func (f *Formatter) groupedByDate(tasks []task.Task) {
 
 	// Define date categories
 	dateGroups := map[string][]task.Task{
-		"Overdue":   {},
-		"Today":     {},
-		"Tomorrow":  {},
-		"This Week": {},
-		"Next Week": {},
-		"Later":     {},
-		"No Date":   {},
+		"Overdue":    {},
+		"Today":      {},
+		"Tomorrow":   {},
+		"This Week":  {},
+		"This Month": {},
+		"This Year":  {},
+		"Later":      {},
+		"No Date":    {},
 	}
-	orderedCategories := []string{"Overdue", "Today", "Tomorrow", "This Week", "Next Week", "Later", "No Date"}
+	orderedCategories := []string{"Overdue", "Today", "Tomorrow", "This Week", "This Month", "This Year", "Later", "No Date"}
 
 	now := time.Now()
 	todayYear, todayMonth, todayDay := now.Date()
 	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
 	tomorrow := today.AddDate(0, 0, 1)
 	endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
-	endOfNextWeek := endOfWeek.AddDate(0, 0, 7)
+	endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local) // Last day of current month
+	endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
 
 	for _, t := range tasks {
-		category := getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfNextWeek)
+		category := getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
 		dateGroups[category] = append(dateGroups[category], t)
 	}
 
@@ -241,7 +243,7 @@ func (f *Formatter) groupedByDate(tasks []task.Task) {
 	}
 }
 
-func getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfNextWeek time.Time) string {
+func getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfMonth, endOfYear time.Time) string {
 	var d *time.Time
 	if planned != nil {
 		d = planned
@@ -268,8 +270,11 @@ func getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfN
 	if dateOnly.Before(endOfWeek) || dateOnly.Equal(endOfWeek) {
 		return "This Week"
 	}
-	if dateOnly.Before(endOfNextWeek) || dateOnly.Equal(endOfNextWeek) {
-		return "Next Week"
+	if dateOnly.Before(endOfMonth) || dateOnly.Equal(endOfMonth) {
+		return "This Month"
+	}
+	if dateOnly.Before(endOfYear) || dateOnly.Equal(endOfYear) {
+		return "This Year"
 	}
 	return "Later"
 }
