@@ -12,16 +12,19 @@ import (
 
 func NewEditCmd(deps *Dependencies) *cobra.Command {
 	var title string
+	var description string
 	var projectName string
 	var areaName string
 	var plannedStr string
 	var dueStr string
+	var today bool
 	var addTags []string
 	var removeTags []string
 	var clearPlanned bool
 	var clearDue bool
 	var clearProject bool
 	var clearArea bool
+	var clearDescription bool
 
 	cmd := &cobra.Command{
 		Use:     "edit <task-id>...",
@@ -65,16 +68,28 @@ Examples:
 			if plannedStr != "" && clearPlanned {
 				return errors.New("cannot specify both --planned and --clear-planned")
 			}
+			if today && plannedStr != "" {
+				return errors.New("cannot specify both --today and --planned")
+			}
+			if today && clearPlanned {
+				return errors.New("cannot specify both --today and --clear-planned")
+			}
+			if today {
+				plannedStr = "today"
+			}
 			if dueStr != "" && clearDue {
 				return errors.New("cannot specify both --due and --clear-due")
+			}
+			if description != "" && clearDescription {
+				return errors.New("cannot specify both --description and --clear-description")
 			}
 
 			formatter := output.NewFormatter(os.Stdout)
 
 			// If no changes specified and single task, show details
-			hasChanges := title != "" || projectName != "" || areaName != "" ||
-				plannedStr != "" || dueStr != "" || clearPlanned || clearDue ||
-				clearProject || clearArea || len(addTags) > 0 || len(removeTags) > 0
+			hasChanges := title != "" || description != "" || projectName != "" || areaName != "" ||
+				plannedStr != "" || dueStr != "" || today || clearPlanned || clearDue ||
+				clearProject || clearArea || clearDescription || len(addTags) > 0 || len(removeTags) > 0
 
 			if !hasChanges {
 				if len(ids) == 1 {
@@ -93,6 +108,11 @@ Examples:
 			var changes []string
 			if title != "" {
 				changes = append(changes, "title")
+			}
+			if description != "" {
+				changes = append(changes, "description")
+			} else if clearDescription {
+				changes = append(changes, "description cleared")
 			}
 			if projectName != "" {
 				changes = append(changes, "project")
@@ -125,6 +145,16 @@ Examples:
 			for _, id := range ids {
 				if title != "" {
 					if _, err := deps.TaskService.SetTitle(id, title); err != nil {
+						return err
+					}
+				}
+
+				if description != "" {
+					if _, err := deps.TaskService.SetDescription(id, &description); err != nil {
+						return err
+					}
+				} else if clearDescription {
+					if _, err := deps.TaskService.SetDescription(id, nil); err != nil {
 						return err
 					}
 				}
@@ -197,16 +227,19 @@ Examples:
 	}
 
 	cmd.Flags().StringVar(&title, "title", "", "Set task title")
+	cmd.Flags().StringVarP(&description, "description", "d", "", "Set task description")
 	cmd.Flags().StringVarP(&projectName, "project", "p", "", "Assign to project")
 	cmd.Flags().StringVarP(&areaName, "area", "a", "", "Assign to area")
-	cmd.Flags().StringVar(&plannedStr, "planned", "", "Set planned date")
-	cmd.Flags().StringVarP(&dueStr, "due", "d", "", "Set due date")
+	cmd.Flags().StringVarP(&plannedStr, "planned", "P", "", "Set planned date")
+	cmd.Flags().BoolVarP(&today, "today", "T", false, "Set planned date to today")
+	cmd.Flags().StringVarP(&dueStr, "due", "D", "", "Set due date")
 	cmd.Flags().StringArrayVarP(&addTags, "tag", "t", nil, "Add tag (repeatable)")
 	cmd.Flags().StringArrayVar(&removeTags, "untag", nil, "Remove tag (repeatable)")
 	cmd.Flags().BoolVar(&clearPlanned, "clear-planned", false, "Clear planned date")
 	cmd.Flags().BoolVar(&clearDue, "clear-due", false, "Clear due date")
 	cmd.Flags().BoolVar(&clearProject, "clear-project", false, "Remove from project")
 	cmd.Flags().BoolVar(&clearArea, "clear-area", false, "Remove from area")
+	cmd.Flags().BoolVar(&clearDescription, "clear-description", false, "Clear description")
 
 	return cmd
 }

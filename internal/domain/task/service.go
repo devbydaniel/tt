@@ -28,6 +28,7 @@ func NewService(repo *Repository, projectService *project.Service, areaService *
 type CreateOptions struct {
 	ProjectName string
 	AreaName    string
+	Description string
 	PlannedDate *time.Time
 	DueDate     *time.Time
 	Someday     bool     // if true, create in someday state
@@ -63,6 +64,9 @@ func (s *Service) Create(title string, opts *CreateOptions) (*Task, error) {
 				return nil, err
 			}
 			task.AreaID = &a.ID
+		}
+		if opts.Description != "" {
+			task.Description = &opts.Description
 		}
 		task.PlannedDate = opts.PlannedDate
 		task.DueDate = opts.DueDate
@@ -242,6 +246,7 @@ func (s *Service) regenerateTask(task *Task, completedAt time.Time) *Task {
 	nextTask := &Task{
 		UUID:          uuid.New().String(),
 		Title:         task.Title,
+		Description:   task.Description,
 		ProjectID:     task.ProjectID,
 		AreaID:        task.AreaID,
 		PlannedDate:   plannedDate,
@@ -448,6 +453,25 @@ func (s *Service) SetTitle(id int64, title string) (*Task, error) {
 	}
 
 	task.Title = title
+
+	if err := s.repo.Update(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+// SetDescription updates the description of a task.
+func (s *Service) SetDescription(id int64, description *string) (*Task, error) {
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	task.Description = description
 
 	if err := s.repo.Update(task); err != nil {
 		return nil, err

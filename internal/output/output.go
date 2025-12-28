@@ -754,6 +754,9 @@ func joinChanges(changes []string) string {
 func (f *Formatter) TaskDetails(t *task.Task) {
 	fmt.Fprintf(f.w, "#%d: %s\n", t.ID, t.Title)
 
+	if t.Description != nil && *t.Description != "" {
+		fmt.Fprintf(f.w, "  Description: %s\n", *t.Description)
+	}
 	if t.PlannedDate != nil {
 		fmt.Fprintf(f.w, "  Planned: %s\n", t.PlannedDate.Format("Jan 2, 2006"))
 	}

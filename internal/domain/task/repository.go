@@ -36,8 +36,8 @@ func (r *Repository) Create(task *Task) error {
 	}
 
 	result, err := r.db.Conn.Exec(
-		`INSERT INTO tasks (uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		task.UUID, task.Title, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.Status, task.CreatedAt.Format(time.RFC3339),
+		`INSERT INTO tasks (uuid, title, description, project_id, area_id, planned_date, due_date, state, status, created_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		task.UUID, task.Title, task.Description, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.Status, task.CreatedAt.Format(time.RFC3339),
 		task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.RecurParentID,
 	)
 	if err != nil {
@@ -65,7 +65,7 @@ type ListFilter struct {
 }
 
 func (r *Repository) List(filter *ListFilter) ([]Task, error) {
-	query := `SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name) FROM tasks t`
+	query := `SELECT t.id, t.uuid, t.title, t.description, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name) FROM tasks t`
 	query += ` LEFT JOIN projects p ON t.project_id = p.id`
 	query += ` LEFT JOIN areas a ON t.area_id = a.id`
 	query += ` LEFT JOIN areas pa ON p.area_id = pa.id`
@@ -141,7 +141,7 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 
 func (r *Repository) GetByID(id int64) (*Task, error) {
 	row := r.db.Conn.QueryRow(
-		`SELECT id, uuid, title, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE id = ?`,
+		`SELECT id, uuid, title, description, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE id = ?`,
 		id,
 	)
 
@@ -150,7 +150,7 @@ func (r *Repository) GetByID(id int64) (*Task, error) {
 	var createdAt string
 	var completedAt *string
 	var recurEnd *string
-	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
+	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.Description, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
 		return nil, err
 	}
 	if plannedDate != nil {
@@ -224,7 +224,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 
 	if since != nil {
 		rows, err = r.db.Conn.Query(
-			`SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name)
+			`SELECT t.id, t.uuid, t.title, t.description, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name)
 			 FROM tasks t
 			 LEFT JOIN projects p ON t.project_id = p.id
 			 LEFT JOIN areas a ON t.area_id = a.id
@@ -235,7 +235,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 		)
 	} else {
 		rows, err = r.db.Conn.Query(
-			`SELECT t.id, t.uuid, t.title, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name)
+			`SELECT t.id, t.uuid, t.title, t.description, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name)
 			 FROM tasks t
 			 LEFT JOIN projects p ON t.project_id = p.id
 			 LEFT JOIN areas a ON t.area_id = a.id
@@ -279,8 +279,8 @@ func (r *Repository) Update(task *Task) error {
 	}
 
 	result, err := r.db.Conn.Exec(
-		`UPDATE tasks SET title = ?, project_id = ?, area_id = ?, planned_date = ?, due_date = ?, state = ?, recur_type = ?, recur_rule = ?, recur_end = ?, recur_paused = ? WHERE id = ?`,
-		task.Title, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.ID,
+		`UPDATE tasks SET title = ?, description = ?, project_id = ?, area_id = ?, planned_date = ?, due_date = ?, state = ?, recur_type = ?, recur_rule = ?, recur_end = ?, recur_paused = ? WHERE id = ?`,
+		task.Title, task.Description, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.ID,
 	)
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 		var createdAt string
 		var completedAt *string
 		var recurEnd *string
-		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID, &t.ProjectName, &t.AreaName); err != nil {
+		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.Description, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID, &t.ProjectName, &t.AreaName); err != nil {
 			return nil, err
 		}
 		if plannedDate != nil {

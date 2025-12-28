@@ -70,12 +70,16 @@ tt add "Task title"
 tt add "Task title" --due tomorrow
 tt add "Task title" --project Work --tag urgent
 tt add "Task title" --planned "+3d" --due "+1w"
+tt add "Task title" -d "More details about this task"
+tt add "Task title" -a Work -T            # Plan for today
 tt add "Someday task" --someday
 ```
 
 **Flags:**
-- `--due, -d` - Due date
-- `--planned` - Planned/start date
+- `--description, -d` - Task description
+- `--due, -D` - Due date
+- `--planned, -P` - Planned/start date
+- `--today, -T` - Set planned date to today
 - `--project, -p` - Assign to project
 - `--area, -a` - Assign to area
 - `--tag, -t` - Add tag (can be used multiple times)
@@ -129,17 +133,22 @@ Recurring tasks automatically create their next occurrence when completed.
 ### Editing Tasks
 
 ```bash
+tt edit 1                          # View task details
 tt edit 1 --title "New title"
+tt edit 1 -d "Add a description"
 tt edit 1 --due friday
+tt edit 1 --today                  # Plan for today
 tt edit 1 --project Work
 tt edit 1 --tag important
 tt edit 1 --untag old-tag
 tt edit 1 --clear-due
 tt edit 1 --clear-project
+tt edit 1 --clear-description
 
 # Edit multiple tasks at once
 tt edit 1 2 3 --project Work
 tt edit 1 2 3 --tag urgent
+tt edit 1 2 3 -T                   # Plan all for today
 ```
 
 ### Managing Dates
