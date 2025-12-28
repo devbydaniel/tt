@@ -16,6 +16,8 @@ func NewProjectCmd(deps *Dependencies) *cobra.Command {
 	cmd.AddCommand(newProjectListCmd(deps))
 	cmd.AddCommand(newProjectAddCmd(deps))
 	cmd.AddCommand(newProjectDeleteCmd(deps))
+	cmd.AddCommand(newProjectRenameCmd(deps))
+	cmd.AddCommand(newProjectMoveCmd(deps))
 
 	return cmd
 }
@@ -82,4 +84,77 @@ func newProjectDeleteCmd(deps *Dependencies) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newProjectRenameCmd(deps *Dependencies) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "rename <old-name> <new-name>",
+		Short: "Rename a project",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			oldName := args[0]
+			newName := args[1]
+
+			_, err := deps.ProjectService.Rename(oldName, newName)
+			if err != nil {
+				return err
+			}
+
+			formatter := output.NewFormatter(os.Stdout)
+			formatter.ProjectRenamed(oldName, newName)
+			return nil
+		},
+	}
+
+	// Register project name completion for first argument
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.ProjectCompletion()
+
+	return cmd
+}
+
+func newProjectMoveCmd(deps *Dependencies) *cobra.Command {
+	var areaName string
+	var clearArea bool
+
+	cmd := &cobra.Command{
+		Use:   "move <name>",
+		Short: "Move a project to an area or clear its area",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectName := args[0]
+			formatter := output.NewFormatter(os.Stdout)
+
+			if clearArea {
+				project, err := deps.ProjectService.ClearArea(projectName)
+				if err != nil {
+					return err
+				}
+				formatter.ProjectAreaCleared(project)
+				return nil
+			}
+
+			if areaName == "" {
+				return cmd.Help()
+			}
+
+			project, err := deps.ProjectService.SetArea(projectName, areaName)
+			if err != nil {
+				return err
+			}
+			formatter.ProjectMoved(project, areaName)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&areaName, "area", "", "Move to area")
+	cmd.Flags().BoolVar(&clearArea, "clear", false, "Clear area assignment")
+	cmd.MarkFlagsMutuallyExclusive("area", "clear")
+
+	// Register completions
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.ProjectCompletion()
+	registry.RegisterAreaFlag(cmd)
+
+	return cmd
 }

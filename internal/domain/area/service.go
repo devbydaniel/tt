@@ -40,3 +40,17 @@ func (s *Service) Delete(name string) (*Area, error) {
 
 	return area, nil
 }
+
+func (s *Service) Rename(oldName, newName string) (*Area, error) {
+	area, err := s.repo.GetByName(oldName)
+	if err != nil {
+		return nil, err
+	}
+
+	area.Name = newName
+	if err := s.repo.Update(area); err != nil {
+		return nil, err
+	}
+
+	return area, nil
+}

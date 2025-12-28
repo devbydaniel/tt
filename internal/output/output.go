@@ -372,7 +372,7 @@ func formatTagIndicator(tags []string) string {
 }
 
 func formatTaskTitle(t *task.Task) string {
-	title := t.Title
+	title := strings.TrimRight(t.Title, "\n\r")
 
 	// Add recurrence indicator
 	title += formatRecurIndicator(t)
@@ -671,6 +671,22 @@ func (f *Formatter) ProjectList(projects []project.Project) {
 
 func (f *Formatter) ProjectDeleted(p *project.Project) {
 	fmt.Fprintf(f.w, "Deleted project: %s\n", p.Name)
+}
+
+func (f *Formatter) AreaRenamed(oldName, newName string) {
+	fmt.Fprintf(f.w, "Renamed area: %s -> %s\n", oldName, newName)
+}
+
+func (f *Formatter) ProjectRenamed(oldName, newName string) {
+	fmt.Fprintf(f.w, "Renamed project: %s -> %s\n", oldName, newName)
+}
+
+func (f *Formatter) ProjectMoved(p *project.Project, areaName string) {
+	fmt.Fprintf(f.w, "Moved project '%s' to area: %s\n", p.Name, areaName)
+}
+
+func (f *Formatter) ProjectAreaCleared(p *project.Project) {
+	fmt.Fprintf(f.w, "Cleared area from project: %s\n", p.Name)
 }
 
 func (f *Formatter) TaskPlannedDateSet(t *task.Task) {

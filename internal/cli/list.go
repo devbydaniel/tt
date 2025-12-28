@@ -39,27 +39,34 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 			}
 
 			// Apply default_list config if no view filter specified
+			// When filtering by project/area, default to showing all tasks in that filter
 			viewCmd := "list"
 			if !today && !upcoming && !someday && !anytime && !inbox && !all {
-				switch deps.Config.DefaultList {
-				case "upcoming":
-					opts.Upcoming = true
-					viewCmd = "upcoming"
-				case "anytime":
-					opts.Anytime = true
-					viewCmd = "anytime"
-				case "someday":
-					opts.Someday = true
-					viewCmd = "someday"
-				case "inbox":
-					opts.Inbox = true
-					viewCmd = "inbox"
-				case "all":
+				if projectName != "" || areaName != "" {
+					// Project/area filter: show all tasks in that project/area
 					opts.All = true
 					viewCmd = "all"
-				default:
-					opts.Today = true
-					viewCmd = "today"
+				} else {
+					switch deps.Config.DefaultList {
+					case "upcoming":
+						opts.Upcoming = true
+						viewCmd = "upcoming"
+					case "anytime":
+						opts.Anytime = true
+						viewCmd = "anytime"
+					case "someday":
+						opts.Someday = true
+						viewCmd = "someday"
+					case "inbox":
+						opts.Inbox = true
+						viewCmd = "inbox"
+					case "all":
+						opts.All = true
+						viewCmd = "all"
+					default:
+						opts.Today = true
+						viewCmd = "today"
+					}
 				}
 			}
 

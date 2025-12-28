@@ -90,6 +90,26 @@ func (r *Repository) Delete(id int64) error {
 	return nil
 }
 
+func (r *Repository) Update(project *Project) error {
+	result, err := r.db.Conn.Exec(
+		`UPDATE projects SET name = ?, area_id = ? WHERE id = ?`,
+		project.Name, project.AreaID, project.ID,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrProjectNotFound
+	}
+
+	return nil
+}
+
 func (r *Repository) ListByArea(areaID int64) ([]Project, error) {
 	rows, err := r.db.Conn.Query(
 		`SELECT id, name, area_id FROM projects WHERE area_id = ? ORDER BY name`,

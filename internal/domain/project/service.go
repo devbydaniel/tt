@@ -56,3 +56,50 @@ func (s *Service) Delete(name string) (*Project, error) {
 
 	return project, nil
 }
+
+func (s *Service) Rename(oldName, newName string) (*Project, error) {
+	project, err := s.repo.GetByName(oldName)
+	if err != nil {
+		return nil, err
+	}
+
+	project.Name = newName
+	if err := s.repo.Update(project); err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
+func (s *Service) SetArea(projectName, areaName string) (*Project, error) {
+	project, err := s.repo.GetByName(projectName)
+	if err != nil {
+		return nil, err
+	}
+
+	a, err := s.areaService.GetByName(areaName)
+	if err != nil {
+		return nil, err
+	}
+
+	project.AreaID = &a.ID
+	if err := s.repo.Update(project); err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
+func (s *Service) ClearArea(projectName string) (*Project, error) {
+	project, err := s.repo.GetByName(projectName)
+	if err != nil {
+		return nil, err
+	}
+
+	project.AreaID = nil
+	if err := s.repo.Update(project); err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}

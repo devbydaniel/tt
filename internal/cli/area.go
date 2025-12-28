@@ -16,6 +16,7 @@ func NewAreaCmd(deps *Dependencies) *cobra.Command {
 	cmd.AddCommand(newAreaListCmd(deps))
 	cmd.AddCommand(newAreaAddCmd(deps))
 	cmd.AddCommand(newAreaDeleteCmd(deps))
+	cmd.AddCommand(newAreaRenameCmd(deps))
 
 	return cmd
 }
@@ -72,4 +73,31 @@ func newAreaDeleteCmd(deps *Dependencies) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newAreaRenameCmd(deps *Dependencies) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "rename <old-name> <new-name>",
+		Short: "Rename an area",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			oldName := args[0]
+			newName := args[1]
+
+			_, err := deps.AreaService.Rename(oldName, newName)
+			if err != nil {
+				return err
+			}
+
+			formatter := output.NewFormatter(os.Stdout)
+			formatter.AreaRenamed(oldName, newName)
+			return nil
+		},
+	}
+
+	// Register area name completion for first argument
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.AreaCompletion()
+
+	return cmd
 }

@@ -195,6 +195,7 @@ tt recur 1 --show               # Show recurrence details
 tt area list
 tt area add Work
 tt area add Health
+tt area rename Work Business
 tt area delete Work
 ```
 
@@ -204,6 +205,9 @@ tt area delete Work
 tt project list
 tt project add "Q1 Goals"
 tt project add "Home Renovation" --area Home
+tt project rename "Q1 Goals" "Q1 Objectives"
+tt project move "Home Renovation" --area Personal
+tt project move "Home Renovation" --clear      # Remove from area
 tt project delete "Q1 Goals"
 ```
 

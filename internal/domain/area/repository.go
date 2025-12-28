@@ -90,6 +90,26 @@ func (r *Repository) Delete(id int64) error {
 	return nil
 }
 
+func (r *Repository) Update(area *Area) error {
+	result, err := r.db.Conn.Exec(
+		`UPDATE areas SET name = ? WHERE id = ?`,
+		area.Name, area.ID,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrAreaNotFound
+	}
+
+	return nil
+}
+
 func scanAreas(rows *sql.Rows) ([]Area, error) {
 	var areas []Area
 	for rows.Next() {
