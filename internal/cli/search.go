@@ -9,6 +9,8 @@ import (
 )
 
 func NewSearchCmd(deps *Dependencies) *cobra.Command {
+	var jsonOutput bool
+
 	cmd := &cobra.Command{
 		Use:     "search <query>",
 		Aliases: []string{"s"},
@@ -27,11 +29,16 @@ func NewSearchCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			if jsonOutput {
+				return output.WriteJSON(os.Stdout, tasks)
+			}
+
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TaskList(tasks)
 			return nil
 		},
 	}
 
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
 }

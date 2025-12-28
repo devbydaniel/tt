@@ -21,6 +21,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	var inbox bool
 	var all bool
 	var group string
+	var jsonOutput bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -74,6 +75,10 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			if jsonOutput {
+				return output.WriteJSON(os.Stdout, tasks)
+			}
+
 			// Resolve grouping: flag > config for view > config for list > none
 			groupBy := group
 			if groupBy == "" {
@@ -101,6 +106,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().BoolVar(&inbox, "inbox", false, "Show tasks with no project, area, or dates")
 	cmd.Flags().BoolVar(&all, "all", false, "Show all active tasks")
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 
 	// Register completions
 	registry := NewCompletionRegistry(deps)

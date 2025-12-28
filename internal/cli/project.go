@@ -24,14 +24,13 @@ func NewProjectCmd(deps *Dependencies) *cobra.Command {
 
 func newProjectListCmd(deps *Dependencies) *cobra.Command {
 	var group string
+	var jsonOutput bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all projects",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-
 			// Use flag if provided, otherwise use config
 			groupBy := group
 			if groupBy == "" {
@@ -43,6 +42,10 @@ func newProjectListCmd(deps *Dependencies) *cobra.Command {
 				if err != nil {
 					return err
 				}
+				if jsonOutput {
+					return output.WriteJSON(os.Stdout, projects)
+				}
+				formatter := output.NewFormatter(os.Stdout, deps.Theme)
 				formatter.ProjectListGrouped(projects, groupBy)
 				return nil
 			}
@@ -51,12 +54,17 @@ func newProjectListCmd(deps *Dependencies) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if jsonOutput {
+				return output.WriteJSON(os.Stdout, projects)
+			}
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.ProjectList(projects)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group projects by: area")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 
 	return cmd
 }

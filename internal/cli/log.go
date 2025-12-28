@@ -11,6 +11,7 @@ import (
 func NewLogCmd(deps *Dependencies) *cobra.Command {
 	var sinceStr string
 	var group string
+	var jsonOutput bool
 
 	cmd := &cobra.Command{
 		Use:   "log",
@@ -30,6 +31,10 @@ func NewLogCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			if jsonOutput {
+				return output.WriteJSON(os.Stdout, tasks)
+			}
+
 			groupBy := group
 			if groupBy == "" {
 				groupBy = deps.Config.Grouping.GetForCommand("log")
@@ -43,6 +48,7 @@ func NewLogCmd(deps *Dependencies) *cobra.Command {
 
 	cmd.Flags().StringVar(&sinceStr, "since", "", "Show tasks completed since date (YYYY-MM-DD)")
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 
 	return cmd
 }

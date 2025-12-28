@@ -22,7 +22,9 @@ func NewAreaCmd(deps *Dependencies) *cobra.Command {
 }
 
 func newAreaListCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all areas",
 		Args:  cobra.NoArgs,
@@ -32,11 +34,18 @@ func newAreaListCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			if jsonOutput {
+				return output.WriteJSON(os.Stdout, areas)
+			}
+
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.AreaList(areas)
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
+	return cmd
 }
 
 func newAreaAddCmd(deps *Dependencies) *cobra.Command {

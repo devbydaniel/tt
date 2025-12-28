@@ -24,7 +24,9 @@ func NewTagCmd(deps *Dependencies) *cobra.Command {
 }
 
 func newTagListCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all tags in use",
 		Args:  cobra.NoArgs,
@@ -34,11 +36,18 @@ func newTagListCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
+			if jsonOutput {
+				return output.WriteJSON(os.Stdout, tags)
+			}
+
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			formatter.TagList(tags)
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
+	return cmd
 }
 
 func newTagAddCmd(deps *Dependencies) *cobra.Command {

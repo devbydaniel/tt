@@ -33,7 +33,7 @@ func (f *Formatter) SetHidePlannedDate(hide bool) {
 }
 
 func (f *Formatter) TaskCreated(t *task.Task) {
-	fmt.Fprintf(f.w, "Created task #%d: %s\n", t.ID, t.Title)
+	fmt.Fprintf(f.w, "Created task #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 }
 
 func (f *Formatter) TaskList(tasks []task.Task) {
@@ -364,12 +364,20 @@ func formatTagIndicator(tags []string) string {
 }
 
 func formatTaskTitle(t *task.Task) string {
-	title := strings.TrimRight(t.Title, "\n\r")
+	title := sanitizeTitle(t.Title)
 
 	// Add recurrence indicator
 	title += formatRecurIndicator(t)
 
 	return title
+}
+
+// sanitizeTitle removes newline characters from task titles to prevent display issues
+func sanitizeTitle(title string) string {
+	title = strings.ReplaceAll(title, "\r\n", " ")
+	title = strings.ReplaceAll(title, "\n", " ")
+	title = strings.ReplaceAll(title, "\r", " ")
+	return strings.TrimSpace(title)
 }
 
 func isPlannedForToday(t *task.Task) bool {
@@ -458,7 +466,7 @@ func formatTaskDate(planned, due *time.Time) string {
 
 func (f *Formatter) TasksCompleted(results []task.CompleteResult) {
 	for _, r := range results {
-		fmt.Fprintf(f.w, "Completed #%d: %s\n", r.Completed.ID, r.Completed.Title)
+		fmt.Fprintf(f.w, "Completed #%d: %s\n", r.Completed.ID, sanitizeTitle(r.Completed.Title))
 		if r.NextTask != nil {
 			nextDate := r.NextTask.PlannedDate
 			if nextDate == nil {
@@ -475,7 +483,7 @@ func (f *Formatter) TasksCompleted(results []task.CompleteResult) {
 
 func (f *Formatter) TasksDeleted(tasks []task.Task) {
 	for _, t := range tasks {
-		fmt.Fprintf(f.w, "Deleted #%d: %s\n", t.ID, t.Title)
+		fmt.Fprintf(f.w, "Deleted #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 	}
 }
 
@@ -490,7 +498,7 @@ func (f *Formatter) Logbook(tasks []task.Task) {
 		if t.CompletedAt != nil {
 			completedAt = t.CompletedAt.Format("2006-01-02 15:04")
 		}
-		fmt.Fprintf(f.w, "%d  %s  %s\n", t.ID, completedAt, t.Title)
+		fmt.Fprintf(f.w, "%d  %s  %s\n", t.ID, completedAt, sanitizeTitle(t.Title))
 	}
 }
 
@@ -617,7 +625,7 @@ func (f *Formatter) renderLogbookRows(tasks []task.Task) {
 		if t.CompletedAt != nil {
 			completedAt = t.CompletedAt.Format("15:04")
 		}
-		fmt.Fprintf(f.w, "  %d  %s  %s\n", t.ID, completedAt, t.Title)
+		fmt.Fprintf(f.w, "  %d  %s  %s\n", t.ID, completedAt, sanitizeTitle(t.Title))
 	}
 }
 
@@ -730,17 +738,17 @@ func (f *Formatter) ProjectAreaCleared(p *project.Project) {
 
 func (f *Formatter) TaskPlannedDateSet(t *task.Task) {
 	if t.PlannedDate != nil {
-		fmt.Fprintf(f.w, "Planned #%d for %s: %s\n", t.ID, t.PlannedDate.Format("Jan 2"), t.Title)
+		fmt.Fprintf(f.w, "Planned #%d for %s: %s\n", t.ID, t.PlannedDate.Format("Jan 2"), sanitizeTitle(t.Title))
 	} else {
-		fmt.Fprintf(f.w, "Cleared planned date for #%d: %s\n", t.ID, t.Title)
+		fmt.Fprintf(f.w, "Cleared planned date for #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 	}
 }
 
 func (f *Formatter) TaskDueDateSet(t *task.Task) {
 	if t.DueDate != nil {
-		fmt.Fprintf(f.w, "Due #%d on %s: %s\n", t.ID, t.DueDate.Format("Jan 2"), t.Title)
+		fmt.Fprintf(f.w, "Due #%d on %s: %s\n", t.ID, t.DueDate.Format("Jan 2"), sanitizeTitle(t.Title))
 	} else {
-		fmt.Fprintf(f.w, "Cleared due date for #%d: %s\n", t.ID, t.Title)
+		fmt.Fprintf(f.w, "Cleared due date for #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 	}
 }
 
@@ -748,34 +756,34 @@ func (f *Formatter) TaskRecurrenceSet(t *task.Task) {
 	if t.RecurRule != nil {
 		rule, err := recurparse.FromJSON(*t.RecurRule)
 		if err != nil {
-			fmt.Fprintf(f.w, "Set recurrence for #%d: %s\n", t.ID, t.Title)
+			fmt.Fprintf(f.w, "Set recurrence for #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 			return
 		}
-		fmt.Fprintf(f.w, "Set recurrence for #%d (%s): %s\n", t.ID, rule.Format(), t.Title)
+		fmt.Fprintf(f.w, "Set recurrence for #%d (%s): %s\n", t.ID, rule.Format(), sanitizeTitle(t.Title))
 	} else {
-		fmt.Fprintf(f.w, "Cleared recurrence for #%d: %s\n", t.ID, t.Title)
+		fmt.Fprintf(f.w, "Cleared recurrence for #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 	}
 }
 
 func (f *Formatter) TaskRecurrencePaused(t *task.Task) {
-	fmt.Fprintf(f.w, "Paused recurrence for #%d: %s\n", t.ID, t.Title)
+	fmt.Fprintf(f.w, "Paused recurrence for #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 }
 
 func (f *Formatter) TaskRecurrenceResumed(t *task.Task) {
-	fmt.Fprintf(f.w, "Resumed recurrence for #%d: %s\n", t.ID, t.Title)
+	fmt.Fprintf(f.w, "Resumed recurrence for #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 }
 
 func (f *Formatter) TaskRecurrenceEndSet(t *task.Task) {
 	if t.RecurEnd != nil {
-		fmt.Fprintf(f.w, "Set recurrence end date for #%d to %s: %s\n", t.ID, t.RecurEnd.Format("Jan 2"), t.Title)
+		fmt.Fprintf(f.w, "Set recurrence end date for #%d to %s: %s\n", t.ID, t.RecurEnd.Format("Jan 2"), sanitizeTitle(t.Title))
 	} else {
-		fmt.Fprintf(f.w, "Cleared recurrence end date for #%d: %s\n", t.ID, t.Title)
+		fmt.Fprintf(f.w, "Cleared recurrence end date for #%d: %s\n", t.ID, sanitizeTitle(t.Title))
 	}
 }
 
 func (f *Formatter) TaskRecurrenceInfo(t *task.Task) {
 	if t.RecurRule == nil {
-		fmt.Fprintf(f.w, "#%d: %s (no recurrence)\n", t.ID, t.Title)
+		fmt.Fprintf(f.w, "#%d: %s (no recurrence)\n", t.ID, sanitizeTitle(t.Title))
 		return
 	}
 
@@ -795,7 +803,7 @@ func (f *Formatter) TaskRecurrenceInfo(t *task.Task) {
 		endStr = fmt.Sprintf(" until %s", t.RecurEnd.Format("Jan 2, 2006"))
 	}
 
-	fmt.Fprintf(f.w, "#%d: %s\n  Recurs: %s%s%s\n", t.ID, t.Title, ruleStr, endStr, status)
+	fmt.Fprintf(f.w, "#%d: %s\n  Recurs: %s%s%s\n", t.ID, sanitizeTitle(t.Title), ruleStr, endStr, status)
 }
 
 func (f *Formatter) TagList(tags []string) {
@@ -810,11 +818,11 @@ func (f *Formatter) TagList(tags []string) {
 }
 
 func (f *Formatter) TaskTagAdded(t *task.Task, tagName string) {
-	fmt.Fprintf(f.w, "Added tag '%s' to #%d: %s\n", tagName, t.ID, t.Title)
+	fmt.Fprintf(f.w, "Added tag '%s' to #%d: %s\n", tagName, t.ID, sanitizeTitle(t.Title))
 }
 
 func (f *Formatter) TaskTagRemoved(t *task.Task, tagName string) {
-	fmt.Fprintf(f.w, "Removed tag '%s' from #%d: %s\n", tagName, t.ID, t.Title)
+	fmt.Fprintf(f.w, "Removed tag '%s' from #%d: %s\n", tagName, t.ID, sanitizeTitle(t.Title))
 }
 
 func (f *Formatter) TaskEdited(id int64, changes []string) {
@@ -837,7 +845,7 @@ func joinChanges(changes []string) string {
 }
 
 func (f *Formatter) TaskDetails(t *task.Task) {
-	fmt.Fprintf(f.w, "#%d: %s\n", t.ID, t.Title)
+	fmt.Fprintf(f.w, "#%d: %s\n", t.ID, sanitizeTitle(t.Title))
 
 	if t.Description != nil && *t.Description != "" {
 		fmt.Fprintf(f.w, "  Description: %s\n", *t.Description)

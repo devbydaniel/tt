@@ -134,32 +134,32 @@ func defaultDirection(f SortField) SortDirection {
 }
 
 type Task struct {
-	ID          int64
-	UUID        string
-	Title       string
-	Description *string
-	ProjectID   *int64
-	AreaID      *int64
-	PlannedDate *time.Time
-	DueDate     *time.Time
-	State       string
-	Status      string
-	CreatedAt   time.Time
-	CompletedAt *time.Time
+	ID          int64      `json:"id"`
+	UUID        string     `json:"uuid"`
+	Title       string     `json:"title"`
+	Description *string    `json:"description,omitempty"`
+	ProjectID   *int64     `json:"projectId,omitempty"`
+	AreaID      *int64     `json:"areaId,omitempty"`
+	PlannedDate *time.Time `json:"plannedDate,omitempty"`
+	DueDate     *time.Time `json:"dueDate,omitempty"`
+	State       string     `json:"state"`
+	Status      string     `json:"status"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	CompletedAt *time.Time `json:"completedAt,omitempty"`
 
 	// Recurrence fields
-	RecurType     *string    // "fixed" or "relative"
-	RecurRule     *string    // JSON rule: {"interval":1,"unit":"week",...}
-	RecurEnd      *time.Time // optional end date
-	RecurPaused   bool       // true = paused
-	RecurParentID *int64     // links to original recurring task
+	RecurType     *string    `json:"recurType,omitempty"`     // "fixed" or "relative"
+	RecurRule     *string    `json:"recurRule,omitempty"`     // JSON rule: {"interval":1,"unit":"week",...}
+	RecurEnd      *time.Time `json:"recurEnd,omitempty"`      // optional end date
+	RecurPaused   bool       `json:"recurPaused,omitempty"`   // true = paused
+	RecurParentID *int64     `json:"recurParentId,omitempty"` // links to original recurring task
 
 	// Tags
-	Tags []string
+	Tags []string `json:"tags,omitempty"`
 
 	// Display fields (populated by queries with JOINs, not persisted)
-	ProjectName *string
-	AreaName    *string
+	ProjectName *string `json:"projectName,omitempty"`
+	AreaName    *string `json:"areaName,omitempty"`
 }
 
 // Recurrence type constants

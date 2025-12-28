@@ -1,13 +1,13 @@
 package project
 
 type Project struct {
-	ID     int64
-	Name   string
-	AreaID *int64
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	AreaID *int64 `json:"areaId,omitempty"`
 }
 
 // ProjectWithArea includes the area name for display purposes
 type ProjectWithArea struct {
 	Project
-	AreaName *string
+	AreaName *string `json:"areaName,omitempty"`
 }
