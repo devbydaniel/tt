@@ -243,8 +243,10 @@ func (f *Formatter) groupedByDate(tasks []task.Task) {
 
 func getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfMonth, endOfYear time.Time) string {
 	var d *time.Time
+	isPlanned := false
 	if planned != nil {
 		d = planned
+		isPlanned = true
 	} else if due != nil {
 		d = due
 	}
@@ -257,6 +259,10 @@ func getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfM
 	dateOnly := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.Local)
 
 	if dateOnly.Before(today) {
+		// Planned dates in past show as "Today", only due dates are "Overdue"
+		if isPlanned {
+			return "Today"
+		}
 		return "Overdue"
 	}
 	if dateOnly.Equal(today) {
