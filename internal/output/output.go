@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -15,11 +16,16 @@ import (
 )
 
 type Formatter struct {
-	w io.Writer
+	w               io.Writer
+	hidePlannedDate bool
 }
 
 func NewFormatter(w io.Writer) *Formatter {
 	return &Formatter{w: w}
+}
+
+func (f *Formatter) SetHidePlannedDate(hide bool) {
+	f.hidePlannedDate = hide
 }
 
 func (f *Formatter) TaskCreated(t *task.Task) {
@@ -58,7 +64,7 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 
 		// Task title with recurrence indicator, dates, and tags
 		title := formatTaskTitle(&t)
-		if t.PlannedDate != nil {
+		if t.PlannedDate != nil && !f.hidePlannedDate {
 			title += " " + mutedStyle.Render("📅 "+t.PlannedDate.Format("Jan 2"))
 		}
 		if t.DueDate != nil {
@@ -83,7 +89,8 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 			return lipgloss.NewStyle().PaddingRight(2)
 		})
 
-	fmt.Fprintln(f.w, tbl.Render())
+	// Normalize: lipgloss adds trailing \n + spaces for single-row tables
+	fmt.Fprintln(f.w, strings.TrimRight(tbl.Render(), " \n"))
 }
 
 // GroupedTaskList displays tasks grouped by the specified field.
@@ -116,6 +123,7 @@ func (f *Formatter) GroupedTaskList(tasks []task.Task, groupBy string) {
 // sorted before "Area > Project" groups (alphabetically, area-only headers come first)
 func (f *Formatter) groupedByProject(tasks []task.Task) {
 	headerStyle := lipgloss.NewStyle().Bold(true)
+	idWidth := maxIDWidth(tasks)
 
 	// Group tasks:
 	// - No area, no project -> "No Project"
@@ -146,8 +154,7 @@ func (f *Formatter) groupedByProject(tasks []task.Task) {
 	// Render: No Project (no area) first
 	if len(noProjectNoAreaTasks) > 0 {
 		fmt.Fprintln(f.w, headerStyle.Render("No Project"))
-		f.renderTaskRows(noProjectNoAreaTasks, 0, false)
-		fmt.Fprintln(f.w)
+		f.renderTaskRows(noProjectNoAreaTasks, 0, false, idWidth)
 	}
 
 	// Render groups alphabetically
@@ -160,14 +167,14 @@ func (f *Formatter) groupedByProject(tasks []task.Task) {
 
 	for _, header := range headers {
 		fmt.Fprintln(f.w, headerStyle.Render(header))
-		f.renderTaskRows(groups[header], 0, false)
-		fmt.Fprintln(f.w)
+		f.renderTaskRows(groups[header], 0, false, idWidth)
 	}
 }
 
 // groupedByArea displays tasks grouped by area
 func (f *Formatter) groupedByArea(tasks []task.Task) {
 	headerStyle := lipgloss.NewStyle().Bold(true)
+	idWidth := maxIDWidth(tasks)
 
 	// Group by area
 	noAreaTasks := make([]task.Task, 0)
@@ -184,8 +191,7 @@ func (f *Formatter) groupedByArea(tasks []task.Task) {
 	// Render: No Area first
 	if len(noAreaTasks) > 0 {
 		fmt.Fprintln(f.w, headerStyle.Render("No Area"))
-		f.renderTaskRows(noAreaTasks, 0, true)
-		fmt.Fprintln(f.w)
+		f.renderTaskRows(noAreaTasks, 0, true, idWidth)
 	}
 
 	// Render areas alphabetically
@@ -197,14 +203,14 @@ func (f *Formatter) groupedByArea(tasks []task.Task) {
 
 	for _, aName := range areaNames {
 		fmt.Fprintln(f.w, headerStyle.Render(aName))
-		f.renderTaskRows(areaGroups[aName], 0, true)
-		fmt.Fprintln(f.w)
+		f.renderTaskRows(areaGroups[aName], 0, true, idWidth)
 	}
 }
 
 // groupedByDate displays tasks grouped by date categories
 func (f *Formatter) groupedByDate(tasks []task.Task) {
 	headerStyle := lipgloss.NewStyle().Bold(true)
+	idWidth := maxIDWidth(tasks)
 
 	// Define date categories
 	dateGroups := map[string][]task.Task{
@@ -234,8 +240,7 @@ func (f *Formatter) groupedByDate(tasks []task.Task) {
 	for _, category := range orderedCategories {
 		if len(dateGroups[category]) > 0 {
 			fmt.Fprintln(f.w, headerStyle.Render(category))
-			f.renderTaskRows(dateGroups[category], 0, true)
-			fmt.Fprintln(f.w)
+			f.renderTaskRows(dateGroups[category], 0, true, idWidth)
 		}
 	}
 }
@@ -273,8 +278,20 @@ func getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfN
 	return "Later"
 }
 
+// maxIDWidth calculates the width needed for the largest task ID
+func maxIDWidth(tasks []task.Task) int {
+	maxWidth := 1
+	for _, t := range tasks {
+		width := len(fmt.Sprintf("%d", t.ID))
+		if width > maxWidth {
+			maxWidth = width
+		}
+	}
+	return maxWidth
+}
+
 // renderTaskRows renders task rows with optional indentation
-func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool) {
+func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool, idWidth int) {
 	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	starStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
 	flagStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
@@ -298,7 +315,7 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 		}
 
 		title := formatTaskTitle(&t)
-		if t.PlannedDate != nil {
+		if t.PlannedDate != nil && !f.hidePlannedDate {
 			title += " " + mutedStyle.Render("📅 "+t.PlannedDate.Format("Jan 2"))
 		}
 		if t.DueDate != nil {
@@ -309,7 +326,7 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 		}
 
 		rows = append(rows, []string{
-			prefix + fmt.Sprintf("%d", t.ID),
+			prefix + fmt.Sprintf("%*d", idWidth, t.ID),
 			scope,
 			title,
 		})
@@ -329,7 +346,8 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 			return style
 		})
 
-	fmt.Fprint(f.w, tbl.Render())
+	// Normalize: lipgloss adds trailing \n + spaces for single-row tables
+	fmt.Fprintln(f.w, strings.TrimRight(tbl.Render(), " \n"))
 }
 
 func formatRecurIndicator(t *task.Task) string {
@@ -535,7 +553,6 @@ func (f *Formatter) logbookByProject(tasks []task.Task) {
 	if len(noProjectNoAreaTasks) > 0 {
 		fmt.Fprintln(f.w, headerStyle.Render("No Project"))
 		f.renderLogbookRows(noProjectNoAreaTasks)
-		fmt.Fprintln(f.w)
 	}
 
 	headers := make([]string, 0, len(groups))
@@ -547,7 +564,6 @@ func (f *Formatter) logbookByProject(tasks []task.Task) {
 	for _, header := range headers {
 		fmt.Fprintln(f.w, headerStyle.Render(header))
 		f.renderLogbookRows(groups[header])
-		fmt.Fprintln(f.w)
 	}
 }
 
@@ -568,7 +584,6 @@ func (f *Formatter) logbookByArea(tasks []task.Task) {
 	if len(noAreaTasks) > 0 {
 		fmt.Fprintln(f.w, headerStyle.Render("No Area"))
 		f.renderLogbookRows(noAreaTasks)
-		fmt.Fprintln(f.w)
 	}
 
 	areaNames := make([]string, 0, len(areaGroups))
@@ -580,7 +595,6 @@ func (f *Formatter) logbookByArea(tasks []task.Task) {
 	for _, aName := range areaNames {
 		fmt.Fprintln(f.w, headerStyle.Render(aName))
 		f.renderLogbookRows(areaGroups[aName])
-		fmt.Fprintln(f.w)
 	}
 }
 
@@ -608,7 +622,6 @@ func (f *Formatter) logbookByDate(tasks []task.Task) {
 	for _, date := range dates {
 		fmt.Fprintln(f.w, headerStyle.Render(date))
 		f.renderLogbookRows(dateGroups[date])
-		fmt.Fprintln(f.w)
 	}
 }
 

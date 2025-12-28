@@ -43,6 +43,7 @@ func NewTodayCmd(deps *Dependencies) *cobra.Command {
 			}
 
 			formatter := output.NewFormatter(os.Stdout)
+			formatter.SetHidePlannedDate(true)
 			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
 		},
