@@ -38,36 +38,20 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				All:         all,
 			}
 
-			// Apply default_list config if no view filter specified
-			// When filtering by project/area, default to showing all tasks in that filter
-			viewCmd := "list"
-			if !today && !upcoming && !someday && !anytime && !inbox && !all {
-				if projectName != "" || areaName != "" {
-					// Project/area filter: show all tasks in that project/area
-					opts.All = true
-					viewCmd = "all"
-				} else {
-					switch deps.Config.DefaultList {
-					case "upcoming":
-						opts.Upcoming = true
-						viewCmd = "upcoming"
-					case "anytime":
-						opts.Anytime = true
-						viewCmd = "anytime"
-					case "someday":
-						opts.Someday = true
-						viewCmd = "someday"
-					case "inbox":
-						opts.Inbox = true
-						viewCmd = "inbox"
-					case "all":
-						opts.All = true
-						viewCmd = "all"
-					default:
-						opts.Today = true
-						viewCmd = "today"
-					}
-				}
+			// Default to showing all active tasks (default_list config only applies to bare "tt" command)
+			viewCmd := "all"
+			if today {
+				viewCmd = "today"
+			} else if upcoming {
+				viewCmd = "upcoming"
+			} else if someday {
+				viewCmd = "someday"
+			} else if anytime {
+				viewCmd = "anytime"
+			} else if inbox {
+				viewCmd = "inbox"
+			} else {
+				opts.All = true
 			}
 
 			tasks, err := deps.TaskService.List(opts)
