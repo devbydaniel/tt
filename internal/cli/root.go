@@ -66,8 +66,15 @@ func runList(deps *Dependencies) error {
 		defaultList = "today"
 	}
 
+	return RunListView(deps, defaultList, "", "")
+}
+
+// RunListView runs a list view with the given view name, optional sort and group overrides.
+// This is used by all shortcut commands (today, upcoming, etc.) and the list command.
+func RunListView(deps *Dependencies, viewCmd, sortOverride, groupOverride string) error {
+	// Build list options based on view command
 	opts := &task.ListOptions{}
-	switch defaultList {
+	switch viewCmd {
 	case "today":
 		opts.Today = true
 	case "upcoming":
@@ -82,14 +89,32 @@ func runList(deps *Dependencies) error {
 		opts.All = true
 	}
 
+	// Resolve sorting: override > config > code default
+	sortToUse := sortOverride
+	if sortToUse == "" {
+		sortToUse = deps.Config.Sorting.GetForCommand(viewCmd)
+	}
+	sortOpts, err := task.ParseSort(sortToUse)
+	if err != nil {
+		return err
+	}
+	opts.Sort = sortOpts
+
 	tasks, err := deps.TaskService.List(opts)
 	if err != nil {
 		return err
 	}
 
-	groupBy := deps.Config.Grouping.GetForCommand(defaultList)
+	// Resolve grouping: override > config > none
+	groupBy := groupOverride
+	if groupBy == "" {
+		groupBy = deps.Config.Grouping.GetForCommand(viewCmd)
+	}
 
 	formatter := output.NewFormatter(os.Stdout, deps.Theme)
+	if viewCmd == "today" {
+		formatter.SetHidePlannedDate(true)
+	}
 	formatter.GroupedTaskList(tasks, groupBy)
 	return nil
 }

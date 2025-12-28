@@ -12,6 +12,7 @@ type Config struct {
 	Database    string
 	DefaultList string // default view: today, upcoming, anytime, someday, inbox, all
 	Grouping    GroupingConfig
+	Sorting     SortingConfig
 	Theme       ThemeConfig
 }
 
@@ -79,11 +80,47 @@ func (g GroupingConfig) GetForCommand(cmd string) string {
 	return "none"
 }
 
+// SortingConfig holds sorting settings with global default and per-command overrides
+type SortingConfig struct {
+	Default  string `toml:"default"`  // global default: created, title, planned, due, id, project, area
+	List     string `toml:"list"`     // override for list command
+	Today    string `toml:"today"`    // override for today command
+	Upcoming string `toml:"upcoming"` // override for upcoming command
+	Anytime  string `toml:"anytime"`  // override for anytime command
+	Someday  string `toml:"someday"`  // override for someday command
+}
+
+// GetForCommand returns the sorting setting for a specific command.
+// Priority: command-specific > global default > "" (use code default)
+func (s SortingConfig) GetForCommand(cmd string) string {
+	var cmdSetting string
+	switch cmd {
+	case "list", "all":
+		cmdSetting = s.List
+	case "today":
+		cmdSetting = s.Today
+	case "upcoming":
+		cmdSetting = s.Upcoming
+	case "anytime":
+		cmdSetting = s.Anytime
+	case "someday":
+		cmdSetting = s.Someday
+	}
+	if cmdSetting != "" {
+		return cmdSetting
+	}
+	if s.Default != "" {
+		return s.Default
+	}
+	return "" // empty means use code default (created:desc)
+}
+
 // fileConfig represents the TOML config file structure
 type fileConfig struct {
 	DataDir     string         `toml:"data_dir"`
 	DefaultList string         `toml:"default_list"`
 	Grouping    GroupingConfig `toml:"grouping"`
+	Sorting     SortingConfig  `toml:"sorting"`
 	Theme       ThemeConfig    `toml:"theme"`
 }
 
@@ -97,12 +134,14 @@ func Load() (*Config, error) {
 	// Load config from file
 	var defaultList string
 	var grouping GroupingConfig
+	var sorting SortingConfig
 	var theme ThemeConfig
 	if configPath := configFilePath(); configPath != "" {
 		var fc fileConfig
 		if _, err := toml.DecodeFile(configPath, &fc); err == nil {
 			defaultList = fc.DefaultList
 			grouping = fc.Grouping
+			sorting = fc.Sorting
 			theme = fc.Theme
 		}
 	}
@@ -111,6 +150,7 @@ func Load() (*Config, error) {
 		Database:    filepath.Join(dataDir, "tasks.db"),
 		DefaultList: defaultList,
 		Grouping:    grouping,
+		Sorting:     sorting,
 		Theme:       theme,
 	}, nil
 }

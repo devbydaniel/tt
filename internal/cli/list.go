@@ -26,7 +26,26 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 		Use:   "list",
 		Short: "List tasks",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			sortOpts, err := task.ParseSort(sortStr)
+			// Determine view command first (needed for config lookup)
+			viewCmd := "all"
+			if today {
+				viewCmd = "today"
+			} else if upcoming {
+				viewCmd = "upcoming"
+			} else if someday {
+				viewCmd = "someday"
+			} else if anytime {
+				viewCmd = "anytime"
+			} else if inbox {
+				viewCmd = "inbox"
+			}
+
+			// Resolve sorting: flag > config for view > code default
+			sortToUse := sortStr
+			if sortToUse == "" {
+				sortToUse = deps.Config.Sorting.GetForCommand(viewCmd)
+			}
+			sortOpts, err := task.ParseSort(sortToUse)
 			if err != nil {
 				return err
 			}
@@ -46,18 +65,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 			}
 
 			// Default to showing all active tasks (default_list config only applies to bare "tt" command)
-			viewCmd := "all"
-			if today {
-				viewCmd = "today"
-			} else if upcoming {
-				viewCmd = "upcoming"
-			} else if someday {
-				viewCmd = "someday"
-			} else if anytime {
-				viewCmd = "anytime"
-			} else if inbox {
-				viewCmd = "inbox"
-			} else {
+			if viewCmd == "all" {
 				opts.All = true
 			}
 

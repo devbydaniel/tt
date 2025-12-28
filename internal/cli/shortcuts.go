@@ -1,135 +1,90 @@
 package cli
 
 import (
-	"os"
-
-	"github.com/devbydaniel/tt/internal/domain/task"
-	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
 
 func NewInboxCmd(deps *Dependencies) *cobra.Command {
-	return &cobra.Command{
+	var group string
+	var sortStr string
+
+	cmd := &cobra.Command{
 		Use:   "inbox",
 		Short: "List tasks with no project, area, or dates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tasks, err := deps.TaskService.List(&task.ListOptions{Inbox: true})
-			if err != nil {
-				return err
-			}
-
-			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			formatter.TaskList(tasks)
-			return nil
+			return RunListView(deps, "inbox", sortStr, group)
 		},
 	}
+
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
+	return cmd
 }
 
 func NewTodayCmd(deps *Dependencies) *cobra.Command {
 	var group string
+	var sortStr string
 
 	cmd := &cobra.Command{
 		Use:   "today",
 		Short: "List tasks planned for today or overdue",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tasks, err := deps.TaskService.List(&task.ListOptions{Today: true})
-			if err != nil {
-				return err
-			}
-
-			groupBy := group
-			if groupBy == "" {
-				groupBy = deps.Config.Grouping.GetForCommand("today")
-			}
-
-			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			formatter.SetHidePlannedDate(true)
-			formatter.GroupedTaskList(tasks, groupBy)
-			return nil
+			return RunListView(deps, "today", sortStr, group)
 		},
 	}
 
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	return cmd
 }
 
 func NewUpcomingCmd(deps *Dependencies) *cobra.Command {
 	var group string
+	var sortStr string
 
 	cmd := &cobra.Command{
 		Use:   "upcoming",
 		Short: "List tasks with future dates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tasks, err := deps.TaskService.List(&task.ListOptions{Upcoming: true})
-			if err != nil {
-				return err
-			}
-
-			groupBy := group
-			if groupBy == "" {
-				groupBy = deps.Config.Grouping.GetForCommand("upcoming")
-			}
-
-			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			formatter.GroupedTaskList(tasks, groupBy)
-			return nil
+			return RunListView(deps, "upcoming", sortStr, group)
 		},
 	}
 
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	return cmd
 }
 
 func NewAnytimeCmd(deps *Dependencies) *cobra.Command {
 	var group string
+	var sortStr string
 
 	cmd := &cobra.Command{
 		Use:   "anytime",
 		Short: "List active tasks with no specific dates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tasks, err := deps.TaskService.List(&task.ListOptions{Anytime: true})
-			if err != nil {
-				return err
-			}
-
-			groupBy := group
-			if groupBy == "" {
-				groupBy = deps.Config.Grouping.GetForCommand("anytime")
-			}
-
-			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			formatter.GroupedTaskList(tasks, groupBy)
-			return nil
+			return RunListView(deps, "anytime", sortStr, group)
 		},
 	}
 
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	return cmd
 }
 
 func NewSomedayCmd(deps *Dependencies) *cobra.Command {
 	var group string
+	var sortStr string
 
 	cmd := &cobra.Command{
 		Use:   "someday",
 		Short: "List tasks deferred to someday",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tasks, err := deps.TaskService.List(&task.ListOptions{Someday: true})
-			if err != nil {
-				return err
-			}
-
-			groupBy := group
-			if groupBy == "" {
-				groupBy = deps.Config.Grouping.GetForCommand("someday")
-			}
-
-			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			formatter.GroupedTaskList(tasks, groupBy)
-			return nil
+			return RunListView(deps, "someday", sortStr, group)
 		},
 	}
 
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	return cmd
 }

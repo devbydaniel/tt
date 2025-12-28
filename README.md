@@ -273,9 +273,15 @@ today = "project"      # Override for today command
 upcoming = "date"      # Override for upcoming command
 log = "date"           # Override for log command
 project_list = "area"  # Override for project list command (area, none)
+
+# Default sorting for list commands
+[sorting]
+default = "created"    # Global default: created, title, planned, due, id, project, area
+today = "planned"      # Override for today command
+upcoming = "planned:asc"  # Override for upcoming command
 ```
 
-The `--group` flag always overrides config settings. View flags like `--today` or `--upcoming` override `default_list`.
+The `--sort` and `--group` flags always override config settings. View flags like `--today` or `--upcoming` override `default_list`.
 
 ### Theming
 

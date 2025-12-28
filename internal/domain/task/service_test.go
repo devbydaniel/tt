@@ -813,3 +813,172 @@ func TestClearArea(t *testing.T) {
 		t.Error("AreaID should be nil after clearing")
 	}
 }
+
+func TestListSortByTitle(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	// Create tasks with different titles (not in alphabetical order)
+	taskSvc.Create("Charlie task", nil)
+	taskSvc.Create("Alpha task", nil)
+	taskSvc.Create("Bravo task", nil)
+
+	// Sort by title ascending
+	sortOpts, _ := task.ParseSort("title:asc")
+	tasks, err := taskSvc.List(&task.ListOptions{Sort: sortOpts})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	if len(tasks) != 3 {
+		t.Fatalf("got %d tasks, want 3", len(tasks))
+	}
+	if tasks[0].Title != "Alpha task" {
+		t.Errorf("tasks[0].Title = %q, want %q", tasks[0].Title, "Alpha task")
+	}
+	if tasks[1].Title != "Bravo task" {
+		t.Errorf("tasks[1].Title = %q, want %q", tasks[1].Title, "Bravo task")
+	}
+	if tasks[2].Title != "Charlie task" {
+		t.Errorf("tasks[2].Title = %q, want %q", tasks[2].Title, "Charlie task")
+	}
+}
+
+func TestListSortByTitleDesc(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	taskSvc.Create("Alpha task", nil)
+	taskSvc.Create("Charlie task", nil)
+	taskSvc.Create("Bravo task", nil)
+
+	sortOpts, _ := task.ParseSort("title:desc")
+	tasks, err := taskSvc.List(&task.ListOptions{Sort: sortOpts})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	if tasks[0].Title != "Charlie task" {
+		t.Errorf("tasks[0].Title = %q, want %q", tasks[0].Title, "Charlie task")
+	}
+	if tasks[2].Title != "Alpha task" {
+		t.Errorf("tasks[2].Title = %q, want %q", tasks[2].Title, "Alpha task")
+	}
+}
+
+func TestListSortByPlannedDate(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	today := time.Now()
+	tomorrow := today.AddDate(0, 0, 1)
+	yesterday := today.AddDate(0, 0, -1)
+
+	taskSvc.Create("Tomorrow task", &task.CreateOptions{PlannedDate: &tomorrow})
+	taskSvc.Create("No date task", nil)
+	taskSvc.Create("Yesterday task", &task.CreateOptions{PlannedDate: &yesterday})
+
+	// Sort by planned date descending (default for date fields)
+	sortOpts, _ := task.ParseSort("planned")
+	tasks, err := taskSvc.List(&task.ListOptions{Sort: sortOpts})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	if len(tasks) != 3 {
+		t.Fatalf("got %d tasks, want 3", len(tasks))
+	}
+
+	// DESC: tomorrow first, yesterday second, no date last
+	if tasks[0].Title != "Tomorrow task" {
+		t.Errorf("tasks[0].Title = %q, want %q", tasks[0].Title, "Tomorrow task")
+	}
+	if tasks[1].Title != "Yesterday task" {
+		t.Errorf("tasks[1].Title = %q, want %q", tasks[1].Title, "Yesterday task")
+	}
+	if tasks[2].Title != "No date task" {
+		t.Errorf("tasks[2].Title = %q, want %q (nulls last)", tasks[2].Title, "No date task")
+	}
+}
+
+func TestListSortByPlannedDateAsc(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	today := time.Now()
+	tomorrow := today.AddDate(0, 0, 1)
+	yesterday := today.AddDate(0, 0, -1)
+
+	taskSvc.Create("Tomorrow task", &task.CreateOptions{PlannedDate: &tomorrow})
+	taskSvc.Create("No date task", nil)
+	taskSvc.Create("Yesterday task", &task.CreateOptions{PlannedDate: &yesterday})
+
+	// Sort by planned date ascending
+	sortOpts, _ := task.ParseSort("planned:asc")
+	tasks, err := taskSvc.List(&task.ListOptions{Sort: sortOpts})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	// ASC: yesterday first, tomorrow second, no date last
+	if tasks[0].Title != "Yesterday task" {
+		t.Errorf("tasks[0].Title = %q, want %q", tasks[0].Title, "Yesterday task")
+	}
+	if tasks[1].Title != "Tomorrow task" {
+		t.Errorf("tasks[1].Title = %q, want %q", tasks[1].Title, "Tomorrow task")
+	}
+	if tasks[2].Title != "No date task" {
+		t.Errorf("tasks[2].Title = %q, want %q (nulls last)", tasks[2].Title, "No date task")
+	}
+}
+
+func TestListSortMultipleFields(t *testing.T) {
+	taskSvc, projectSvc, _ := setupServices(t)
+
+	projectSvc.Create("Alpha Project", "")
+	projectSvc.Create("Beta Project", "")
+
+	taskSvc.Create("Task B", &task.CreateOptions{ProjectName: "Alpha Project"})
+	taskSvc.Create("Task A", &task.CreateOptions{ProjectName: "Alpha Project"})
+	taskSvc.Create("Task C", &task.CreateOptions{ProjectName: "Beta Project"})
+
+	// Sort by project then title
+	sortOpts, _ := task.ParseSort("project:asc,title:asc")
+	tasks, err := taskSvc.List(&task.ListOptions{Sort: sortOpts})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	if len(tasks) != 3 {
+		t.Fatalf("got %d tasks, want 3", len(tasks))
+	}
+
+	// Alpha Project tasks first (sorted by title), then Beta Project
+	if tasks[0].Title != "Task A" {
+		t.Errorf("tasks[0].Title = %q, want %q", tasks[0].Title, "Task A")
+	}
+	if tasks[1].Title != "Task B" {
+		t.Errorf("tasks[1].Title = %q, want %q", tasks[1].Title, "Task B")
+	}
+	if tasks[2].Title != "Task C" {
+		t.Errorf("tasks[2].Title = %q, want %q", tasks[2].Title, "Task C")
+	}
+}
+
+func TestListDefaultSort(t *testing.T) {
+	taskSvc, _, _ := setupServices(t)
+
+	// Create tasks - they'll have same created_at since test runs fast
+	taskSvc.Create("First", nil)
+	taskSvc.Create("Second", nil)
+	taskSvc.Create("Third", nil)
+
+	// Default sort (no options) should use created:desc
+	tasks, err := taskSvc.List(nil)
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	if len(tasks) != 3 {
+		t.Fatalf("got %d tasks, want 3", len(tasks))
+	}
+
+	// With same created_at, order depends on ID (which is also desc in the CASE expression)
+	// The important thing is it doesn't error
+}
