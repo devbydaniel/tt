@@ -103,6 +103,17 @@ tt list --all --group=none      # Flat list (default)
 
 All list commands support the `--group` / `-g` flag.
 
+### Searching Tasks (`search` / `s`)
+
+```bash
+tt search "groceries"           # Search by title (case-insensitive)
+tt s "report"                   # Shorthand
+
+# Combine with list filters
+tt list --search "report" --project Work
+tt list -s "meeting" --upcoming
+```
+
 ### Completing Tasks
 
 ```bash

@@ -113,6 +113,7 @@ type ListOptions struct {
 	Anytime     bool   // show active tasks with no dates
 	Inbox       bool   // show tasks with no project/area/dates
 	All         bool   // show all active (no date filter)
+	Search      string // case-insensitive title search
 }
 
 func (s *Service) List(opts *ListOptions) ([]Task, error) {
@@ -137,6 +138,9 @@ func (s *Service) List(opts *ListOptions) ([]Task, error) {
 		}
 		if opts.TagName != "" {
 			filter.TagName = opts.TagName
+		}
+		if opts.Search != "" {
+			filter.Search = opts.Search
 		}
 
 		if opts.Someday {

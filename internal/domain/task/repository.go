@@ -62,6 +62,7 @@ type ListFilter struct {
 	Anytime   bool   // no planned_date and no due_date (active only)
 	Inbox     bool   // no project, no area, no dates
 	TagName   string // filter by tag
+	Search    string // case-insensitive title search
 }
 
 func (r *Repository) List(filter *ListFilter) ([]Task, error) {
@@ -115,6 +116,10 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 		if filter.Inbox {
 			// no project, no area, no planned_date, no due_date
 			query += ` AND t.project_id IS NULL AND t.area_id IS NULL AND t.planned_date IS NULL AND t.due_date IS NULL`
+		}
+		if filter.Search != "" {
+			query += ` AND t.title LIKE ? COLLATE NOCASE`
+			args = append(args, "%"+filter.Search+"%")
 		}
 	}
 
