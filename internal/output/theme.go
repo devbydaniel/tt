@@ -99,7 +99,7 @@ func DefaultTheme() *Theme {
 		Icons: Icons{
 			Planned: "★",
 			Due:     "⚑",
-			Date:    "📅",
+			Date:    "›",
 		},
 	}
 }

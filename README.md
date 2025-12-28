@@ -12,6 +12,7 @@ Built for people who live in the terminal and want a simple, powerful way to man
 - **Smart recurrence** - `every monday`, `daily`, or `3d after done`
 - **Flexible organization** - Areas, projects, and tags
 - **Shell completion** - Tab completion for bash, zsh, and fish
+- **Themeable** - Preset themes (Dracula, Nord, etc.) or custom colors
 - **Fast** - Instant startup, instant results
 
 ## Installation
@@ -104,6 +105,24 @@ tt list --all --group=none      # Flat list (default)
 
 All list commands support the `--group` / `-g` flag.
 
+### Sorting Tasks
+
+```bash
+tt list --sort created          # Sort by creation date (newest first, default)
+tt list -s title                # Sort alphabetically by title
+tt list -s due                  # Sort by due date (newest first)
+tt list -s planned:asc          # Sort by planned date (oldest first)
+tt list -s due,title            # Multi-field: by due date, then title
+tt list -s project:asc,title    # By project name, then title
+```
+
+**Sort fields:** `id`, `title`, `planned`, `due`, `created`, `project`, `area`
+
+**Defaults:**
+- Date fields (`planned`, `due`, `created`) default to descending (newest first)
+- Text fields (`title`, `project`, `area`) default to ascending (A-Z)
+- Tasks without values (e.g., no due date) always sort last
+
 ### Searching Tasks (`search` / `s`)
 
 ```bash
@@ -112,7 +131,7 @@ tt s "report"                   # Shorthand
 
 # Combine with list filters
 tt list --search "report" --project Work
-tt list -s "meeting" --upcoming
+tt list -S "meeting" --upcoming
 ```
 
 ### Completing Tasks
@@ -258,6 +277,49 @@ project_list = "area"  # Override for project list command (area, none)
 
 The `--group` flag always overrides config settings. View flags like `--today` or `--upcoming` override `default_list`.
 
+### Theming
+
+Customize colors and icons to match your terminal theme:
+
+```toml
+[theme]
+name = "dracula"  # Use a preset theme
+```
+
+**Available presets:**
+
+| Theme | Type |
+|-------|------|
+| `dracula` | Dark |
+| `nord` | Dark |
+| `gruvbox` | Dark |
+| `tokyo-night` | Dark |
+| `solarized-light` | Light |
+| `catppuccin-latte` | Light |
+
+**Custom colors:**
+
+```toml
+[theme]
+# Colors: ANSI codes (0-255) or hex (#RRGGBB)
+muted = "#6272a4"    # Dates, tags, secondary info
+accent = "#f1fa8c"   # Planned-today indicator (★)
+warning = "#ff5555"  # Due/overdue indicator (⚑)
+header = "#bd93f9"   # Section headers
+scope = "#8be9fd"    # Project/area column
+```
+
+**Custom icons:**
+
+```toml
+[theme.icons]
+planned = "★"   # Tasks planned for today
+due = "⚑"       # Due/overdue indicator
+date = "›"      # Planned date prefix
+```
+
+You can combine a preset with custom overrides - preset colors are applied first, then your custom values override them.
+
 ## Data Storage
 
 Your tasks are stored in a local SQLite database:
@@ -314,6 +376,7 @@ After enabling, restart your shell or source the config file. Then use Tab to co
 ```bash
 tt add --project <TAB>    # Shows available projects
 tt list --area <TAB>      # Shows available areas
+tt list --sort <TAB>      # Shows sort fields
 tt edit 1 -p W<TAB>       # Completes to "Work" if it exists
 ```
 
