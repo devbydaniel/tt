@@ -54,15 +54,6 @@ tt --help
 
 ## Usage
 
-**Command aliases** for faster typing:
-
-| Command | Alias |
-|---------|-------|
-| `edit`  | `e`   |
-| `plan`  | `p`   |
-| `due`   | `d`   |
-| `tag`   | `t`   |
-
 ### Adding Tasks
 
 ```bash
@@ -91,10 +82,11 @@ tt add "Someday task" --someday
 ```bash
 tt                        # Today's tasks + overdue (default)
 tt list                   # Same as above
-tt list --upcoming        # Future planned tasks
-tt list --someday         # Someday/maybe tasks
-tt list --anytime         # Active tasks with no dates
-tt list --inbox           # Tasks with no project, area, or dates
+tt today                  # Shorthand for tt list (today's tasks + overdue)
+tt upcoming               # Future planned tasks (or: tt list --upcoming)
+tt someday                # Someday/maybe tasks (or: tt list --someday)
+tt anytime                # Active tasks with no dates (or: tt list --anytime)
+tt inbox                  # Tasks with no project, area, or dates (or: tt list --inbox)
 tt list --all             # All incomplete tasks
 
 # Filter by organization
@@ -109,16 +101,6 @@ tt list --all --group=date      # Group by date (Overdue, Today, Tomorrow, etc.)
 tt list --all --group=none      # Flat list (default)
 ```
 
-**Shorthand commands** for quick access:
-
-```bash
-tt inbox                  # Tasks with no project, area, or dates
-tt today                  # Today's tasks + overdue
-tt upcoming               # Future planned tasks
-tt anytime                # Active tasks with no dates
-tt someday                # Someday/maybe tasks
-```
-
 All list commands support the `--group` / `-g` flag.
 
 ### Completing Tasks
@@ -130,7 +112,7 @@ tt done 1 2 3             # Complete multiple tasks
 
 Recurring tasks automatically create their next occurrence when completed.
 
-### Editing Tasks
+### Editing Tasks (`edit` / `e`)
 
 ```bash
 tt edit 1                          # View task details
@@ -151,16 +133,16 @@ tt edit 1 2 3 --tag urgent
 tt edit 1 2 3 -T                   # Plan all for today
 ```
 
-### Managing Dates
+### Managing Dates (`plan` / `p`, `due` / `d`)
 
 ```bash
 # Set planned date (when you want to start)
-tt plan 1 tomorrow
+tt plan 1 tomorrow         # or: tt p 1 tomorrow
 tt plan 1 monday
 tt plan 1 --clear
 
 # Set due date (when it's due)
-tt due 1 friday
+tt due 1 friday            # or: tt d 1 friday
 tt due 1 +1w
 tt due 1 --clear
 ```
@@ -213,11 +195,11 @@ tt project add "Home Renovation" --area Home
 tt project delete "Q1 Goals"
 ```
 
-**Tags** - Flexible labels:
+**Tags** (`tag` / `t`) - Flexible labels:
 
 ```bash
 tt tag list                    # Show all tags in use
-tt tag add 1 urgent            # Add tag to task
+tt tag add 1 urgent            # Add tag to task (or: tt t add 1 urgent)
 tt tag remove 1 urgent         # Remove tag from task
 ```
 

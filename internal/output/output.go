@@ -40,7 +40,7 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 	// Build table rows
 	rows := make([][]string, 0, len(tasks))
 	for _, t := range tasks {
-		// Prefix: red flag for due (precedence), yellow star for planned today
+		// Prefix: red flag for due (precedence), yellow star for planned today or earlier
 		prefix := "  "
 		if isDueOrOverdue(&t) {
 			prefix = flagStyle.Render("⚑") + " "
@@ -112,16 +112,26 @@ func (f *Formatter) GroupedTaskList(tasks []task.Task, groupBy string) {
 }
 
 // groupedByProject displays tasks grouped by "Area > Project"
+// Tasks with area but no project appear under just the area name,
+// sorted before "Area > Project" groups (alphabetically, area-only headers come first)
 func (f *Formatter) groupedByProject(tasks []task.Task) {
 	headerStyle := lipgloss.NewStyle().Bold(true)
 
-	// Group tasks by combined "Area > Project" key
-	noProjectTasks := make([]task.Task, 0)
+	// Group tasks:
+	// - No area, no project -> "No Project"
+	// - Area but no project -> area name (e.g., "Work")
+	// - Project -> "Area > Project" or just "Project"
+	noProjectNoAreaTasks := make([]task.Task, 0)
 	groups := make(map[string][]task.Task)
 
 	for _, t := range tasks {
 		if t.ProjectName == nil {
-			noProjectTasks = append(noProjectTasks, t)
+			if t.AreaName == nil {
+				noProjectNoAreaTasks = append(noProjectNoAreaTasks, t)
+			} else {
+				// Area but no project - use area name as header
+				groups[*t.AreaName] = append(groups[*t.AreaName], t)
+			}
 			continue
 		}
 
@@ -133,14 +143,15 @@ func (f *Formatter) groupedByProject(tasks []task.Task) {
 		groups[header] = append(groups[header], t)
 	}
 
-	// Render: No Project first
-	if len(noProjectTasks) > 0 {
+	// Render: No Project (no area) first
+	if len(noProjectNoAreaTasks) > 0 {
 		fmt.Fprintln(f.w, headerStyle.Render("No Project"))
-		f.renderTaskRows(noProjectTasks, 0, false)
+		f.renderTaskRows(noProjectNoAreaTasks, 0, false)
 		fmt.Fprintln(f.w)
 	}
 
 	// Render groups alphabetically
+	// Natural sort order puts "Area" before "Area > Project"
 	headers := make([]string, 0, len(groups))
 	for h := range groups {
 		headers = append(headers, h)
@@ -357,8 +368,10 @@ func isPlannedForToday(t *task.Task) bool {
 	}
 	now := time.Now()
 	todayYear, todayMonth, todayDay := now.Date()
+	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
 	dateYear, dateMonth, dateDay := t.PlannedDate.Date()
-	return dateYear == todayYear && dateMonth == todayMonth && dateDay == todayDay
+	plannedDate := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.Local)
+	return !plannedDate.After(today)
 }
 
 func isDueOrOverdue(t *task.Task) bool {
@@ -499,12 +512,16 @@ func (f *Formatter) GroupedLogbook(tasks []task.Task, groupBy string) {
 func (f *Formatter) logbookByProject(tasks []task.Task) {
 	headerStyle := lipgloss.NewStyle().Bold(true)
 
-	noProjectTasks := make([]task.Task, 0)
+	noProjectNoAreaTasks := make([]task.Task, 0)
 	groups := make(map[string][]task.Task)
 
 	for _, t := range tasks {
 		if t.ProjectName == nil {
-			noProjectTasks = append(noProjectTasks, t)
+			if t.AreaName == nil {
+				noProjectNoAreaTasks = append(noProjectNoAreaTasks, t)
+			} else {
+				groups[*t.AreaName] = append(groups[*t.AreaName], t)
+			}
 			continue
 		}
 
@@ -515,9 +532,9 @@ func (f *Formatter) logbookByProject(tasks []task.Task) {
 		groups[header] = append(groups[header], t)
 	}
 
-	if len(noProjectTasks) > 0 {
+	if len(noProjectNoAreaTasks) > 0 {
 		fmt.Fprintln(f.w, headerStyle.Render("No Project"))
-		f.renderLogbookRows(noProjectTasks)
+		f.renderLogbookRows(noProjectNoAreaTasks)
 		fmt.Fprintln(f.w)
 	}
 
