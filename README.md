@@ -87,7 +87,7 @@ tt list                   # Same as above
 tt today                  # Shorthand for tt list (today's tasks + overdue)
 tt upcoming               # Future planned tasks (or: tt list --upcoming)
 tt someday                # Someday/maybe tasks (or: tt list --someday)
-tt anytime                # Active tasks with no dates (or: tt list --anytime)
+tt anytime                # Tasks with no dates but with a project/area (or: tt list --anytime)
 tt inbox                  # Tasks with no project, area, or dates (or: tt list --inbox)
 tt list --all             # All incomplete tasks
 

@@ -15,7 +15,8 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		formatter := output.NewFormatter(os.Stderr, nil)
+		formatter.Error(err.Error())
 		os.Exit(1)
 	}
 }

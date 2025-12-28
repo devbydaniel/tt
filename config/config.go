@@ -22,6 +22,8 @@ type ThemeConfig struct {
 	Muted   string     `toml:"muted"`   // color for dates, tags, secondary info
 	Accent  string     `toml:"accent"`  // color for planned-today indicator
 	Warning string     `toml:"warning"` // color for due/overdue indicator
+	Success string     `toml:"success"` // color for success messages
+	Error   string     `toml:"error"`   // color for error messages
 	Header  string     `toml:"header"`  // color for section headers (bold applied automatically)
 	ID      string     `toml:"id"`      // color for task IDs (empty = inherit from muted)
 	Scope   string     `toml:"scope"`   // color for project/area column

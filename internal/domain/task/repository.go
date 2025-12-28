@@ -170,8 +170,8 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 			args = append(args, today, today)
 		}
 		if filter.Anytime {
-			// no planned_date and no due_date
-			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL`
+			// no planned_date and no due_date, must have project or area (excludes inbox)
+			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL AND (t.project_id IS NOT NULL OR t.area_id IS NOT NULL)`
 		}
 		if filter.Inbox {
 			// no project, no area, no planned_date, no due_date
