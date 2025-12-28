@@ -53,13 +53,8 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 			prefix = f.theme.Accent.Render(f.theme.Icons.Planned) + " "
 		}
 
-		// Scope: project name if present, else area name
-		scope := ""
-		if t.ProjectName != nil {
-			scope = *t.ProjectName
-		} else if t.AreaName != nil {
-			scope = *t.AreaName
-		}
+		// Scope: "area > project" or just "area"/"project"
+		scope := formatScope(t.AreaName, t.ProjectName)
 
 		// Task title with recurrence, dates, and tags
 		title := formatTaskTitle(&t)
@@ -300,12 +295,7 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 	scopeWidth := 0
 	if showScope {
 		for _, t := range tasks {
-			scope := ""
-			if t.ProjectName != nil {
-				scope = *t.ProjectName
-			} else if t.AreaName != nil {
-				scope = *t.AreaName
-			}
+			scope := formatScope(t.AreaName, t.ProjectName)
 			if len(scope) > scopeWidth {
 				scopeWidth = len(scope)
 			}
@@ -336,17 +326,27 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 		}
 
 		if showScope {
-			scope := ""
-			if t.ProjectName != nil {
-				scope = *t.ProjectName
-			} else if t.AreaName != nil {
-				scope = *t.AreaName
-			}
+			scope := formatScope(t.AreaName, t.ProjectName)
 			fmt.Fprintf(f.w, "%s%s%*d  %-*s  %s\n", indentStr, prefix, idWidth, t.ID, scopeWidth, scope, title)
 		} else {
 			fmt.Fprintf(f.w, "%s%s%*d  %s\n", indentStr, prefix, idWidth, t.ID, title)
 		}
 	}
+}
+
+// formatScope returns the scope display string for a task.
+// Shows "area > project" when both exist, just "area" or "project" when only one exists.
+func formatScope(areaName, projectName *string) string {
+	if projectName != nil {
+		if areaName != nil {
+			return *areaName + " > " + *projectName
+		}
+		return *projectName
+	}
+	if areaName != nil {
+		return *areaName
+	}
+	return ""
 }
 
 func formatRecurIndicator(t *task.Task) string {
