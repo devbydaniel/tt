@@ -33,7 +33,7 @@ func (f *Formatter) SetHidePlannedDate(hide bool) {
 }
 
 func (f *Formatter) TaskCreated(t *task.Task) {
-	fmt.Fprintf(f.w, "%s task #%d: %s\n", f.theme.Success.Render("Created"), t.ID, sanitizeTitle(t.Title))
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Created task #%d: %s", t.ID, sanitizeTitle(t.Title))))
 }
 
 func (f *Formatter) TaskList(tasks []task.Task) {
@@ -462,7 +462,7 @@ func formatTaskDate(planned, due *time.Time) string {
 
 func (f *Formatter) TasksCompleted(results []task.CompleteResult) {
 	for _, r := range results {
-		fmt.Fprintf(f.w, "%s #%d: %s\n", f.theme.Success.Render("Completed"), r.Completed.ID, sanitizeTitle(r.Completed.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Completed #%d: %s", r.Completed.ID, sanitizeTitle(r.Completed.Title))))
 		if r.NextTask != nil {
 			nextDate := r.NextTask.PlannedDate
 			if nextDate == nil {
@@ -479,7 +479,7 @@ func (f *Formatter) TasksCompleted(results []task.CompleteResult) {
 
 func (f *Formatter) TasksDeleted(tasks []task.Task) {
 	for _, t := range tasks {
-		fmt.Fprintf(f.w, "%s #%d: %s\n", f.theme.Success.Render("Deleted"), t.ID, sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted #%d: %s", t.ID, sanitizeTitle(t.Title))))
 	}
 }
 
@@ -626,7 +626,7 @@ func (f *Formatter) renderLogbookRows(tasks []task.Task) {
 }
 
 func (f *Formatter) AreaCreated(a *area.Area) {
-	fmt.Fprintf(f.w, "%s area: %s\n", f.theme.Success.Render("Created"), a.Name)
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Created area: %s", a.Name)))
 }
 
 func (f *Formatter) AreaList(areas []area.Area) {
@@ -641,11 +641,11 @@ func (f *Formatter) AreaList(areas []area.Area) {
 }
 
 func (f *Formatter) AreaDeleted(a *area.Area) {
-	fmt.Fprintf(f.w, "%s area: %s\n", f.theme.Success.Render("Deleted"), a.Name)
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted area: %s", a.Name)))
 }
 
 func (f *Formatter) ProjectCreated(p *project.Project) {
-	fmt.Fprintf(f.w, "%s project: %s\n", f.theme.Success.Render("Created"), p.Name)
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Created project: %s", p.Name)))
 }
 
 func (f *Formatter) ProjectList(projects []project.Project) {
@@ -713,38 +713,38 @@ func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, group
 }
 
 func (f *Formatter) ProjectDeleted(p *project.Project) {
-	fmt.Fprintf(f.w, "%s project: %s\n", f.theme.Success.Render("Deleted"), p.Name)
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted project: %s", p.Name)))
 }
 
 func (f *Formatter) AreaRenamed(oldName, newName string) {
-	fmt.Fprintf(f.w, "%s area: %s -> %s\n", f.theme.Success.Render("Renamed"), oldName, newName)
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Renamed area: %s -> %s", oldName, newName)))
 }
 
 func (f *Formatter) ProjectRenamed(oldName, newName string) {
-	fmt.Fprintf(f.w, "%s project: %s -> %s\n", f.theme.Success.Render("Renamed"), oldName, newName)
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Renamed project: %s -> %s", oldName, newName)))
 }
 
 func (f *Formatter) ProjectMoved(p *project.Project, areaName string) {
-	fmt.Fprintf(f.w, "%s project '%s' to area: %s\n", f.theme.Success.Render("Moved"), p.Name, areaName)
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Moved project '%s' to area: %s", p.Name, areaName)))
 }
 
 func (f *Formatter) ProjectAreaCleared(p *project.Project) {
-	fmt.Fprintf(f.w, "%s area from project: %s\n", f.theme.Success.Render("Cleared"), p.Name)
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Cleared area from project: %s", p.Name)))
 }
 
 func (f *Formatter) TaskPlannedDateSet(t *task.Task) {
 	if t.PlannedDate != nil {
-		fmt.Fprintf(f.w, "%s #%d for %s: %s\n", f.theme.Success.Render("Planned"), t.ID, t.PlannedDate.Format("Jan 2"), sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Planned #%d for %s: %s", t.ID, t.PlannedDate.Format("Jan 2"), sanitizeTitle(t.Title))))
 	} else {
-		fmt.Fprintf(f.w, "%s planned date for #%d: %s\n", f.theme.Success.Render("Cleared"), t.ID, sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Cleared planned date for #%d: %s", t.ID, sanitizeTitle(t.Title))))
 	}
 }
 
 func (f *Formatter) TaskDueDateSet(t *task.Task) {
 	if t.DueDate != nil {
-		fmt.Fprintf(f.w, "%s #%d on %s: %s\n", f.theme.Success.Render("Due"), t.ID, t.DueDate.Format("Jan 2"), sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Due #%d on %s: %s", t.ID, t.DueDate.Format("Jan 2"), sanitizeTitle(t.Title))))
 	} else {
-		fmt.Fprintf(f.w, "%s due date for #%d: %s\n", f.theme.Success.Render("Cleared"), t.ID, sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Cleared due date for #%d: %s", t.ID, sanitizeTitle(t.Title))))
 	}
 }
 
@@ -752,28 +752,28 @@ func (f *Formatter) TaskRecurrenceSet(t *task.Task) {
 	if t.RecurRule != nil {
 		rule, err := recurparse.FromJSON(*t.RecurRule)
 		if err != nil {
-			fmt.Fprintf(f.w, "%s recurrence for #%d: %s\n", f.theme.Success.Render("Set"), t.ID, sanitizeTitle(t.Title))
+			fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Set recurrence for #%d: %s", t.ID, sanitizeTitle(t.Title))))
 			return
 		}
-		fmt.Fprintf(f.w, "%s recurrence for #%d (%s): %s\n", f.theme.Success.Render("Set"), t.ID, rule.Format(), sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Set recurrence for #%d (%s): %s", t.ID, rule.Format(), sanitizeTitle(t.Title))))
 	} else {
-		fmt.Fprintf(f.w, "%s recurrence for #%d: %s\n", f.theme.Success.Render("Cleared"), t.ID, sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Cleared recurrence for #%d: %s", t.ID, sanitizeTitle(t.Title))))
 	}
 }
 
 func (f *Formatter) TaskRecurrencePaused(t *task.Task) {
-	fmt.Fprintf(f.w, "%s recurrence for #%d: %s\n", f.theme.Success.Render("Paused"), t.ID, sanitizeTitle(t.Title))
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Paused recurrence for #%d: %s", t.ID, sanitizeTitle(t.Title))))
 }
 
 func (f *Formatter) TaskRecurrenceResumed(t *task.Task) {
-	fmt.Fprintf(f.w, "%s recurrence for #%d: %s\n", f.theme.Success.Render("Resumed"), t.ID, sanitizeTitle(t.Title))
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Resumed recurrence for #%d: %s", t.ID, sanitizeTitle(t.Title))))
 }
 
 func (f *Formatter) TaskRecurrenceEndSet(t *task.Task) {
 	if t.RecurEnd != nil {
-		fmt.Fprintf(f.w, "%s recurrence end date for #%d to %s: %s\n", f.theme.Success.Render("Set"), t.ID, t.RecurEnd.Format("Jan 2"), sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Set recurrence end date for #%d to %s: %s", t.ID, t.RecurEnd.Format("Jan 2"), sanitizeTitle(t.Title))))
 	} else {
-		fmt.Fprintf(f.w, "%s recurrence end date for #%d: %s\n", f.theme.Success.Render("Cleared"), t.ID, sanitizeTitle(t.Title))
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Cleared recurrence end date for #%d: %s", t.ID, sanitizeTitle(t.Title))))
 	}
 }
 
@@ -814,15 +814,15 @@ func (f *Formatter) TagList(tags []string) {
 }
 
 func (f *Formatter) TaskTagAdded(t *task.Task, tagName string) {
-	fmt.Fprintf(f.w, "%s tag '%s' to #%d: %s\n", f.theme.Success.Render("Added"), tagName, t.ID, sanitizeTitle(t.Title))
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Added tag '%s' to #%d: %s", tagName, t.ID, sanitizeTitle(t.Title))))
 }
 
 func (f *Formatter) TaskTagRemoved(t *task.Task, tagName string) {
-	fmt.Fprintf(f.w, "%s tag '%s' from #%d: %s\n", f.theme.Success.Render("Removed"), tagName, t.ID, sanitizeTitle(t.Title))
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Removed tag '%s' from #%d: %s", tagName, t.ID, sanitizeTitle(t.Title))))
 }
 
 func (f *Formatter) TaskEdited(id int64, changes []string) {
-	fmt.Fprintf(f.w, "%s #%d: %s\n", f.theme.Success.Render("Updated"), id, joinChanges(changes))
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Updated #%d: %s", id, joinChanges(changes))))
 }
 
 func joinChanges(changes []string) string {
@@ -872,5 +872,5 @@ func formatTagList(tags []string) string {
 }
 
 func (f *Formatter) Error(msg string) {
-	fmt.Fprintf(f.w, "%s: %s\n", f.theme.Error.Render("Error"), msg)
+	fmt.Fprintln(f.w, f.theme.Error.Render(fmt.Sprintf("Error: %s", msg)))
 }
