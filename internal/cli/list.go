@@ -74,11 +74,17 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				groupBy = deps.Config.GetGroup(configKey)
 			}
 
+			// Resolve hideScope: flag > config for view
+			hideScopeToUse := hideScope
+			if !hideScope {
+				hideScopeToUse = deps.Config.GetHideScope(configKey)
+			}
+
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 			if schedule == "today" {
 				formatter.SetHidePlannedDate(true)
 			}
-			if hideScope {
+			if hideScopeToUse {
 				formatter.SetHideScope(true)
 			}
 

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,14 +13,17 @@ import (
 
 // Content displays the task list in the right panel
 type Content struct {
-	title    string
-	tasks    []task.Task
-	width    int
-	height   int
-	viewport viewport.Model
-	ready    bool
-	styles   *Styles
-	card     *Card
+	title          string
+	tasks          []task.Task
+	groupBy        string          // grouping mode: none, project, area, date
+	hideScope      bool            // whether to hide the project/area column
+	scheduleGroups *ScheduleGroups // pre-grouped schedule data (mutually exclusive with tasks+groupBy)
+	width          int
+	height         int
+	viewport       viewport.Model
+	ready          bool
+	styles         *Styles
+	card           *Card
 }
 
 // NewContent creates a new content panel
@@ -59,9 +63,26 @@ func (c Content) SetSize(width, height int) Content {
 	return c
 }
 
-// SetTasks updates the displayed tasks
-func (c Content) SetTasks(tasks []task.Task, title string) Content {
+// SetTasks updates the displayed tasks with optional grouping
+func (c Content) SetTasks(tasks []task.Task, title string, groupBy string, hideScope bool) Content {
 	c.tasks = tasks
+	c.title = title
+	c.groupBy = groupBy
+	c.hideScope = hideScope
+	c.scheduleGroups = nil // Clear schedule groups (mutually exclusive)
+	if c.ready {
+		c.viewport.SetContent(c.buildTaskList())
+		c.viewport.GotoTop()
+	}
+	return c
+}
+
+// SetScheduleGroups updates the content with pre-grouped schedule data
+func (c Content) SetScheduleGroups(groups ScheduleGroups, title string, hideScope bool) Content {
+	c.scheduleGroups = &groups
+	c.tasks = nil // Clear tasks (mutually exclusive)
+	c.groupBy = ""
+	c.hideScope = hideScope
 	c.title = title
 	if c.ready {
 		c.viewport.SetContent(c.buildTaskList())
@@ -72,17 +93,245 @@ func (c Content) SetTasks(tasks []task.Task, title string) Content {
 
 // buildTaskList renders all tasks as a string
 func (c Content) buildTaskList() string {
+	// Schedule grouping (pre-grouped data)
+	if c.scheduleGroups != nil {
+		return c.buildGroupedBySchedule()
+	}
+
+	// Check for empty tasks
 	if len(c.tasks) == 0 {
 		return c.styles.Theme.Muted.Render("No tasks")
 	}
 
+	// Client-side grouping
+	switch c.groupBy {
+	case "project":
+		return c.buildGroupedByProject()
+	case "area":
+		return c.buildGroupedByArea()
+	case "date":
+		return c.buildGroupedByDate()
+	default:
+		return c.buildFlatTaskList()
+	}
+}
+
+// buildFlatTaskList renders tasks without grouping
+func (c Content) buildFlatTaskList() string {
 	var rows []string
 	for _, t := range c.tasks {
 		row := c.renderTaskRow(&t)
 		rows = append(rows, row)
 	}
-
 	return strings.Join(rows, "\n")
+}
+
+// buildGroupedByProject groups tasks by "Area > Project" hierarchy
+func (c Content) buildGroupedByProject() string {
+	// Group tasks: No project/no area -> "No Project", area only -> area name, project -> "Area > Project"
+	noProjectNoArea := make([]task.Task, 0)
+	groups := make(map[string][]task.Task)
+
+	for _, t := range c.tasks {
+		if t.ProjectName == nil {
+			if t.AreaName == nil {
+				noProjectNoArea = append(noProjectNoArea, t)
+			} else {
+				groups[*t.AreaName] = append(groups[*t.AreaName], t)
+			}
+			continue
+		}
+
+		header := *t.ProjectName
+		if t.AreaName != nil {
+			header = *t.AreaName + " > " + *t.ProjectName
+		}
+		groups[header] = append(groups[header], t)
+	}
+
+	var sections []string
+
+	// Render "No Project" first
+	if len(noProjectNoArea) > 0 {
+		sections = append(sections, c.renderGroupSection("No Project", noProjectNoArea))
+	}
+
+	// Render groups alphabetically
+	headers := make([]string, 0, len(groups))
+	for h := range groups {
+		headers = append(headers, h)
+	}
+	sort.Strings(headers)
+
+	for _, header := range headers {
+		sections = append(sections, c.renderGroupSection(header, groups[header]))
+	}
+
+	if len(sections) == 0 {
+		return c.styles.Theme.Muted.Render("No tasks")
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+// buildGroupedByArea groups tasks by area
+func (c Content) buildGroupedByArea() string {
+	noArea := make([]task.Task, 0)
+	areaGroups := make(map[string][]task.Task)
+
+	for _, t := range c.tasks {
+		if t.AreaName == nil {
+			noArea = append(noArea, t)
+		} else {
+			areaGroups[*t.AreaName] = append(areaGroups[*t.AreaName], t)
+		}
+	}
+
+	var sections []string
+
+	// Render "No Area" first
+	if len(noArea) > 0 {
+		sections = append(sections, c.renderGroupSection("No Area", noArea))
+	}
+
+	// Render areas alphabetically
+	areaNames := make([]string, 0, len(areaGroups))
+	for name := range areaGroups {
+		areaNames = append(areaNames, name)
+	}
+	sort.Strings(areaNames)
+
+	for _, aName := range areaNames {
+		sections = append(sections, c.renderGroupSection(aName, areaGroups[aName]))
+	}
+
+	if len(sections) == 0 {
+		return c.styles.Theme.Muted.Render("No tasks")
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+// buildGroupedByDate groups tasks by date categories
+func (c Content) buildGroupedByDate() string {
+	now := time.Now()
+	todayYear, todayMonth, todayDay := now.Date()
+	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
+	tomorrow := today.AddDate(0, 0, 1)
+	endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
+	endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local)
+	endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
+
+	dateGroups := map[string][]task.Task{
+		"Overdue":    {},
+		"Today":      {},
+		"Tomorrow":   {},
+		"This Week":  {},
+		"This Month": {},
+		"This Year":  {},
+		"Later":      {},
+		"No Date":    {},
+	}
+
+	for _, t := range c.tasks {
+		category := c.getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
+		dateGroups[category] = append(dateGroups[category], t)
+	}
+
+	orderedCategories := []string{"Overdue", "Today", "Tomorrow", "This Week", "This Month", "This Year", "Later", "No Date"}
+	var sections []string
+
+	for _, category := range orderedCategories {
+		if len(dateGroups[category]) > 0 {
+			sections = append(sections, c.renderGroupSection(category, dateGroups[category]))
+		}
+	}
+
+	if len(sections) == 0 {
+		return c.styles.Theme.Muted.Render("No tasks")
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+// buildGroupedBySchedule renders pre-grouped schedule data
+func (c Content) buildGroupedBySchedule() string {
+	if c.scheduleGroups == nil {
+		return c.styles.Theme.Muted.Render("No tasks")
+	}
+
+	schedules := []struct {
+		name  string
+		tasks []task.Task
+	}{
+		{"Today", c.scheduleGroups.Today},
+		{"Upcoming", c.scheduleGroups.Upcoming},
+		{"Anytime", c.scheduleGroups.Anytime},
+		{"Someday", c.scheduleGroups.Someday},
+	}
+
+	var sections []string
+	for _, sched := range schedules {
+		if len(sched.tasks) == 0 {
+			continue
+		}
+		sections = append(sections, c.renderGroupSection(sched.name, sched.tasks))
+	}
+
+	if len(sections) == 0 {
+		return c.styles.Theme.Muted.Render("No tasks")
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+// renderGroupSection renders a group header and its tasks
+func (c Content) renderGroupSection(header string, tasks []task.Task) string {
+	headerLine := c.styles.Theme.Header.Render(header)
+	var rows []string
+	for _, t := range tasks {
+		rows = append(rows, c.renderTaskRow(&t))
+	}
+	return headerLine + "\n" + strings.Join(rows, "\n")
+}
+
+// getDateCategory determines which date category a task belongs to
+func (c Content) getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfMonth, endOfYear time.Time) string {
+	var d *time.Time
+	isPlanned := false
+	if planned != nil {
+		d = planned
+		isPlanned = true
+	} else if due != nil {
+		d = due
+	}
+
+	if d == nil {
+		return "No Date"
+	}
+
+	dateYear, dateMonth, dateDay := d.Date()
+	dateOnly := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.Local)
+
+	if dateOnly.Before(today) {
+		// Planned dates in past show as "Today", only due dates are "Overdue"
+		if isPlanned {
+			return "Today"
+		}
+		return "Overdue"
+	}
+	if dateOnly.Equal(today) {
+		return "Today"
+	}
+	if dateOnly.Equal(tomorrow) {
+		return "Tomorrow"
+	}
+	if dateOnly.Before(endOfWeek) || dateOnly.Equal(endOfWeek) {
+		return "This Week"
+	}
+	if dateOnly.Before(endOfMonth) || dateOnly.Equal(endOfMonth) {
+		return "This Month"
+	}
+	if dateOnly.Before(endOfYear) || dateOnly.Equal(endOfYear) {
+		return "This Year"
+	}
+	return "Later"
 }
 
 // View renders the content panel
@@ -205,7 +454,7 @@ func (c Content) renderTaskRow(t *task.Task) string {
 
 	// Build row
 	parts := []string{prefix + id}
-	if scope != "" {
+	if scope != "" && !c.hideScope {
 		parts = append(parts, scope)
 	}
 	parts = append(parts, title)

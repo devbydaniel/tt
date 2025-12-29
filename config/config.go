@@ -10,8 +10,9 @@ import (
 
 // ListSettings holds per-list configuration options
 type ListSettings struct {
-	Sort  string `toml:"sort"`
-	Group string `toml:"group"`
+	Sort      string `toml:"sort"`
+	Group     string `toml:"group"`
+	HideScope bool   `toml:"hide_scope"`
 }
 
 type Config struct {
@@ -131,6 +132,35 @@ func (c *Config) GetGroup(listName string) string {
 		return c.Group
 	}
 	return "none"
+}
+
+// GetHideScope returns the hide_scope setting for a list view.
+func (c *Config) GetHideScope(listName string) bool {
+	switch listName {
+	case "today":
+		return c.Today.HideScope
+	case "upcoming":
+		return c.Upcoming.HideScope
+	case "anytime":
+		return c.Anytime.HideScope
+	case "someday":
+		return c.Someday.HideScope
+	case "log":
+		return c.Log.HideScope
+	case "project-list":
+		return c.ProjectList.HideScope
+	case "project":
+		return c.Project.HideScope
+	case "area":
+		return c.Area.HideScope
+	case "tag":
+		return c.Tag.HideScope
+	case "list", "all":
+		return c.List.HideScope
+	case "inbox":
+		return c.Inbox.HideScope
+	}
+	return false
 }
 
 // fileConfig represents the TOML config file structure

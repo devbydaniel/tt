@@ -287,6 +287,12 @@ group = "project"
 sort = "planned:asc"
 group = "date"
 
+[project]
+hide_scope = true      # Hide project/area columns when filtering by project
+
+[area]
+hide_scope = true      # Hide project/area columns when filtering by area
+
 [log]
 group = "date"
 

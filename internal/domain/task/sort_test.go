@@ -14,7 +14,7 @@ func TestParseSort(t *testing.T) {
 		{
 			name:  "empty string returns default",
 			input: "",
-			want:  []SortOption{{Field: SortByCreated, Direction: SortDesc}},
+			want:  []SortOption{{Field: SortByID, Direction: SortAsc}},
 		},
 		{
 			name:  "single field with default direction (text)",
@@ -141,10 +141,10 @@ func TestDefaultSort(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("DefaultSort() returned %d options, want 1", len(got))
 	}
-	if got[0].Field != SortByCreated {
-		t.Errorf("DefaultSort()[0].Field = %v, want %v", got[0].Field, SortByCreated)
+	if got[0].Field != SortByID {
+		t.Errorf("DefaultSort()[0].Field = %v, want %v", got[0].Field, SortByID)
 	}
-	if got[0].Direction != SortDesc {
-		t.Errorf("DefaultSort()[0].Direction = %v, want %v", got[0].Direction, SortDesc)
+	if got[0].Direction != SortAsc {
+		t.Errorf("DefaultSort()[0].Direction = %v, want %v", got[0].Direction, SortAsc)
 	}
 }

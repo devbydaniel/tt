@@ -58,8 +58,14 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 			prefix = f.theme.Accent.Render(f.theme.Icons.Planned) + " "
 		}
 
+		// ID styled
+		id := f.theme.ID.Render(fmt.Sprintf("%d", t.ID))
+
 		// Scope: "area > project" or just "area"/"project"
 		scope := formatScope(t.AreaName, t.ProjectName)
+		if scope != "" {
+			scope = f.theme.Scope.Render(scope)
+		}
 
 		// Task title with recurrence, dates, and tags
 		title := formatTaskTitle(&t)
@@ -78,12 +84,12 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 
 		if f.hideScope {
 			rows = append(rows, []string{
-				prefix + fmt.Sprintf("%d", t.ID),
+				prefix + id,
 				title,
 			})
 		} else {
 			rows = append(rows, []string{
-				prefix + fmt.Sprintf("%d", t.ID),
+				prefix + id,
 				scope,
 				title,
 			})
@@ -336,6 +342,10 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 			prefix = f.theme.Accent.Render(f.theme.Icons.Planned) + " "
 		}
 
+		// ID styled with padding
+		idStr := fmt.Sprintf("%*d", idWidth, t.ID)
+		id := f.theme.ID.Render(idStr)
+
 		title := formatTaskTitle(&t)
 		if recur := formatRecurIndicator(&t); recur != "" {
 			title += " " + f.theme.Muted.Render(recur)
@@ -352,9 +362,12 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 
 		if showScope {
 			scope := formatScope(t.AreaName, t.ProjectName)
-			fmt.Fprintf(f.w, "%s%s%*d  %-*s  %s\n", indentStr, prefix, idWidth, t.ID, scopeWidth, scope, title)
+			// Pad scope before styling to maintain alignment
+			scopePadded := fmt.Sprintf("%-*s", scopeWidth, scope)
+			scopeStyled := f.theme.Scope.Render(scopePadded)
+			fmt.Fprintf(f.w, "%s%s%s  %s  %s\n", indentStr, prefix, id, scopeStyled, title)
 		} else {
-			fmt.Fprintf(f.w, "%s%s%*d  %s\n", indentStr, prefix, idWidth, t.ID, title)
+			fmt.Fprintf(f.w, "%s%s%s  %s\n", indentStr, prefix, id, title)
 		}
 	}
 }
