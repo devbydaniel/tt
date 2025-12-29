@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/project"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -47,72 +45,8 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 		return
 	}
 
-	// Build table rows
-	rows := make([][]string, 0, len(tasks))
-	for _, t := range tasks {
-		// Prefix: red flag for due (precedence), yellow star for planned today or earlier
-		prefix := "  "
-		if isDueOrOverdue(&t) {
-			prefix = f.theme.Warning.Render(f.theme.Icons.Due) + " "
-		} else if isPlannedForToday(&t) {
-			prefix = f.theme.Accent.Render(f.theme.Icons.Planned) + " "
-		}
-
-		// ID styled
-		id := f.theme.ID.Render(fmt.Sprintf("%d", t.ID))
-
-		// Scope: "area > project" or just "area"/"project"
-		scope := formatScope(t.AreaName, t.ProjectName)
-		if scope != "" {
-			scope = f.theme.Scope.Render(scope)
-		}
-
-		// Task title with recurrence, dates, and tags
-		title := formatTaskTitle(&t)
-		if recur := formatRecurIndicator(&t); recur != "" {
-			title += " " + f.theme.Muted.Render(recur)
-		}
-		if t.PlannedDate != nil && !f.hidePlannedDate {
-			title += " " + f.theme.Muted.Render(f.theme.Icons.Date+" "+t.PlannedDate.Format("Jan 2"))
-		}
-		if t.DueDate != nil {
-			title += " " + f.theme.Muted.Render(f.theme.Icons.Due+" "+t.DueDate.Format("Jan 2"))
-		}
-		if len(t.Tags) > 0 {
-			title += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
-		}
-
-		if f.hideScope {
-			rows = append(rows, []string{
-				prefix + id,
-				title,
-			})
-		} else {
-			rows = append(rows, []string{
-				prefix + id,
-				scope,
-				title,
-			})
-		}
-	}
-
-	// Create minimal table (no borders, no headers)
-	tbl := table.New().
-		Rows(rows...).
-		Border(lipgloss.Border{}).
-		BorderTop(false).
-		BorderBottom(false).
-		BorderLeft(false).
-		BorderRight(false).
-		BorderHeader(false).
-		BorderColumn(false).
-		BorderRow(false).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			return lipgloss.NewStyle().PaddingRight(2)
-		})
-
-	// Normalize: lipgloss adds trailing \n + spaces for single-row tables
-	fmt.Fprintln(f.w, strings.TrimRight(tbl.Render(), " \n"))
+	idWidth := maxIDWidth(tasks)
+	f.renderTaskRows(tasks, 0, !f.hideScope, idWidth)
 }
 
 // GroupedTaskList displays tasks grouped by the specified field.
@@ -322,17 +256,6 @@ func maxIDWidth(tasks []task.Task) int {
 
 // renderTaskRows renders task rows with optional indentation
 func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool, idWidth int) {
-	// Calculate scope width for alignment when showing scope
-	scopeWidth := 0
-	if showScope {
-		for _, t := range tasks {
-			scope := formatScope(t.AreaName, t.ProjectName)
-			if len(scope) > scopeWidth {
-				scopeWidth = len(scope)
-			}
-		}
-	}
-
 	indentStr := strings.Repeat(" ", indent)
 	for _, t := range tasks {
 		prefix := "  "
@@ -346,7 +269,15 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 		idStr := fmt.Sprintf("%*d", idWidth, t.ID)
 		id := f.theme.ID.Render(idStr)
 
-		title := formatTaskTitle(&t)
+		// Task title with optional scope prefix
+		title := ""
+		if showScope {
+			scope := formatScope(t.AreaName, t.ProjectName)
+			if scope != "" {
+				title = f.theme.Scope.Render(scope) + "  "
+			}
+		}
+		title += formatTaskTitle(&t)
 		if recur := formatRecurIndicator(&t); recur != "" {
 			title += " " + f.theme.Muted.Render(recur)
 		}
@@ -360,15 +291,7 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 			title += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
 		}
 
-		if showScope {
-			scope := formatScope(t.AreaName, t.ProjectName)
-			// Pad scope before styling to maintain alignment
-			scopePadded := fmt.Sprintf("%-*s", scopeWidth, scope)
-			scopeStyled := f.theme.Scope.Render(scopePadded)
-			fmt.Fprintf(f.w, "%s%s%s  %s  %s\n", indentStr, prefix, id, scopeStyled, title)
-		} else {
-			fmt.Fprintf(f.w, "%s%s%s  %s\n", indentStr, prefix, id, title)
-		}
+		fmt.Fprintf(f.w, "%s%s%s  %s\n", indentStr, prefix, id, title)
 	}
 }
 
