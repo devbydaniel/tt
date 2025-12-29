@@ -8,6 +8,8 @@ type keyMap struct {
 	Tab      key.Binding
 	ShiftTab key.Binding
 	Enter    key.Binding
+	Escape   key.Binding
+	Rename   key.Binding
 	Quit     key.Binding
 }
 
@@ -31,6 +33,14 @@ var keys = keyMap{
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "select"),
+	),
+	Escape: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "back"),
+	),
+	Rename: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "rename"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),

@@ -13,6 +13,14 @@ import (
 	"github.com/devbydaniel/tt/internal/output"
 )
 
+// FocusArea indicates which panel has focus
+type FocusArea int
+
+const (
+	FocusSidebar FocusArea = iota
+	FocusContent
+)
+
 // Model is the root TUI model
 type Model struct {
 	// Services
@@ -31,8 +39,10 @@ type Model struct {
 	height int
 
 	// Components
-	sidebar Sidebar
-	content Content
+	sidebar     Sidebar
+	content     Content
+	renameModal RenameModal
+	focusArea   FocusArea
 
 	// Cached data
 	areas    []area.Area
@@ -55,6 +65,7 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 		styles:         styles,
 		sidebar:        NewSidebar(styles),
 		content:        NewContent(styles),
+		renameModal:    NewRenameModal(styles),
 	}
 }
 
@@ -125,9 +136,43 @@ func (m Model) loadData() tea.Msg {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Route keys to rename modal when active
+		if m.renameModal.Active() {
+			var result *RenameResult
+			m.renameModal, result = m.renameModal.Update(msg)
+			if result != nil && !result.Canceled {
+				// Rename was confirmed, update the task
+				return m, m.renameTask(result.TaskID, result.NewTitle)
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
+
+		case key.Matches(msg, keys.Enter):
+			if m.focusArea == FocusSidebar {
+				m.focusArea = FocusContent
+				m.content = m.content.SetFocused(true)
+				return m, nil
+			}
+
+		case key.Matches(msg, keys.Escape):
+			if m.focusArea == FocusContent {
+				m.focusArea = FocusSidebar
+				m.content = m.content.SetFocused(false)
+				return m, nil
+			}
+
+		case key.Matches(msg, keys.Rename):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					m.renameModal = m.renameModal.SetSize(m.width, m.height)
+					m.renameModal = m.renameModal.Open(selectedTask.ID, selectedTask.Title)
+					return m, nil
+				}
+			}
 
 		case key.Matches(msg, keys.Tab):
 			m.sidebar = m.sidebar.NextSection()
@@ -138,10 +183,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.Up):
+			if m.focusArea == FocusContent {
+				m.content = m.content.MoveUp()
+				return m, nil
+			}
 			m.sidebar = m.sidebar.MoveUp()
 			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.Down):
+			if m.focusArea == FocusContent {
+				m.content = m.content.MoveDown()
+				return m, nil
+			}
 			m.sidebar = m.sidebar.MoveDown()
 			return m, m.loadTasksForSelection
 		}
@@ -191,6 +244,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.content = m.content.SetScheduleGroups(msg.groups, msg.title, msg.hideScope)
 		return m, nil
+
+	case taskRenamedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload tasks to show the updated title
+		return m, m.loadTasksForSelection
 	}
 
 	return m, nil
@@ -219,6 +280,12 @@ type scheduleTasksLoadedMsg struct {
 	title     string
 	hideScope bool
 	err       error
+}
+
+// taskRenamedMsg carries the result of a task rename
+type taskRenamedMsg struct {
+	task *task.Task
+	err  error
 }
 
 // loadTasksForSelection loads tasks based on sidebar selection
@@ -297,6 +364,14 @@ func (m Model) loadScheduleGroups(item SidebarItem, title string, sortOpts []tas
 	return scheduleTasksLoadedMsg{groups: groups, title: title, hideScope: hideScope}
 }
 
+// renameTask creates a command to rename a task
+func (m Model) renameTask(taskID int64, newTitle string) tea.Cmd {
+	return func() tea.Msg {
+		updated, err := m.taskService.SetTitle(taskID, newTitle)
+		return taskRenamedMsg{task: updated, err: err}
+	}
+}
+
 // View implements tea.Model
 func (m Model) View() string {
 	if m.err != nil {
@@ -309,5 +384,12 @@ func (m Model) View() string {
 
 	// Render sidebar and content side by side with 1-char gap
 	contentView := lipgloss.NewStyle().MarginLeft(1).Render(m.content.View())
-	return lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView)
+	mainView := lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView)
+
+	// Overlay rename modal if active
+	if m.renameModal.Active() {
+		return m.renameModal.View()
+	}
+
+	return mainView
 }

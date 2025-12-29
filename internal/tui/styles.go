@@ -21,6 +21,10 @@ type Styles struct {
 	ContentBorder lipgloss.Style
 	ContentHeader lipgloss.Style
 	TaskRow       lipgloss.Style
+
+	// Modal styles
+	ModalBorder lipgloss.Style
+	ModalTitle  lipgloss.Style
 }
 
 // NewStyles creates TUI styles from the base theme
@@ -70,5 +74,15 @@ func NewStyles(theme *output.Theme) *Styles {
 			MarginBottom(1),
 
 		TaskRow: lipgloss.NewStyle(),
+
+		ModalBorder: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(accentColor).
+			Padding(1, 2),
+
+		ModalTitle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(headerColor).
+			MarginBottom(1),
 	}
 }

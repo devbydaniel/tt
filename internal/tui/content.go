@@ -13,25 +13,28 @@ import (
 
 // Content displays the task list in the right panel
 type Content struct {
-	title          string
-	tasks          []task.Task
-	groupBy        string          // grouping mode: none, project, area, date
-	hideScope      bool            // whether to hide the project/area column
-	scheduleGroups *ScheduleGroups // pre-grouped schedule data (mutually exclusive with tasks+groupBy)
-	width          int
-	height         int
-	viewport       viewport.Model
-	ready          bool
-	styles         *Styles
-	card           *Card
+	title         string
+	displayTasks  []task.Task    // tasks in display order (computed once when set)
+	taskSchedules map[int64]string // task ID -> schedule name (for schedule grouping)
+	groupBy       string         // grouping mode: none, project, area, date, schedule
+	hideScope     bool           // whether to hide the project/area column
+	width         int
+	height        int
+	viewport      viewport.Model
+	ready         bool
+	styles        *Styles
+	card          *Card
+	focused       bool // whether content panel has focus
+	selectedIndex int  // index into displayTasks (-1 = none)
 }
 
 // NewContent creates a new content panel
 func NewContent(styles *Styles) Content {
 	return Content{
-		title:  "Today",
-		styles: styles,
-		card:   NewCard(styles),
+		title:         "Today",
+		styles:        styles,
+		card:          NewCard(styles),
+		selectedIndex: -1,
 	}
 }
 
@@ -65,11 +68,16 @@ func (c Content) SetSize(width, height int) Content {
 
 // SetTasks updates the displayed tasks with optional grouping
 func (c Content) SetTasks(tasks []task.Task, title string, groupBy string, hideScope bool) Content {
-	c.tasks = tasks
 	c.title = title
 	c.groupBy = groupBy
 	c.hideScope = hideScope
-	c.scheduleGroups = nil // Clear schedule groups (mutually exclusive)
+	c.displayTasks = c.computeDisplayOrder(tasks, groupBy)
+	// Reset selection when tasks change
+	if c.focused && len(c.displayTasks) > 0 {
+		c.selectedIndex = 0
+	} else {
+		c.selectedIndex = -1
+	}
 	if c.ready {
 		c.viewport.SetContent(c.buildTaskList())
 		c.viewport.GotoTop()
@@ -79,11 +87,35 @@ func (c Content) SetTasks(tasks []task.Task, title string, groupBy string, hideS
 
 // SetScheduleGroups updates the content with pre-grouped schedule data
 func (c Content) SetScheduleGroups(groups ScheduleGroups, title string, hideScope bool) Content {
-	c.scheduleGroups = &groups
-	c.tasks = nil // Clear tasks (mutually exclusive)
-	c.groupBy = ""
+	c.groupBy = "schedule"
 	c.hideScope = hideScope
 	c.title = title
+	// Build display order and schedule map
+	c.taskSchedules = make(map[int64]string)
+	var all []task.Task
+	for _, t := range groups.Today {
+		c.taskSchedules[t.ID] = "Today"
+		all = append(all, t)
+	}
+	for _, t := range groups.Upcoming {
+		c.taskSchedules[t.ID] = "Upcoming"
+		all = append(all, t)
+	}
+	for _, t := range groups.Anytime {
+		c.taskSchedules[t.ID] = "Anytime"
+		all = append(all, t)
+	}
+	for _, t := range groups.Someday {
+		c.taskSchedules[t.ID] = "Someday"
+		all = append(all, t)
+	}
+	c.displayTasks = all
+	// Reset selection when tasks change
+	if c.focused && len(c.displayTasks) > 0 {
+		c.selectedIndex = 0
+	} else {
+		c.selectedIndex = -1
+	}
 	if c.ready {
 		c.viewport.SetContent(c.buildTaskList())
 		c.viewport.GotoTop()
@@ -93,17 +125,10 @@ func (c Content) SetScheduleGroups(groups ScheduleGroups, title string, hideScop
 
 // buildTaskList renders all tasks as a string
 func (c Content) buildTaskList() string {
-	// Schedule grouping (pre-grouped data)
-	if c.scheduleGroups != nil {
-		return c.buildGroupedBySchedule()
-	}
-
-	// Check for empty tasks
-	if len(c.tasks) == 0 {
+	if len(c.displayTasks) == 0 {
 		return c.styles.Theme.Muted.Render("No tasks")
 	}
 
-	// Client-side grouping
 	switch c.groupBy {
 	case "project":
 		return c.buildGroupedByProject()
@@ -111,6 +136,8 @@ func (c Content) buildTaskList() string {
 		return c.buildGroupedByArea()
 	case "date":
 		return c.buildGroupedByDate()
+	case "schedule":
+		return c.buildGroupedBySchedule()
 	default:
 		return c.buildFlatTaskList()
 	}
@@ -119,95 +146,36 @@ func (c Content) buildTaskList() string {
 // buildFlatTaskList renders tasks without grouping
 func (c Content) buildFlatTaskList() string {
 	var rows []string
-	for _, t := range c.tasks {
-		row := c.renderTaskRow(&t)
-		rows = append(rows, row)
+	for i := range c.displayTasks {
+		rows = append(rows, c.renderTaskRow(&c.displayTasks[i], i))
 	}
 	return strings.Join(rows, "\n")
 }
 
 // buildGroupedByProject groups tasks by "Area > Project" hierarchy
 func (c Content) buildGroupedByProject() string {
-	// Group tasks: No project/no area -> "No Project", area only -> area name, project -> "Area > Project"
-	noProjectNoArea := make([]task.Task, 0)
-	groups := make(map[string][]task.Task)
-
-	for _, t := range c.tasks {
+	return c.buildGroupedList(func(t *task.Task) string {
 		if t.ProjectName == nil {
 			if t.AreaName == nil {
-				noProjectNoArea = append(noProjectNoArea, t)
-			} else {
-				groups[*t.AreaName] = append(groups[*t.AreaName], t)
+				return "No Project"
 			}
-			continue
+			return *t.AreaName
 		}
-
-		header := *t.ProjectName
 		if t.AreaName != nil {
-			header = *t.AreaName + " > " + *t.ProjectName
+			return *t.AreaName + " > " + *t.ProjectName
 		}
-		groups[header] = append(groups[header], t)
-	}
-
-	var sections []string
-
-	// Render "No Project" first
-	if len(noProjectNoArea) > 0 {
-		sections = append(sections, c.renderGroupSection("No Project", noProjectNoArea))
-	}
-
-	// Render groups alphabetically
-	headers := make([]string, 0, len(groups))
-	for h := range groups {
-		headers = append(headers, h)
-	}
-	sort.Strings(headers)
-
-	for _, header := range headers {
-		sections = append(sections, c.renderGroupSection(header, groups[header]))
-	}
-
-	if len(sections) == 0 {
-		return c.styles.Theme.Muted.Render("No tasks")
-	}
-	return strings.Join(sections, "\n\n")
+		return *t.ProjectName
+	})
 }
 
 // buildGroupedByArea groups tasks by area
 func (c Content) buildGroupedByArea() string {
-	noArea := make([]task.Task, 0)
-	areaGroups := make(map[string][]task.Task)
-
-	for _, t := range c.tasks {
+	return c.buildGroupedList(func(t *task.Task) string {
 		if t.AreaName == nil {
-			noArea = append(noArea, t)
-		} else {
-			areaGroups[*t.AreaName] = append(areaGroups[*t.AreaName], t)
+			return "No Area"
 		}
-	}
-
-	var sections []string
-
-	// Render "No Area" first
-	if len(noArea) > 0 {
-		sections = append(sections, c.renderGroupSection("No Area", noArea))
-	}
-
-	// Render areas alphabetically
-	areaNames := make([]string, 0, len(areaGroups))
-	for name := range areaGroups {
-		areaNames = append(areaNames, name)
-	}
-	sort.Strings(areaNames)
-
-	for _, aName := range areaNames {
-		sections = append(sections, c.renderGroupSection(aName, areaGroups[aName]))
-	}
-
-	if len(sections) == 0 {
-		return c.styles.Theme.Muted.Render("No tasks")
-	}
-	return strings.Join(sections, "\n\n")
+		return *t.AreaName
+	})
 }
 
 // buildGroupedByDate groups tasks by date categories
@@ -220,75 +188,50 @@ func (c Content) buildGroupedByDate() string {
 	endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local)
 	endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
 
-	dateGroups := map[string][]task.Task{
-		"Overdue":    {},
-		"Today":      {},
-		"Tomorrow":   {},
-		"This Week":  {},
-		"This Month": {},
-		"This Year":  {},
-		"Later":      {},
-		"No Date":    {},
-	}
-
-	for _, t := range c.tasks {
-		category := c.getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
-		dateGroups[category] = append(dateGroups[category], t)
-	}
-
-	orderedCategories := []string{"Overdue", "Today", "Tomorrow", "This Week", "This Month", "This Year", "Later", "No Date"}
-	var sections []string
-
-	for _, category := range orderedCategories {
-		if len(dateGroups[category]) > 0 {
-			sections = append(sections, c.renderGroupSection(category, dateGroups[category]))
-		}
-	}
-
-	if len(sections) == 0 {
-		return c.styles.Theme.Muted.Render("No tasks")
-	}
-	return strings.Join(sections, "\n\n")
+	return c.buildGroupedList(func(t *task.Task) string {
+		return c.getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
+	})
 }
 
 // buildGroupedBySchedule renders pre-grouped schedule data
 func (c Content) buildGroupedBySchedule() string {
-	if c.scheduleGroups == nil {
-		return c.styles.Theme.Muted.Render("No tasks")
-	}
-
-	schedules := []struct {
-		name  string
-		tasks []task.Task
-	}{
-		{"Today", c.scheduleGroups.Today},
-		{"Upcoming", c.scheduleGroups.Upcoming},
-		{"Anytime", c.scheduleGroups.Anytime},
-		{"Someday", c.scheduleGroups.Someday},
-	}
-
-	var sections []string
-	for _, sched := range schedules {
-		if len(sched.tasks) == 0 {
-			continue
+	return c.buildGroupedList(func(t *task.Task) string {
+		if sched, ok := c.taskSchedules[t.ID]; ok {
+			return sched
 		}
-		sections = append(sections, c.renderGroupSection(sched.name, sched.tasks))
-	}
-
-	if len(sections) == 0 {
-		return c.styles.Theme.Muted.Render("No tasks")
-	}
-	return strings.Join(sections, "\n\n")
+		return "Unknown"
+	})
 }
 
-// renderGroupSection renders a group header and its tasks
-func (c Content) renderGroupSection(header string, tasks []task.Task) string {
-	headerLine := c.styles.Theme.Header.Render(header)
-	var rows []string
-	for _, t := range tasks {
-		rows = append(rows, c.renderTaskRow(&t))
+// buildGroupedList renders displayTasks with headers when group changes
+func (c Content) buildGroupedList(getGroup func(*task.Task) string) string {
+	var sections []string
+	var currentGroup string
+	var currentRows []string
+
+	for i := range c.displayTasks {
+		t := &c.displayTasks[i]
+		group := getGroup(t)
+
+		if group != currentGroup {
+			// Flush previous group
+			if len(currentRows) > 0 {
+				header := c.styles.Theme.Header.Render(currentGroup)
+				sections = append(sections, header+"\n"+strings.Join(currentRows, "\n"))
+			}
+			currentGroup = group
+			currentRows = nil
+		}
+		currentRows = append(currentRows, c.renderTaskRow(t, i))
 	}
-	return headerLine + "\n" + strings.Join(rows, "\n")
+
+	// Flush last group
+	if len(currentRows) > 0 {
+		header := c.styles.Theme.Header.Render(currentGroup)
+		sections = append(sections, header+"\n"+strings.Join(currentRows, "\n"))
+	}
+
+	return strings.Join(sections, "\n\n")
 }
 
 // getDateCategory determines which date category a task belongs to
@@ -343,7 +286,7 @@ func (c Content) View() string {
 		content = c.buildTaskList()
 	}
 
-	return c.card.Render(c.title, content, c.width, c.height, false)
+	return c.card.Render(c.title, content, c.width, c.height, c.focused)
 }
 
 // ScrollUp scrolls the content up
@@ -406,14 +349,15 @@ func (c Content) ViewportHeight() int {
 
 // TotalLines returns total content lines
 func (c Content) TotalLines() int {
-	return len(c.tasks)
+	return len(c.displayTasks)
 }
 
 // renderTaskRow formats a single task row
-func (c Content) renderTaskRow(t *task.Task) string {
+func (c Content) renderTaskRow(t *task.Task, index int) string {
 	theme := c.styles.Theme
+	isSelected := c.focused && index == c.selectedIndex
 
-	// Prefix: flag for due, star for planned today
+	// Prefix: selection indicator, flag for due, star for planned today
 	prefix := "  "
 	if c.isDueOrOverdue(t) {
 		prefix = theme.Warning.Render(theme.Icons.Due) + " "
@@ -462,7 +406,16 @@ func (c Content) renderTaskRow(t *task.Task) string {
 		parts = append(parts, strings.Join(extras, " "))
 	}
 
-	return strings.Join(parts, "  ")
+	row := strings.Join(parts, "  ")
+
+	// Apply selection highlighting
+	if isSelected {
+		row = c.styles.SelectedItem.Render("> " + row)
+	} else {
+		row = "  " + row
+	}
+
+	return row
 }
 
 func (c Content) formatScope(areaName, projectName *string) string {
@@ -538,4 +491,154 @@ func (c Content) isDueOrOverdue(t *task.Task) bool {
 	dateYear, dateMonth, dateDay := t.DueDate.Date()
 	dueDate := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.Local)
 	return !dueDate.After(today)
+}
+
+// SetFocused sets whether the content panel has focus
+func (c Content) SetFocused(focused bool) Content {
+	c.focused = focused
+	if focused && len(c.displayTasks) > 0 {
+		c.selectedIndex = 0
+	} else {
+		c.selectedIndex = -1
+	}
+	if c.ready {
+		c.viewport.SetContent(c.buildTaskList())
+	}
+	return c
+}
+
+// MoveUp moves selection up
+func (c Content) MoveUp() Content {
+	if c.selectedIndex > 0 {
+		c.selectedIndex--
+		if c.ready {
+			c.viewport.SetContent(c.buildTaskList())
+		}
+	}
+	return c
+}
+
+// MoveDown moves selection down
+func (c Content) MoveDown() Content {
+	if c.selectedIndex < len(c.displayTasks)-1 {
+		c.selectedIndex++
+		if c.ready {
+			c.viewport.SetContent(c.buildTaskList())
+		}
+	}
+	return c
+}
+
+// SelectedTask returns the currently selected task, or nil if none
+func (c Content) SelectedTask() *task.Task {
+	if !c.focused || c.selectedIndex < 0 || c.selectedIndex >= len(c.displayTasks) {
+		return nil
+	}
+	return &c.displayTasks[c.selectedIndex]
+}
+
+// computeDisplayOrder returns tasks sorted by the given grouping mode
+func (c Content) computeDisplayOrder(tasks []task.Task, groupBy string) []task.Task {
+	switch groupBy {
+	case "project":
+		return c.orderByProject(tasks)
+	case "area":
+		return c.orderByArea(tasks)
+	case "date":
+		return c.orderByDate(tasks)
+	default:
+		return tasks
+	}
+}
+
+// orderByProject sorts tasks by project grouping
+func (c Content) orderByProject(tasks []task.Task) []task.Task {
+	noProjectNoArea := make([]task.Task, 0)
+	groups := make(map[string][]task.Task)
+
+	for _, t := range tasks {
+		if t.ProjectName == nil {
+			if t.AreaName == nil {
+				noProjectNoArea = append(noProjectNoArea, t)
+			} else {
+				groups[*t.AreaName] = append(groups[*t.AreaName], t)
+			}
+			continue
+		}
+		header := *t.ProjectName
+		if t.AreaName != nil {
+			header = *t.AreaName + " > " + *t.ProjectName
+		}
+		groups[header] = append(groups[header], t)
+	}
+
+	var result []task.Task
+	result = append(result, noProjectNoArea...)
+
+	headers := make([]string, 0, len(groups))
+	for h := range groups {
+		headers = append(headers, h)
+	}
+	sort.Strings(headers)
+
+	for _, header := range headers {
+		result = append(result, groups[header]...)
+	}
+	return result
+}
+
+// orderByArea sorts tasks by area grouping
+func (c Content) orderByArea(tasks []task.Task) []task.Task {
+	noArea := make([]task.Task, 0)
+	areaGroups := make(map[string][]task.Task)
+
+	for _, t := range tasks {
+		if t.AreaName == nil {
+			noArea = append(noArea, t)
+		} else {
+			areaGroups[*t.AreaName] = append(areaGroups[*t.AreaName], t)
+		}
+	}
+
+	var result []task.Task
+	result = append(result, noArea...)
+
+	areaNames := make([]string, 0, len(areaGroups))
+	for name := range areaGroups {
+		areaNames = append(areaNames, name)
+	}
+	sort.Strings(areaNames)
+
+	for _, aName := range areaNames {
+		result = append(result, areaGroups[aName]...)
+	}
+	return result
+}
+
+// orderByDate sorts tasks by date category
+func (c Content) orderByDate(tasks []task.Task) []task.Task {
+	now := time.Now()
+	todayYear, todayMonth, todayDay := now.Date()
+	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
+	tomorrow := today.AddDate(0, 0, 1)
+	endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
+	endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local)
+	endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
+
+	dateGroups := map[string][]task.Task{
+		"Overdue": {}, "Today": {}, "Tomorrow": {}, "This Week": {},
+		"This Month": {}, "This Year": {}, "Later": {}, "No Date": {},
+	}
+
+	for _, t := range tasks {
+		category := c.getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
+		dateGroups[category] = append(dateGroups[category], t)
+	}
+
+	orderedCategories := []string{"Overdue", "Today", "Tomorrow", "This Week", "This Month", "This Year", "Later", "No Date"}
+	var result []task.Task
+	for _, category := range orderedCategories {
+		result = append(result, dateGroups[category]...)
+	}
+	return result
 }
