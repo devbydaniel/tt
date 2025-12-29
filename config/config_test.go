@@ -4,129 +4,159 @@ import (
 	"testing"
 )
 
-func TestSortingConfig_GetForCommand(t *testing.T) {
+func TestConfig_GetSort(t *testing.T) {
 	tests := []struct {
-		name   string
-		config SortingConfig
-		cmd    string
-		want   string
+		name     string
+		config   Config
+		listName string
+		want     string
 	}{
 		{
-			name:   "empty config returns empty (code default)",
-			config: SortingConfig{},
-			cmd:    "today",
-			want:   "",
+			name:     "empty config returns empty (code default)",
+			config:   Config{},
+			listName: "today",
+			want:     "",
 		},
 		{
-			name:   "global default used when no command override",
-			config: SortingConfig{Default: "title"},
-			cmd:    "today",
-			want:   "title",
+			name:     "global default used when no list override",
+			config:   Config{Sort: "title"},
+			listName: "today",
+			want:     "title",
 		},
 		{
-			name:   "command override takes precedence",
-			config: SortingConfig{Default: "title", Today: "planned"},
-			cmd:    "today",
-			want:   "planned",
+			name:     "list override takes precedence",
+			config:   Config{Sort: "title", Today: ListSettings{Sort: "planned"}},
+			listName: "today",
+			want:     "planned",
 		},
 		{
-			name:   "today command",
-			config: SortingConfig{Today: "planned:asc"},
-			cmd:    "today",
-			want:   "planned:asc",
+			name:     "today list",
+			config:   Config{Today: ListSettings{Sort: "planned:asc"}},
+			listName: "today",
+			want:     "planned:asc",
 		},
 		{
-			name:   "upcoming command",
-			config: SortingConfig{Upcoming: "due"},
-			cmd:    "upcoming",
-			want:   "due",
+			name:     "upcoming list",
+			config:   Config{Upcoming: ListSettings{Sort: "due"}},
+			listName: "upcoming",
+			want:     "due",
 		},
 		{
-			name:   "anytime command",
-			config: SortingConfig{Anytime: "title"},
-			cmd:    "anytime",
-			want:   "title",
+			name:     "anytime list",
+			config:   Config{Anytime: ListSettings{Sort: "title"}},
+			listName: "anytime",
+			want:     "title",
 		},
 		{
-			name:   "someday command",
-			config: SortingConfig{Someday: "created"},
-			cmd:    "someday",
-			want:   "created",
+			name:     "someday list",
+			config:   Config{Someday: ListSettings{Sort: "created"}},
+			listName: "someday",
+			want:     "created",
 		},
 		{
-			name:   "list command",
-			config: SortingConfig{List: "project,title"},
-			cmd:    "list",
-			want:   "project,title",
+			name:     "list view",
+			config:   Config{List: ListSettings{Sort: "project,title"}},
+			listName: "list",
+			want:     "project,title",
 		},
 		{
-			name:   "all command uses list setting",
-			config: SortingConfig{List: "id"},
-			cmd:    "all",
-			want:   "id",
+			name:     "all view uses list setting",
+			config:   Config{List: ListSettings{Sort: "id"}},
+			listName: "all",
+			want:     "id",
 		},
 		{
-			name:   "unknown command falls back to default",
-			config: SortingConfig{Default: "title"},
-			cmd:    "unknown",
-			want:   "title",
+			name:     "unknown list falls back to global default",
+			config:   Config{Sort: "title"},
+			listName: "unknown",
+			want:     "title",
+		},
+		{
+			name:     "log list",
+			config:   Config{Log: ListSettings{Sort: "created"}},
+			listName: "log",
+			want:     "created",
+		},
+		{
+			name:     "inbox list",
+			config:   Config{Inbox: ListSettings{Sort: "title"}},
+			listName: "inbox",
+			want:     "title",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.config.GetForCommand(tt.cmd)
+			got := tt.config.GetSort(tt.listName)
 			if got != tt.want {
-				t.Errorf("GetForCommand(%q) = %q, want %q", tt.cmd, got, tt.want)
+				t.Errorf("GetSort(%q) = %q, want %q", tt.listName, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestGroupingConfig_GetForCommand(t *testing.T) {
+func TestConfig_GetGroup(t *testing.T) {
 	tests := []struct {
-		name   string
-		config GroupingConfig
-		cmd    string
-		want   string
+		name     string
+		config   Config
+		listName string
+		want     string
 	}{
 		{
-			name:   "empty config returns none",
-			config: GroupingConfig{},
-			cmd:    "today",
-			want:   "none",
+			name:     "empty config returns none",
+			config:   Config{},
+			listName: "today",
+			want:     "none",
 		},
 		{
-			name:   "global default used",
-			config: GroupingConfig{Default: "project"},
-			cmd:    "today",
-			want:   "project",
+			name:     "global default used",
+			config:   Config{Group: "project"},
+			listName: "today",
+			want:     "project",
 		},
 		{
-			name:   "command override takes precedence",
-			config: GroupingConfig{Default: "project", Today: "date"},
-			cmd:    "today",
-			want:   "date",
+			name:     "list override takes precedence",
+			config:   Config{Group: "project", Today: ListSettings{Group: "date"}},
+			listName: "today",
+			want:     "date",
 		},
 		{
-			name:   "project-list ignores global default",
-			config: GroupingConfig{Default: "project"},
-			cmd:    "project-list",
-			want:   "none",
+			name:     "project-list ignores global default",
+			config:   Config{Group: "project"},
+			listName: "project-list",
+			want:     "none",
 		},
 		{
-			name:   "project-list uses its own setting",
-			config: GroupingConfig{Default: "project", ProjectList: "area"},
-			cmd:    "project-list",
-			want:   "area",
+			name:     "project-list uses its own setting",
+			config:   Config{Group: "project", ProjectList: ListSettings{Group: "area"}},
+			listName: "project-list",
+			want:     "area",
+		},
+		{
+			name:     "upcoming list",
+			config:   Config{Upcoming: ListSettings{Group: "date"}},
+			listName: "upcoming",
+			want:     "date",
+		},
+		{
+			name:     "log list",
+			config:   Config{Log: ListSettings{Group: "date"}},
+			listName: "log",
+			want:     "date",
+		},
+		{
+			name:     "all view uses list setting",
+			config:   Config{List: ListSettings{Group: "area"}},
+			listName: "all",
+			want:     "area",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.config.GetForCommand(tt.cmd)
+			got := tt.config.GetGroup(tt.listName)
 			if got != tt.want {
-				t.Errorf("GetForCommand(%q) = %q, want %q", tt.cmd, got, tt.want)
+				t.Errorf("GetGroup(%q) = %q, want %q", tt.listName, got, tt.want)
 			}
 		})
 	}

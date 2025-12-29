@@ -8,11 +8,25 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// ListSettings holds per-list configuration options
+type ListSettings struct {
+	Sort  string `toml:"sort"`
+	Group string `toml:"group"`
+}
+
 type Config struct {
 	Database    string
 	DefaultList string // default view: today, upcoming, anytime, someday, inbox, all
-	Grouping    GroupingConfig
-	Sorting     SortingConfig
+	Sort        string // global default sort
+	Group       string // global default group
+	Today       ListSettings
+	Upcoming    ListSettings
+	Anytime     ListSettings
+	Someday     ListSettings
+	Log         ListSettings
+	ProjectList ListSettings
+	List        ListSettings // for "all" view
+	Inbox       ListSettings
 	Theme       ThemeConfig
 }
 
@@ -37,93 +51,84 @@ type IconConfig struct {
 	Date    string `toml:"date"`    // prefix for planned dates (default: 📅)
 }
 
-// GroupingConfig holds grouping settings with global default and per-command overrides
-type GroupingConfig struct {
-	Default     string `toml:"default"`      // global default: project, area, date, none
-	List        string `toml:"list"`         // override for list command
-	Today       string `toml:"today"`        // override for today command
-	Upcoming    string `toml:"upcoming"`     // override for upcoming command
-	Anytime     string `toml:"anytime"`      // override for anytime command
-	Someday     string `toml:"someday"`      // override for someday command
-	Log         string `toml:"log"`          // override for log command
-	ProjectList string `toml:"project_list"` // override for project list command (area, none)
+// GetSort returns the sort setting for a list view.
+// Priority: list-specific > global default > "" (code default)
+func (c *Config) GetSort(listName string) string {
+	var listSetting string
+	switch listName {
+	case "today":
+		listSetting = c.Today.Sort
+	case "upcoming":
+		listSetting = c.Upcoming.Sort
+	case "anytime":
+		listSetting = c.Anytime.Sort
+	case "someday":
+		listSetting = c.Someday.Sort
+	case "log":
+		listSetting = c.Log.Sort
+	case "project-list":
+		listSetting = c.ProjectList.Sort
+	case "list", "all":
+		listSetting = c.List.Sort
+	case "inbox":
+		listSetting = c.Inbox.Sort
+	}
+	if listSetting != "" {
+		return listSetting
+	}
+	return c.Sort // global default (empty means code default)
 }
 
-// GetForCommand returns the grouping setting for a specific command.
-// Priority: command-specific > global default > "none"
-func (g GroupingConfig) GetForCommand(cmd string) string {
-	var cmdSetting string
-	switch cmd {
-	case "list":
-		cmdSetting = g.List
+// GetGroup returns the group setting for a list view.
+// Priority: list-specific > global default > "none"
+func (c *Config) GetGroup(listName string) string {
+	var listSetting string
+	switch listName {
 	case "today":
-		cmdSetting = g.Today
+		listSetting = c.Today.Group
 	case "upcoming":
-		cmdSetting = g.Upcoming
+		listSetting = c.Upcoming.Group
 	case "anytime":
-		cmdSetting = g.Anytime
+		listSetting = c.Anytime.Group
 	case "someday":
-		cmdSetting = g.Someday
+		listSetting = c.Someday.Group
 	case "log":
-		cmdSetting = g.Log
+		listSetting = c.Log.Group
 	case "project-list":
-		cmdSetting = g.ProjectList
+		listSetting = c.ProjectList.Group
+	case "list", "all":
+		listSetting = c.List.Group
+	case "inbox":
+		listSetting = c.Inbox.Group
 	}
-	if cmdSetting != "" {
-		return cmdSetting
+	if listSetting != "" {
+		return listSetting
 	}
 	// Don't apply global default to project-list (it uses different grouping options)
-	if cmd == "project-list" {
+	if listName == "project-list" {
 		return "none"
 	}
-	if g.Default != "" {
-		return g.Default
+	if c.Group != "" {
+		return c.Group
 	}
 	return "none"
 }
 
-// SortingConfig holds sorting settings with global default and per-command overrides
-type SortingConfig struct {
-	Default  string `toml:"default"`  // global default: created, title, planned, due, id, project, area
-	List     string `toml:"list"`     // override for list command
-	Today    string `toml:"today"`    // override for today command
-	Upcoming string `toml:"upcoming"` // override for upcoming command
-	Anytime  string `toml:"anytime"`  // override for anytime command
-	Someday  string `toml:"someday"`  // override for someday command
-}
-
-// GetForCommand returns the sorting setting for a specific command.
-// Priority: command-specific > global default > "" (use code default)
-func (s SortingConfig) GetForCommand(cmd string) string {
-	var cmdSetting string
-	switch cmd {
-	case "list", "all":
-		cmdSetting = s.List
-	case "today":
-		cmdSetting = s.Today
-	case "upcoming":
-		cmdSetting = s.Upcoming
-	case "anytime":
-		cmdSetting = s.Anytime
-	case "someday":
-		cmdSetting = s.Someday
-	}
-	if cmdSetting != "" {
-		return cmdSetting
-	}
-	if s.Default != "" {
-		return s.Default
-	}
-	return "" // empty means use code default (created:desc)
-}
-
 // fileConfig represents the TOML config file structure
 type fileConfig struct {
-	DataDir     string         `toml:"data_dir"`
-	DefaultList string         `toml:"default_list"`
-	Grouping    GroupingConfig `toml:"grouping"`
-	Sorting     SortingConfig  `toml:"sorting"`
-	Theme       ThemeConfig    `toml:"theme"`
+	DataDir     string       `toml:"data_dir"`
+	DefaultList string       `toml:"default_list"`
+	Sort        string       `toml:"sort"`
+	Group       string       `toml:"group"`
+	Today       ListSettings `toml:"today"`
+	Upcoming    ListSettings `toml:"upcoming"`
+	Anytime     ListSettings `toml:"anytime"`
+	Someday     ListSettings `toml:"someday"`
+	Log         ListSettings `toml:"log"`
+	ProjectList ListSettings `toml:"project_list"`
+	List        ListSettings `toml:"list"`
+	Inbox       ListSettings `toml:"inbox"`
+	Theme       ThemeConfig  `toml:"theme"`
 }
 
 func Load() (*Config, error) {
@@ -133,28 +138,29 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	// Load config from file
-	var defaultList string
-	var grouping GroupingConfig
-	var sorting SortingConfig
-	var theme ThemeConfig
+	cfg := &Config{
+		Database: filepath.Join(dataDir, "tasks.db"),
+	}
+
 	if configPath := configFilePath(); configPath != "" {
 		var fc fileConfig
 		if _, err := toml.DecodeFile(configPath, &fc); err == nil {
-			defaultList = fc.DefaultList
-			grouping = fc.Grouping
-			sorting = fc.Sorting
-			theme = fc.Theme
+			cfg.DefaultList = fc.DefaultList
+			cfg.Sort = fc.Sort
+			cfg.Group = fc.Group
+			cfg.Today = fc.Today
+			cfg.Upcoming = fc.Upcoming
+			cfg.Anytime = fc.Anytime
+			cfg.Someday = fc.Someday
+			cfg.Log = fc.Log
+			cfg.ProjectList = fc.ProjectList
+			cfg.List = fc.List
+			cfg.Inbox = fc.Inbox
+			cfg.Theme = fc.Theme
 		}
 	}
 
-	return &Config{
-		Database:    filepath.Join(dataDir, "tasks.db"),
-		DefaultList: defaultList,
-		Grouping:    grouping,
-		Sorting:     sorting,
-		Theme:       theme,
-	}, nil
+	return cfg, nil
 }
 
 // resolveDataDir determines the data directory with priority:

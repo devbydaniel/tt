@@ -34,7 +34,7 @@ func newProjectListCmd(deps *Dependencies) *cobra.Command {
 			// Use flag if provided, otherwise use config
 			groupBy := group
 			if groupBy == "" {
-				groupBy = deps.Config.Grouping.GetForCommand("project-list")
+				groupBy = deps.Config.GetGroup("project-list")
 			}
 
 			if groupBy == "area" {

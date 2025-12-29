@@ -44,7 +44,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 			// Resolve sorting: flag > config for view > code default
 			sortToUse := sortStr
 			if sortToUse == "" {
-				sortToUse = deps.Config.Sorting.GetForCommand(viewCmd)
+				sortToUse = deps.Config.GetSort(viewCmd)
 			}
 			sortOpts, err := task.ParseSort(sortToUse)
 			if err != nil {
@@ -82,7 +82,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 			// Resolve grouping: flag > config for view > config for list > none
 			groupBy := group
 			if groupBy == "" {
-				groupBy = deps.Config.Grouping.GetForCommand(viewCmd)
+				groupBy = deps.Config.GetGroup(viewCmd)
 			}
 
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)

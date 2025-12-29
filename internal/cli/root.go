@@ -59,6 +59,9 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	// Shorthand task commands
 	rootCmd.AddCommand(NewRenameCmd(deps))
 
+	// Interactive TUI
+	rootCmd.AddCommand(NewTUICmd(deps))
+
 	return rootCmd
 }
 
@@ -95,7 +98,7 @@ func RunListView(deps *Dependencies, viewCmd, sortOverride, groupOverride string
 	// Resolve sorting: override > config > code default
 	sortToUse := sortOverride
 	if sortToUse == "" {
-		sortToUse = deps.Config.Sorting.GetForCommand(viewCmd)
+		sortToUse = deps.Config.GetSort(viewCmd)
 	}
 	sortOpts, err := task.ParseSort(sortToUse)
 	if err != nil {
@@ -115,7 +118,7 @@ func RunListView(deps *Dependencies, viewCmd, sortOverride, groupOverride string
 	// Resolve grouping: override > config > none
 	groupBy := groupOverride
 	if groupBy == "" {
-		groupBy = deps.Config.Grouping.GetForCommand(viewCmd)
+		groupBy = deps.Config.GetGroup(viewCmd)
 	}
 
 	formatter := output.NewFormatter(os.Stdout, deps.Theme)

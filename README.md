@@ -266,19 +266,24 @@ data_dir = "/path/to/data"
 # Options: today, upcoming, anytime, someday, inbox, all
 default_list = "today"
 
-# Default grouping for list commands
-[grouping]
-default = "project"    # Global default: project, area, date, none
-today = "project"      # Override for today command
-upcoming = "date"      # Override for upcoming command
-log = "date"           # Override for log command
-project_list = "area"  # Override for project list command (area, none)
+# Global defaults for all list views
+sort = "created"       # created, title, planned, due, id, project, area
+group = "project"      # project, area, date, none
 
-# Default sorting for list commands
-[sorting]
-default = "created"    # Global default: created, title, planned, due, id, project, area
-today = "planned"      # Override for today command
-upcoming = "planned:asc"  # Override for upcoming command
+# Per-list overrides
+[today]
+sort = "planned"
+group = "project"
+
+[upcoming]
+sort = "planned:asc"
+group = "date"
+
+[log]
+group = "date"
+
+[project_list]
+group = "area"         # area or none
 ```
 
 The `--sort` and `--group` flags always override config settings. View flags like `--today` or `--upcoming` override `default_list`.

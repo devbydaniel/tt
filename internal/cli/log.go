@@ -37,7 +37,7 @@ func NewLogCmd(deps *Dependencies) *cobra.Command {
 
 			groupBy := group
 			if groupBy == "" {
-				groupBy = deps.Config.Grouping.GetForCommand("log")
+				groupBy = deps.Config.GetGroup("log")
 			}
 
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
