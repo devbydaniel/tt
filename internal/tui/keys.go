@@ -10,6 +10,7 @@ type keyMap struct {
 	Enter    key.Binding
 	Escape   key.Binding
 	Rename   key.Binding
+	Move     key.Binding
 	Quit     key.Binding
 }
 
@@ -41,6 +42,10 @@ var keys = keyMap{
 	Rename: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "rename"),
+	),
+	Move: key.NewBinding(
+		key.WithKeys("m"),
+		key.WithHelp("m", "move"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),

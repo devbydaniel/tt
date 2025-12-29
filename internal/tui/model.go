@@ -42,6 +42,7 @@ type Model struct {
 	sidebar     Sidebar
 	content     Content
 	renameModal RenameModal
+	moveModal   MoveModal
 	focusArea   FocusArea
 
 	// Cached data
@@ -66,6 +67,7 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 		sidebar:        NewSidebar(styles),
 		content:        NewContent(styles),
 		renameModal:    NewRenameModal(styles),
+		moveModal:      NewMoveModal(styles),
 	}
 }
 
@@ -147,6 +149,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Route keys to move modal when active
+		if m.moveModal.Active() {
+			var result *MoveResult
+			m.moveModal, result = m.moveModal.Update(msg)
+			if result != nil && !result.Canceled {
+				return m, m.moveTask(result.TaskID, result.ItemType, result.Name)
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -170,6 +182,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
 					m.renameModal = m.renameModal.SetSize(m.width, m.height)
 					m.renameModal = m.renameModal.Open(selectedTask.ID, selectedTask.Title)
+					return m, nil
+				}
+			}
+
+		case key.Matches(msg, keys.Move):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					m.moveModal = m.moveModal.SetSize(m.width, m.height)
+					m.moveModal = m.moveModal.Open(selectedTask.ID, m.projects, m.areas)
 					return m, nil
 				}
 			}
@@ -252,6 +273,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Reload tasks to show the updated title
 		return m, m.loadTasksForSelection
+
+	case taskMovedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload tasks to reflect the move
+		return m, m.loadTasksForSelection
 	}
 
 	return m, nil
@@ -284,6 +313,12 @@ type scheduleTasksLoadedMsg struct {
 
 // taskRenamedMsg carries the result of a task rename
 type taskRenamedMsg struct {
+	task *task.Task
+	err  error
+}
+
+// taskMovedMsg carries the result of a task move
+type taskMovedMsg struct {
 	task *task.Task
 	err  error
 }
@@ -372,6 +407,23 @@ func (m Model) renameTask(taskID int64, newTitle string) tea.Cmd {
 	}
 }
 
+// moveTask creates a command to move a task to a project or area
+func (m Model) moveTask(taskID int64, itemType, name string) tea.Cmd {
+	return func() tea.Msg {
+		var updated *task.Task
+		var err error
+
+		switch itemType {
+		case "project":
+			updated, err = m.taskService.SetProject(taskID, name)
+		case "area":
+			updated, err = m.taskService.SetArea(taskID, name)
+		}
+
+		return taskMovedMsg{task: updated, err: err}
+	}
+}
+
 // View implements tea.Model
 func (m Model) View() string {
 	if m.err != nil {
@@ -389,6 +441,11 @@ func (m Model) View() string {
 	// Overlay rename modal if active
 	if m.renameModal.Active() {
 		return m.renameModal.View()
+	}
+
+	// Overlay move modal if active
+	if m.moveModal.Active() {
+		return m.moveModal.View()
 	}
 
 	return mainView
