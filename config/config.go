@@ -24,9 +24,11 @@ type Config struct {
 	Anytime       ListSettings
 	Someday       ListSettings
 	Log           ListSettings
-	ProjectList   ListSettings
-	ProjectDetail ListSettings
-	List          ListSettings // for "all" view
+	ProjectList ListSettings
+	Project     ListSettings
+	Area        ListSettings
+	Tag         ListSettings
+	List        ListSettings // for "all" view
 	Inbox         ListSettings
 	Theme       ThemeConfig
 }
@@ -69,8 +71,12 @@ func (c *Config) GetSort(listName string) string {
 		listSetting = c.Log.Sort
 	case "project-list":
 		listSetting = c.ProjectList.Sort
-	case "project-detail":
-		listSetting = c.ProjectDetail.Sort
+	case "project":
+		listSetting = c.Project.Sort
+	case "area":
+		listSetting = c.Area.Sort
+	case "tag":
+		listSetting = c.Tag.Sort
 	case "list", "all":
 		listSetting = c.List.Sort
 	case "inbox":
@@ -99,8 +105,12 @@ func (c *Config) GetGroup(listName string) string {
 		listSetting = c.Log.Group
 	case "project-list":
 		listSetting = c.ProjectList.Group
-	case "project-detail":
-		listSetting = c.ProjectDetail.Group
+	case "project":
+		listSetting = c.Project.Group
+	case "area":
+		listSetting = c.Area.Group
+	case "tag":
+		listSetting = c.Tag.Group
 	case "list", "all":
 		listSetting = c.List.Group
 	case "inbox":
@@ -113,9 +123,9 @@ func (c *Config) GetGroup(listName string) string {
 	if listName == "project-list" {
 		return "none"
 	}
-	// project-detail defaults to schedule grouping
-	if listName == "project-detail" {
-		return "schedule"
+	// project/area/tag filter defaults to no grouping
+	if listName == "project" || listName == "area" || listName == "tag" {
+		return "none"
 	}
 	if c.Group != "" {
 		return c.Group
@@ -134,9 +144,11 @@ type fileConfig struct {
 	Anytime       ListSettings `toml:"anytime"`
 	Someday       ListSettings `toml:"someday"`
 	Log           ListSettings `toml:"log"`
-	ProjectList   ListSettings `toml:"project_list"`
-	ProjectDetail ListSettings `toml:"project_detail"`
-	List          ListSettings `toml:"list"`
+	ProjectList ListSettings `toml:"project_list"`
+	Project     ListSettings `toml:"project"`
+	Area        ListSettings `toml:"area"`
+	Tag         ListSettings `toml:"tag"`
+	List        ListSettings `toml:"list"`
 	Inbox         ListSettings `toml:"inbox"`
 	Theme       ThemeConfig  `toml:"theme"`
 }
@@ -164,7 +176,9 @@ func Load() (*Config, error) {
 			cfg.Someday = fc.Someday
 			cfg.Log = fc.Log
 			cfg.ProjectList = fc.ProjectList
-			cfg.ProjectDetail = fc.ProjectDetail
+			cfg.Project = fc.Project
+			cfg.Area = fc.Area
+			cfg.Tag = fc.Tag
 			cfg.List = fc.List
 			cfg.Inbox = fc.Inbox
 			cfg.Theme = fc.Theme

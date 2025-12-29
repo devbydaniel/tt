@@ -103,9 +103,9 @@ tt list --all --group=area      # Group by area
 tt list --all --group=date      # Group by date (Overdue, Today, Tomorrow, etc.)
 tt list --all --group=none      # Flat list (default)
 
-# View project/area tasks (defaults to schedule grouping)
-tt list --project "Backend API"              # Grouped by schedule
-tt list --project "Backend API" -g none      # No grouping
+# Filter by project/area
+tt list --project "Backend API"
+tt list --project "Backend API" -g schedule  # Group by schedule
 tt list --project "Backend API" --hide-scope # Hide redundant project column
 ```
 
@@ -114,7 +114,8 @@ All list commands support the `--group` / `-g` flag.
 ### Sorting Tasks
 
 ```bash
-tt list --sort created          # Sort by creation date (newest first, default)
+tt list -s id                   # Sort by ID (ascending, default)
+tt list --sort created          # Sort by creation date (newest first)
 tt list -s title                # Sort alphabetically by title
 tt list -s due                  # Sort by due date (newest first)
 tt list -s planned:asc          # Sort by planned date (oldest first)
@@ -125,8 +126,9 @@ tt list -s project:asc,title    # By project name, then title
 **Sort fields:** `id`, `title`, `planned`, `due`, `created`, `project`, `area`
 
 **Defaults:**
+- Default sort is `id:asc` (oldest first) unless configured otherwise
 - Date fields (`planned`, `due`, `created`) default to descending (newest first)
-- Text fields (`title`, `project`, `area`) default to ascending (A-Z)
+- Other fields (`id`, `title`, `project`, `area`) default to ascending
 - Tasks without values (e.g., no due date) always sort last
 
 ### Searching Tasks (`search` / `s`)

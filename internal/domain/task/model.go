@@ -38,9 +38,9 @@ type SortOption struct {
 	Direction SortDirection
 }
 
-// DefaultSort returns the default sort options (created desc)
+// DefaultSort returns the default sort options (id asc)
 func DefaultSort() []SortOption {
-	return []SortOption{{Field: SortByCreated, Direction: SortDesc}}
+	return []SortOption{{Field: SortByID, Direction: SortAsc}}
 }
 
 // ParseSort parses a sort string into SortOptions

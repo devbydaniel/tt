@@ -48,13 +48,14 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				viewCmd = "inbox"
 			}
 
-			// Determine if filtering by project or area (affects defaults)
-			filterByScope := projectName != "" || areaName != ""
+			// Determine config key for settings lookup (priority: project > area > tag)
 			configKey := viewCmd
 			if projectName != "" {
-				configKey = "project-detail"
+				configKey = "project"
 			} else if areaName != "" {
-				configKey = "area-detail"
+				configKey = "area"
+			} else if tagName != "" {
+				configKey = "tag"
 			}
 
 			// Resolve sorting: flag > config for view > code default
@@ -67,13 +68,10 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				return err
 			}
 
-			// Resolve grouping: flag > config for view > "schedule" default for scope filters
+			// Resolve grouping: flag > config for view
 			groupBy := group
 			if groupBy == "" {
 				groupBy = deps.Config.GetGroup(configKey)
-			}
-			if groupBy == "" && filterByScope {
-				groupBy = "schedule"
 			}
 
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
