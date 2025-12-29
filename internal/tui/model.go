@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -43,6 +44,7 @@ type Model struct {
 	content     Content
 	renameModal RenameModal
 	moveModal   MoveModal
+	dateModal   DateModal
 	focusArea   FocusArea
 
 	// Cached data
@@ -68,6 +70,7 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 		content:        NewContent(styles),
 		renameModal:    NewRenameModal(styles),
 		moveModal:      NewMoveModal(styles),
+		dateModal:      NewDateModal(styles),
 	}
 }
 
@@ -159,6 +162,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Route keys to date modal when active
+		if m.dateModal.Active() {
+			var result *DateResult
+			m.dateModal, result = m.dateModal.Update(msg)
+			if result != nil && !result.Canceled {
+				return m, m.setTaskDate(result.TaskID, result.Date, result.Mode)
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -191,6 +204,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
 					m.moveModal = m.moveModal.SetSize(m.width, m.height)
 					m.moveModal = m.moveModal.Open(selectedTask.ID, m.projects, m.areas)
+					return m, nil
+				}
+			}
+
+		case key.Matches(msg, keys.Planned):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					m.dateModal = m.dateModal.SetSize(m.width, m.height)
+					m.dateModal = m.dateModal.Open(selectedTask.ID, DateModalPlanned, selectedTask.PlannedDate)
+					return m, nil
+				}
+			}
+
+		case key.Matches(msg, keys.Due):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					m.dateModal = m.dateModal.SetSize(m.width, m.height)
+					m.dateModal = m.dateModal.Open(selectedTask.ID, DateModalDue, selectedTask.DueDate)
 					return m, nil
 				}
 			}
@@ -281,6 +312,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Reload tasks to reflect the move
 		return m, m.loadTasksForSelection
+
+	case taskDateUpdatedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload tasks to reflect the date change
+		return m, m.loadTasksForSelection
 	}
 
 	return m, nil
@@ -319,6 +358,12 @@ type taskRenamedMsg struct {
 
 // taskMovedMsg carries the result of a task move
 type taskMovedMsg struct {
+	task *task.Task
+	err  error
+}
+
+// taskDateUpdatedMsg carries the result of a date update
+type taskDateUpdatedMsg struct {
 	task *task.Task
 	err  error
 }
@@ -424,6 +469,23 @@ func (m Model) moveTask(taskID int64, itemType, name string) tea.Cmd {
 	}
 }
 
+// setTaskDate creates a command to set a task's planned or due date
+func (m Model) setTaskDate(taskID int64, date *time.Time, mode DateModalMode) tea.Cmd {
+	return func() tea.Msg {
+		var updated *task.Task
+		var err error
+
+		switch mode {
+		case DateModalPlanned:
+			updated, err = m.taskService.SetPlannedDate(taskID, date)
+		case DateModalDue:
+			updated, err = m.taskService.SetDueDate(taskID, date)
+		}
+
+		return taskDateUpdatedMsg{task: updated, err: err}
+	}
+}
+
 // View implements tea.Model
 func (m Model) View() string {
 	if m.err != nil {
@@ -446,6 +508,11 @@ func (m Model) View() string {
 	// Overlay move modal if active
 	if m.moveModal.Active() {
 		return m.moveModal.View()
+	}
+
+	// Overlay date modal if active
+	if m.dateModal.Active() {
+		return m.dateModal.View()
 	}
 
 	return mainView

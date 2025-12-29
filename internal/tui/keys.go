@@ -11,6 +11,8 @@ type keyMap struct {
 	Escape   key.Binding
 	Rename   key.Binding
 	Move     key.Binding
+	Planned  key.Binding
+	Due      key.Binding
 	Quit     key.Binding
 }
 
@@ -46,6 +48,14 @@ var keys = keyMap{
 	Move: key.NewBinding(
 		key.WithKeys("m"),
 		key.WithHelp("m", "move"),
+	),
+	Planned: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "set planned date"),
+	),
+	Due: key.NewBinding(
+		key.WithKeys("d"),
+		key.WithHelp("d", "set due date"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
