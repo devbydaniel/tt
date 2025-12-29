@@ -3,39 +3,41 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Tab      key.Binding
-	ShiftTab key.Binding
-	Enter    key.Binding
-	Escape   key.Binding
-	Rename   key.Binding
-	Move     key.Binding
-	Planned  key.Binding
-	Due      key.Binding
-	Quit     key.Binding
+	Up           key.Binding
+	Down         key.Binding
+	Tab          key.Binding
+	ShiftTab     key.Binding
+	Enter        key.Binding
+	Escape       key.Binding
+	FocusSidebar key.Binding
+	FocusContent key.Binding
+	Rename       key.Binding
+	Move         key.Binding
+	Planned      key.Binding
+	Due          key.Binding
+	Quit         key.Binding
 }
 
 // sidebarKeyMap provides help bindings when sidebar is focused
 type sidebarKeyMap struct{}
 
 func (k sidebarKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Tab, keys.Enter, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Tab, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Tab, keys.ShiftTab, keys.Enter, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Tab, keys.ShiftTab, keys.FocusContent, keys.Quit}}
 }
 
 // contentKeyMap provides help bindings when content is focused
 type contentKeyMap struct{}
 
 func (k contentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Escape, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Quit}
 }
 
 func (k contentKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Escape, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Quit}}
 }
 
 // renameKeyMap provides help bindings for rename modal
@@ -124,6 +126,14 @@ var keys = keyMap{
 	Escape: key.NewBinding(
 		key.WithKeys("esc"),
 		key.WithHelp("esc", "back"),
+	),
+	FocusSidebar: key.NewBinding(
+		key.WithKeys("h"),
+		key.WithHelp("h", "sidebar"),
+	),
+	FocusContent: key.NewBinding(
+		key.WithKeys("l"),
+		key.WithHelp("l", "content"),
 	),
 	Rename: key.NewBinding(
 		key.WithKeys("r"),

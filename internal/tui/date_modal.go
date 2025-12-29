@@ -77,6 +77,7 @@ func (m DateModal) Open(taskID int64, mode DateModalMode, currentDate *time.Time
 
 	m.datepicker.SetTime(initialDate)
 	m.datepicker.SelectDate()
+	m.input.Prompt = "> "
 	m.input.Focus()
 
 	return m
@@ -114,9 +115,11 @@ func (m DateModal) Update(msg tea.Msg) (DateModal, *DateResult) {
 		case tea.KeyTab:
 			m.focusInput = !m.focusInput
 			if m.focusInput {
+				m.input.Prompt = "> "
 				m.input.Focus()
 				m.datepicker.Blur()
 			} else {
+				m.input.Prompt = "  "
 				m.input.Blur()
 				m.datepicker.SetFocus(datepicker.FocusCalendar)
 			}
@@ -191,13 +194,8 @@ func (m DateModal) View() string {
 	}
 	title := m.styles.ModalTitle.Render(titleText)
 
-	// Input field with focus indicator
-	var input string
-	if m.focusInput {
-		input = "> " + m.input.View()
-	} else {
-		input = "  " + m.input.View()
-	}
+	// Input field (textinput already has "> " prompt when focused)
+	input := m.input.View()
 
 	// Error message
 	var errView string
@@ -221,7 +219,7 @@ func (m DateModal) View() string {
 	}
 	parts = append(parts, "", picker)
 
-	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
+	content := lipgloss.JoinVertical(lipgloss.Center, parts...)
 	modal := m.styles.ModalBorder.Render(content)
 
 	return lipgloss.Place(

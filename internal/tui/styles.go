@@ -78,7 +78,7 @@ func NewStyles(theme *output.Theme) *Styles {
 		ModalBorder: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(accentColor).
-			Padding(1, 2),
+			Padding(0, 1),
 
 		ModalTitle: lipgloss.NewStyle().
 			Bold(true).

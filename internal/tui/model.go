@@ -192,10 +192,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-		case key.Matches(msg, keys.Escape):
+		case key.Matches(msg, keys.Escape), key.Matches(msg, keys.FocusSidebar):
 			if m.focusArea == FocusContent {
 				m.focusArea = FocusSidebar
 				m.content = m.content.SetFocused(false)
+				return m, nil
+			}
+
+		case key.Matches(msg, keys.FocusContent):
+			if m.focusArea == FocusSidebar {
+				m.focusArea = FocusContent
+				m.content = m.content.SetFocused(true)
 				return m, nil
 			}
 
