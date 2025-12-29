@@ -213,21 +213,13 @@ func (m DateModal) View() string {
 		picker = m.datepicker.View()
 	}
 
-	// Hints
-	var hints string
-	if m.focusInput {
-		hints = m.styles.Theme.Muted.Render("Tab: date picker • Enter: confirm • Esc: cancel")
-	} else {
-		hints = m.styles.Theme.Muted.Render("Tab: input • Enter: select • ←↑→↓: navigate • Esc: cancel")
-	}
-
 	// Build content
 	var parts []string
 	parts = append(parts, title, "", input)
 	if errView != "" {
 		parts = append(parts, errView)
 	}
-	parts = append(parts, "", picker, "", hints)
+	parts = append(parts, "", picker)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
 	modal := m.styles.ModalBorder.Render(content)
@@ -242,4 +234,9 @@ func (m DateModal) View() string {
 // Active returns whether the modal is currently shown
 func (m DateModal) Active() bool {
 	return m.active
+}
+
+// FocusInput returns whether the input field is focused (vs the picker)
+func (m DateModal) FocusInput() bool {
+	return m.focusInput
 }

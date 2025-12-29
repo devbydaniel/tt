@@ -195,9 +195,8 @@ func (m MoveModal) View() string {
 	title := m.styles.ModalTitle.Render("Move Task")
 	input := m.input.View()
 	list := m.renderList()
-	hint := m.styles.Theme.Muted.Render("↑/↓ navigate • Enter select • Esc cancel")
 
-	content := lipgloss.JoinVertical(lipgloss.Left, title, input, "", list, "", hint)
+	content := lipgloss.JoinVertical(lipgloss.Left, title, input, "", list)
 	modal := m.styles.ModalBorder.Render(content)
 
 	return lipgloss.Place(

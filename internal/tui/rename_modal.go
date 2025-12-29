@@ -106,9 +106,8 @@ func (m RenameModal) View() string {
 	// Modal content
 	title := m.styles.ModalTitle.Render("Rename Task")
 	input := m.input.View()
-	hint := m.styles.Theme.Muted.Render("Enter to save • Esc to cancel")
 
-	content := lipgloss.JoinVertical(lipgloss.Left, title, input, "", hint)
+	content := lipgloss.JoinVertical(lipgloss.Left, title, input)
 	modal := m.styles.ModalBorder.Render(content)
 
 	// Center the modal

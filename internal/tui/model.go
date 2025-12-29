@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -45,6 +46,7 @@ type Model struct {
 	renameModal RenameModal
 	moveModal   MoveModal
 	dateModal   DateModal
+	help        help.Model
 	focusArea   FocusArea
 
 	// Cached data
@@ -60,6 +62,12 @@ type Model struct {
 func NewModel(taskService *task.Service, areaService *area.Service, projectService *project.Service, theme *output.Theme, cfg *config.Config) Model {
 	styles := NewStyles(theme)
 
+	// Initialize help with theme-matching styles
+	helpModel := help.New()
+	helpModel.Styles.ShortKey = theme.Accent
+	helpModel.Styles.ShortDesc = theme.Muted
+	helpModel.Styles.ShortSeparator = theme.Muted
+
 	return Model{
 		taskService:    taskService,
 		areaService:    areaService,
@@ -71,6 +79,7 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 		renameModal:    NewRenameModal(styles),
 		moveModal:      NewMoveModal(styles),
 		dateModal:      NewDateModal(styles),
+		help:           helpModel,
 	}
 }
 
@@ -193,7 +202,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Rename):
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
-					m.renameModal = m.renameModal.SetSize(m.width, m.height)
+					m.renameModal = m.renameModal.SetSize(m.width, m.height-1) // -1 for help bar
 					m.renameModal = m.renameModal.Open(selectedTask.ID, selectedTask.Title)
 					return m, nil
 				}
@@ -202,7 +211,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Move):
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
-					m.moveModal = m.moveModal.SetSize(m.width, m.height)
+					m.moveModal = m.moveModal.SetSize(m.width, m.height-1) // -1 for help bar
 					m.moveModal = m.moveModal.Open(selectedTask.ID, m.projects, m.areas)
 					return m, nil
 				}
@@ -211,7 +220,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Planned):
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
-					m.dateModal = m.dateModal.SetSize(m.width, m.height)
+					m.dateModal = m.dateModal.SetSize(m.width, m.height-1) // -1 for help bar
 					m.dateModal = m.dateModal.Open(selectedTask.ID, DateModalPlanned, selectedTask.PlannedDate)
 					return m, nil
 				}
@@ -220,7 +229,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Due):
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
-					m.dateModal = m.dateModal.SetSize(m.width, m.height)
+					m.dateModal = m.dateModal.SetSize(m.width, m.height-1) // -1 for help bar
 					m.dateModal = m.dateModal.Open(selectedTask.ID, DateModalDue, selectedTask.DueDate)
 					return m, nil
 				}
@@ -255,6 +264,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
+		// Reserve 1 row for help bar at the bottom
+		helpHeight := 1
+		availableHeight := m.height - helpHeight
+
 		// Sidebar gets 1/4, content gets rest minus 1-char gap between columns
 		sidebarWidth := m.width / 4
 		if sidebarWidth < 20 {
@@ -262,8 +275,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		contentWidth := m.width - sidebarWidth - 1
 
-		m.sidebar = m.sidebar.SetSize(sidebarWidth, m.height)
-		m.content = m.content.SetSize(contentWidth, m.height)
+		// Calculate sidebar height that's evenly divisible by 3 (number of sections)
+		// This ensures both columns end at the same row
+		sidebarHeight := (availableHeight / 3) * 3
+
+		m.sidebar = m.sidebar.SetSize(sidebarWidth, sidebarHeight)
+		m.content = m.content.SetSize(contentWidth, sidebarHeight)
+		m.help.Width = m.width
 		return m, nil
 
 	case loadDataMsg:
@@ -496,24 +514,41 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
+	// Determine which help keys to show based on current state
+	var helpView string
+	switch {
+	case m.renameModal.Active():
+		helpView = m.help.View(renameKeys)
+	case m.moveModal.Active():
+		helpView = m.help.View(moveKeys)
+	case m.dateModal.Active():
+		if m.dateModal.FocusInput() {
+			helpView = m.help.View(dateInputKeys)
+		} else {
+			helpView = m.help.View(datePickerKeys)
+		}
+	case m.focusArea == FocusSidebar:
+		helpView = m.help.View(sidebarKeys)
+	default:
+		helpView = m.help.View(contentKeys)
+	}
+	helpView = lipgloss.PlaceHorizontal(m.width, lipgloss.Center, helpView)
+
+	// Render modal if active (with help bar below)
+	if m.renameModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.renameModal.View(), helpView)
+	}
+	if m.moveModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.moveModal.View(), helpView)
+	}
+	if m.dateModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.dateModal.View(), helpView)
+	}
+
 	// Render sidebar and content side by side with 1-char gap
 	contentView := lipgloss.NewStyle().MarginLeft(1).Render(m.content.View())
 	mainView := lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView)
 
-	// Overlay rename modal if active
-	if m.renameModal.Active() {
-		return m.renameModal.View()
-	}
-
-	// Overlay move modal if active
-	if m.moveModal.Active() {
-		return m.moveModal.View()
-	}
-
-	// Overlay date modal if active
-	if m.dateModal.Active() {
-		return m.dateModal.View()
-	}
-
-	return mainView
+	// Combine main view with help bar at the bottom
+	return lipgloss.JoinVertical(lipgloss.Left, mainView, helpView)
 }
