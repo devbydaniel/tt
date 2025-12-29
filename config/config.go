@@ -19,14 +19,15 @@ type Config struct {
 	DefaultList string // default view: today, upcoming, anytime, someday, inbox, all
 	Sort        string // global default sort
 	Group       string // global default group
-	Today       ListSettings
-	Upcoming    ListSettings
-	Anytime     ListSettings
-	Someday     ListSettings
-	Log         ListSettings
-	ProjectList ListSettings
-	List        ListSettings // for "all" view
-	Inbox       ListSettings
+	Today         ListSettings
+	Upcoming      ListSettings
+	Anytime       ListSettings
+	Someday       ListSettings
+	Log           ListSettings
+	ProjectList   ListSettings
+	ProjectDetail ListSettings
+	List          ListSettings // for "all" view
+	Inbox         ListSettings
 	Theme       ThemeConfig
 }
 
@@ -68,6 +69,8 @@ func (c *Config) GetSort(listName string) string {
 		listSetting = c.Log.Sort
 	case "project-list":
 		listSetting = c.ProjectList.Sort
+	case "project-detail":
+		listSetting = c.ProjectDetail.Sort
 	case "list", "all":
 		listSetting = c.List.Sort
 	case "inbox":
@@ -96,6 +99,8 @@ func (c *Config) GetGroup(listName string) string {
 		listSetting = c.Log.Group
 	case "project-list":
 		listSetting = c.ProjectList.Group
+	case "project-detail":
+		listSetting = c.ProjectDetail.Group
 	case "list", "all":
 		listSetting = c.List.Group
 	case "inbox":
@@ -107,6 +112,10 @@ func (c *Config) GetGroup(listName string) string {
 	// Don't apply global default to project-list (it uses different grouping options)
 	if listName == "project-list" {
 		return "none"
+	}
+	// project-detail defaults to schedule grouping
+	if listName == "project-detail" {
+		return "schedule"
 	}
 	if c.Group != "" {
 		return c.Group
@@ -120,14 +129,15 @@ type fileConfig struct {
 	DefaultList string       `toml:"default_list"`
 	Sort        string       `toml:"sort"`
 	Group       string       `toml:"group"`
-	Today       ListSettings `toml:"today"`
-	Upcoming    ListSettings `toml:"upcoming"`
-	Anytime     ListSettings `toml:"anytime"`
-	Someday     ListSettings `toml:"someday"`
-	Log         ListSettings `toml:"log"`
-	ProjectList ListSettings `toml:"project_list"`
-	List        ListSettings `toml:"list"`
-	Inbox       ListSettings `toml:"inbox"`
+	Today         ListSettings `toml:"today"`
+	Upcoming      ListSettings `toml:"upcoming"`
+	Anytime       ListSettings `toml:"anytime"`
+	Someday       ListSettings `toml:"someday"`
+	Log           ListSettings `toml:"log"`
+	ProjectList   ListSettings `toml:"project_list"`
+	ProjectDetail ListSettings `toml:"project_detail"`
+	List          ListSettings `toml:"list"`
+	Inbox         ListSettings `toml:"inbox"`
 	Theme       ThemeConfig  `toml:"theme"`
 }
 
@@ -154,6 +164,7 @@ func Load() (*Config, error) {
 			cfg.Someday = fc.Someday
 			cfg.Log = fc.Log
 			cfg.ProjectList = fc.ProjectList
+			cfg.ProjectDetail = fc.ProjectDetail
 			cfg.List = fc.List
 			cfg.Inbox = fc.Inbox
 			cfg.Theme = fc.Theme

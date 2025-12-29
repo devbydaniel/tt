@@ -83,7 +83,7 @@ func (m Model) loadData() tea.Msg {
 	}
 
 	// Load today's tasks by default
-	tasks, err := m.taskService.List(&task.ListOptions{Today: true})
+	tasks, err := m.taskService.List(&task.ListOptions{Schedule: "today"})
 	if err != nil {
 		return loadDataMsg{err: err}
 	}
@@ -177,15 +177,15 @@ func (m Model) loadTasksForSelection() tea.Msg {
 	case "static":
 		switch item.Key {
 		case "inbox":
-			opts.Inbox = true
+			opts.Schedule = "inbox"
 		case "today":
-			opts.Today = true
+			opts.Schedule = "today"
 		case "upcoming":
-			opts.Upcoming = true
+			opts.Schedule = "upcoming"
 		case "anytime":
-			opts.Anytime = true
+			opts.Schedule = "anytime"
 		case "someday":
-			opts.Someday = true
+			opts.Schedule = "someday"
 		}
 	case "area":
 		opts.AreaName = item.Key

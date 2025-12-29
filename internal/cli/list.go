@@ -19,7 +19,6 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	var someday bool
 	var anytime bool
 	var inbox bool
-	var all bool
 	var group string
 	var jsonOutput bool
 
@@ -27,17 +26,23 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 		Use:   "list",
 		Short: "List tasks",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Determine view command first (needed for config lookup)
+			// Determine schedule from flags
+			schedule := ""
 			viewCmd := "all"
 			if today {
+				schedule = "today"
 				viewCmd = "today"
 			} else if upcoming {
+				schedule = "upcoming"
 				viewCmd = "upcoming"
 			} else if someday {
+				schedule = "someday"
 				viewCmd = "someday"
 			} else if anytime {
+				schedule = "anytime"
 				viewCmd = "anytime"
 			} else if inbox {
+				schedule = "inbox"
 				viewCmd = "inbox"
 			}
 
@@ -57,17 +62,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				TagName:     tagName,
 				Search:      search,
 				Sort:        sortOpts,
-				Today:       today,
-				Upcoming:    upcoming,
-				Someday:     someday,
-				Anytime:     anytime,
-				Inbox:       inbox,
-				All:         all,
-			}
-
-			// Default to showing all active tasks (default_list config only applies to bare "tt" command)
-			if viewCmd == "all" {
-				opts.All = true
+				Schedule:    schedule,
 			}
 
 			tasks, err := deps.TaskService.List(opts)
@@ -86,7 +81,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 			}
 
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			if opts.Today {
+			if schedule == "today" {
 				formatter.SetHidePlannedDate(true)
 			}
 			formatter.GroupedTaskList(tasks, groupBy)
@@ -104,7 +99,6 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().BoolVar(&someday, "someday", false, "Show someday tasks")
 	cmd.Flags().BoolVar(&anytime, "anytime", false, "Show active tasks with no dates")
 	cmd.Flags().BoolVar(&inbox, "inbox", false, "Show tasks with no project, area, or dates")
-	cmd.Flags().BoolVar(&all, "all", false, "Show all active tasks")
 	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 

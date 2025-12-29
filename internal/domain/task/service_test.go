@@ -641,7 +641,7 @@ func TestFilterByTag(t *testing.T) {
 	}
 
 	// All tasks should include tags
-	allTasks, _ := taskSvc.List(&task.ListOptions{All: true})
+	allTasks, _ := taskSvc.List(nil)
 	if len(allTasks) != 4 {
 		t.Errorf("got %d total tasks, want 4", len(allTasks))
 	}

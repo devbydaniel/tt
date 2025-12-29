@@ -82,17 +82,17 @@ func RunListView(deps *Dependencies, viewCmd, sortOverride, groupOverride string
 	opts := &task.ListOptions{}
 	switch viewCmd {
 	case "today":
-		opts.Today = true
+		opts.Schedule = "today"
 	case "upcoming":
-		opts.Upcoming = true
+		opts.Schedule = "upcoming"
 	case "anytime":
-		opts.Anytime = true
+		opts.Schedule = "anytime"
 	case "someday":
-		opts.Someday = true
+		opts.Schedule = "someday"
 	case "inbox":
-		opts.Inbox = true
+		opts.Schedule = "inbox"
 	case "all":
-		opts.All = true
+		// no schedule filter
 	}
 
 	// Resolve sorting: override > config > code default

@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -15,6 +17,7 @@ func NewProjectCmd(deps *Dependencies) *cobra.Command {
 
 	cmd.AddCommand(newProjectListCmd(deps))
 	cmd.AddCommand(newProjectAddCmd(deps))
+	cmd.AddCommand(newProjectShowCmd(deps))
 	cmd.AddCommand(newProjectDeleteCmd(deps))
 	cmd.AddCommand(newProjectRenameCmd(deps))
 	cmd.AddCommand(newProjectMoveCmd(deps))
@@ -190,6 +193,107 @@ func newProjectMoveCmd(deps *Dependencies) *cobra.Command {
 	registry := NewCompletionRegistry(deps)
 	cmd.ValidArgsFunction = registry.ProjectCompletion()
 	registry.RegisterAreaFlag(cmd)
+
+	return cmd
+}
+
+func newProjectShowCmd(deps *Dependencies) *cobra.Command {
+	var group string
+	var sortStr string
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "show <name>",
+		Short: "Show tasks for a project",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectName := args[0]
+
+			// Validate project exists
+			if _, err := deps.ProjectService.GetByName(projectName); err != nil {
+				return err
+			}
+
+			// Resolve grouping: flag > config > "schedule"
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.GetGroup("project-detail")
+			}
+
+			// Resolve sorting: flag > config > code default
+			sortToUse := sortStr
+			if sortToUse == "" {
+				sortToUse = deps.Config.GetSort("project-detail")
+			}
+			sortOpts, err := task.ParseSort(sortToUse)
+			if err != nil {
+				return err
+			}
+
+			// JSON output: single call, all tasks
+			if jsonOutput {
+				tasks, err := deps.TaskService.List(&task.ListOptions{
+					ProjectName: projectName,
+					Sort:        sortOpts,
+				})
+				if err != nil {
+					return err
+				}
+				return output.WriteJSON(os.Stdout, tasks)
+			}
+
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
+			formatter.SetHideScope(true)
+
+			if groupBy == "schedule" {
+				// Use 4 separate calls to reuse repository filter logic
+				schedules := []struct {
+					name     string
+					schedule string
+				}{
+					{"Today", "today"},
+					{"Upcoming", "upcoming"},
+					{"Anytime", "anytime"},
+					{"Someday", "someday"},
+				}
+
+				for _, sched := range schedules {
+					tasks, err := deps.TaskService.List(&task.ListOptions{
+						ProjectName: projectName,
+						Schedule:    sched.schedule,
+						Sort:        sortOpts,
+					})
+					if err != nil {
+						return err
+					}
+					if len(tasks) > 0 {
+						fmt.Fprintln(os.Stdout, deps.Theme.Header.Render(sched.name))
+						formatter.TaskList(tasks)
+					}
+				}
+			} else {
+				// Other groupings: single call, client-side grouping
+				tasks, err := deps.TaskService.List(&task.ListOptions{
+					ProjectName: projectName,
+					Sort:        sortOpts,
+				})
+				if err != nil {
+					return err
+				}
+				formatter.GroupedTaskList(tasks, groupBy)
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: schedule, date, none")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
+
+	// Register project name completion
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.ProjectCompletion()
 
 	return cmd
 }

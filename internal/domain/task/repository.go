@@ -171,11 +171,13 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 		}
 		if filter.Anytime {
 			// no planned_date and no due_date, must have project or area (excludes inbox)
-			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL AND (t.project_id IS NOT NULL OR t.area_id IS NOT NULL)`
+			// enforces active state (someday tasks are excluded)
+			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL AND (t.project_id IS NOT NULL OR t.area_id IS NOT NULL) AND t.state = 'active'`
 		}
 		if filter.Inbox {
 			// no project, no area, no planned_date, no due_date
-			query += ` AND t.project_id IS NULL AND t.area_id IS NULL AND t.planned_date IS NULL AND t.due_date IS NULL`
+			// enforces active state (someday tasks are excluded)
+			query += ` AND t.project_id IS NULL AND t.area_id IS NULL AND t.planned_date IS NULL AND t.due_date IS NULL AND t.state = 'active'`
 		}
 		if filter.Search != "" {
 			query += ` AND t.title LIKE ? COLLATE NOCASE`

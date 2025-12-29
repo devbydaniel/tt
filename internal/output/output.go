@@ -18,6 +18,7 @@ import (
 type Formatter struct {
 	w               io.Writer
 	hidePlannedDate bool
+	hideScope       bool
 	theme           *Theme
 }
 
@@ -30,6 +31,10 @@ func NewFormatter(w io.Writer, theme *Theme) *Formatter {
 
 func (f *Formatter) SetHidePlannedDate(hide bool) {
 	f.hidePlannedDate = hide
+}
+
+func (f *Formatter) SetHideScope(hide bool) {
+	f.hideScope = hide
 }
 
 func (f *Formatter) TaskCreated(t *task.Task) {
@@ -71,17 +76,31 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 			title += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
 		}
 
-		rows = append(rows, []string{
-			prefix + fmt.Sprintf("%d", t.ID),
-			scope,
-			title,
-		})
+		if f.hideScope {
+			rows = append(rows, []string{
+				prefix + fmt.Sprintf("%d", t.ID),
+				title,
+			})
+		} else {
+			rows = append(rows, []string{
+				prefix + fmt.Sprintf("%d", t.ID),
+				scope,
+				title,
+			})
+		}
 	}
 
 	// Create minimal table (no borders, no headers)
 	tbl := table.New().
 		Rows(rows...).
-		Border(lipgloss.HiddenBorder()).
+		Border(lipgloss.Border{}).
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(false).
+		BorderRight(false).
+		BorderHeader(false).
+		BorderColumn(false).
+		BorderRow(false).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			return lipgloss.NewStyle().PaddingRight(2)
 		})

@@ -21,7 +21,7 @@ func NewSearchCmd(deps *Dependencies) *cobra.Command {
 
 			opts := &task.ListOptions{
 				Search: query,
-				All:    true, // search across all active tasks
+				// No schedule filter = search across all tasks
 			}
 
 			tasks, err := deps.TaskService.List(opts)

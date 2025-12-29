@@ -107,20 +107,13 @@ type ListOptions struct {
 	ProjectName string
 	AreaName    string
 	TagName     string       // filter by tag
-	Today       bool         // show today + overdue
-	Upcoming    bool         // show future dates
-	Someday     bool         // show someday tasks
-	Anytime     bool         // show active tasks with no dates
-	Inbox       bool         // show tasks with no project/area/dates
-	All         bool         // show all active (no date filter)
+	Schedule    string       // "today", "upcoming", "anytime", "inbox", "someday"
 	Search      string       // case-insensitive title search
 	Sort        []SortOption // sort options (default: created desc)
 }
 
 func (s *Service) List(opts *ListOptions) ([]Task, error) {
-	filter := &ListFilter{
-		State: StateActive, // default to active tasks
-	}
+	filter := &ListFilter{}
 
 	if opts != nil {
 		if opts.ProjectName != "" {
@@ -147,18 +140,20 @@ func (s *Service) List(opts *ListOptions) ([]Task, error) {
 			filter.Sort = opts.Sort
 		}
 
-		if opts.Someday {
-			filter.State = StateSomeday
-		} else if opts.Today {
+		// Schedule filter - repo enforces active state for today/upcoming/anytime/inbox
+		switch opts.Schedule {
+		case "today":
 			filter.Today = true
-		} else if opts.Upcoming {
+		case "upcoming":
 			filter.Upcoming = true
-		} else if opts.Anytime {
+		case "anytime":
 			filter.Anytime = true
-		} else if opts.Inbox {
+		case "inbox":
 			filter.Inbox = true
+		case "someday":
+			filter.State = StateSomeday
 		}
-		// opts.All means no date filter, just state = active (default)
+		// No schedule = no state filter (get all states)
 	}
 
 	return s.repo.List(filter)
