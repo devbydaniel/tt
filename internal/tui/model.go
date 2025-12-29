@@ -106,21 +106,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.Tab):
 			m.sidebar = m.sidebar.NextSection()
-			return m, nil
+			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.ShiftTab):
 			m.sidebar = m.sidebar.PrevSection()
-			return m, nil
+			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.Up):
 			m.sidebar = m.sidebar.MoveUp()
-			return m, nil
+			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.Down):
 			m.sidebar = m.sidebar.MoveDown()
-			return m, nil
-
-		case key.Matches(msg, keys.Enter):
 			return m, m.loadTasksForSelection
 		}
 
