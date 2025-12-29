@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -20,6 +21,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	var anytime bool
 	var inbox bool
 	var group string
+	var hideScope bool
 	var jsonOutput bool
 
 	cmd := &cobra.Command{
@@ -46,43 +48,101 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				viewCmd = "inbox"
 			}
 
+			// Determine if filtering by project or area (affects defaults)
+			filterByScope := projectName != "" || areaName != ""
+			configKey := viewCmd
+			if projectName != "" {
+				configKey = "project-detail"
+			} else if areaName != "" {
+				configKey = "area-detail"
+			}
+
 			// Resolve sorting: flag > config for view > code default
 			sortToUse := sortStr
 			if sortToUse == "" {
-				sortToUse = deps.Config.GetSort(viewCmd)
+				sortToUse = deps.Config.GetSort(configKey)
 			}
 			sortOpts, err := task.ParseSort(sortToUse)
 			if err != nil {
 				return err
 			}
 
-			opts := &task.ListOptions{
+			// Resolve grouping: flag > config for view > "schedule" default for scope filters
+			groupBy := group
+			if groupBy == "" {
+				groupBy = deps.Config.GetGroup(configKey)
+			}
+			if groupBy == "" && filterByScope {
+				groupBy = "schedule"
+			}
+
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
+			if schedule == "today" {
+				formatter.SetHidePlannedDate(true)
+			}
+			if hideScope {
+				formatter.SetHideScope(true)
+			}
+
+			// JSON output: single call, all tasks
+			if jsonOutput {
+				tasks, err := deps.TaskService.List(&task.ListOptions{
+					ProjectName: projectName,
+					AreaName:    areaName,
+					TagName:     tagName,
+					Search:      search,
+					Sort:        sortOpts,
+					Schedule:    schedule,
+				})
+				if err != nil {
+					return err
+				}
+				return output.WriteJSON(os.Stdout, tasks)
+			}
+
+			// Schedule grouping: 4 separate queries
+			if groupBy == "schedule" {
+				schedules := []struct {
+					name     string
+					schedule string
+				}{
+					{"Today", "today"},
+					{"Upcoming", "upcoming"},
+					{"Anytime", "anytime"},
+					{"Someday", "someday"},
+				}
+
+				for _, sched := range schedules {
+					tasks, err := deps.TaskService.List(&task.ListOptions{
+						ProjectName: projectName,
+						AreaName:    areaName,
+						TagName:     tagName,
+						Search:      search,
+						Sort:        sortOpts,
+						Schedule:    sched.schedule,
+					})
+					if err != nil {
+						return err
+					}
+					if len(tasks) > 0 {
+						fmt.Fprintln(os.Stdout, deps.Theme.Header.Render(sched.name))
+						formatter.TaskList(tasks)
+					}
+				}
+				return nil
+			}
+
+			// Other groupings: single call, client-side grouping
+			tasks, err := deps.TaskService.List(&task.ListOptions{
 				ProjectName: projectName,
 				AreaName:    areaName,
 				TagName:     tagName,
 				Search:      search,
 				Sort:        sortOpts,
 				Schedule:    schedule,
-			}
-
-			tasks, err := deps.TaskService.List(opts)
+			})
 			if err != nil {
 				return err
-			}
-
-			if jsonOutput {
-				return output.WriteJSON(os.Stdout, tasks)
-			}
-
-			// Resolve grouping: flag > config for view > config for list > none
-			groupBy := group
-			if groupBy == "" {
-				groupBy = deps.Config.GetGroup(viewCmd)
-			}
-
-			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			if schedule == "today" {
-				formatter.SetHidePlannedDate(true)
 			}
 			formatter.GroupedTaskList(tasks, groupBy)
 			return nil
@@ -99,7 +159,8 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().BoolVar(&someday, "someday", false, "Show someday tasks")
 	cmd.Flags().BoolVar(&anytime, "anytime", false, "Show active tasks with no dates")
 	cmd.Flags().BoolVar(&inbox, "inbox", false, "Show tasks with no project, area, or dates")
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: schedule, project, area, date, none")
+	cmd.Flags().BoolVar(&hideScope, "hide-scope", false, "Hide project/area columns")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 
 	// Register completions

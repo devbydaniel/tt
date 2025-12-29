@@ -97,10 +97,16 @@ tt list --area Health
 tt list --tag urgent
 
 # Group output
+tt list --all --group=schedule  # Group by schedule (Today, Upcoming, Anytime, Someday)
 tt list --all --group=project   # Group by Area > Project
 tt list --all --group=area      # Group by area
 tt list --all --group=date      # Group by date (Overdue, Today, Tomorrow, etc.)
 tt list --all --group=none      # Flat list (default)
+
+# View project/area tasks (defaults to schedule grouping)
+tt list --project "Backend API"              # Grouped by schedule
+tt list --project "Backend API" -g none      # No grouping
+tt list --project "Backend API" --hide-scope # Hide redundant project column
 ```
 
 All list commands support the `--group` / `-g` flag.
