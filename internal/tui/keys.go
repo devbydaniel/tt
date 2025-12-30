@@ -16,6 +16,7 @@ type keyMap struct {
 	Planned      key.Binding
 	Due          key.Binding
 	Add          key.Binding
+	Toggle       key.Binding
 	Quit         key.Binding
 }
 
@@ -34,11 +35,11 @@ func (k sidebarKeyMap) FullHelp() [][]key.Binding {
 type contentKeyMap struct{}
 
 func (k contentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Add, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Add, keys.Toggle, keys.Quit}
 }
 
 func (k contentKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Toggle, keys.Quit}}
 }
 
 // renameKeyMap provides help bindings for rename modal
@@ -172,6 +173,10 @@ var keys = keyMap{
 	Add: key.NewBinding(
 		key.WithKeys("a"),
 		key.WithHelp("a", "add task"),
+	),
+	Toggle: key.NewBinding(
+		key.WithKeys(" "),
+		key.WithHelp("space", "toggle done"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),

@@ -265,6 +265,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addModal = m.addModal.Open(m.projects, m.areas, prefill)
 			return m, nil
 
+		case key.Matches(msg, keys.Toggle):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					return m, m.toggleTask(selectedTask.ID, selectedTask.Status)
+				}
+			}
+
 		case key.Matches(msg, keys.Tab):
 			m.sidebar = m.sidebar.NextSection()
 			return m, m.loadTasksForSelection
@@ -376,6 +383,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Reload tasks to show the new task
 		return m, m.loadTasksForSelection
+
+	case taskToggledMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Update the task status in-place (don't reload to keep task visible)
+		m.content = m.content.UpdateTaskStatus(msg.taskID, msg.done)
+		return m, nil
 	}
 
 	return m, nil
@@ -428,6 +444,13 @@ type taskDateUpdatedMsg struct {
 type taskCreatedMsg struct {
 	task *task.Task
 	err  error
+}
+
+// taskToggledMsg carries the result of toggling a task's done status
+type taskToggledMsg struct {
+	taskID int64
+	done   bool // true if task was marked done, false if undone
+	err    error
 }
 
 // loadTasksForSelection loads tasks based on sidebar selection
@@ -562,6 +585,21 @@ func (m Model) createTask(result *AddResult) tea.Cmd {
 
 		created, err := m.taskService.Create(result.Title, opts)
 		return taskCreatedMsg{task: created, err: err}
+	}
+}
+
+// toggleTask creates a command to toggle a task's done status
+func (m Model) toggleTask(taskID int64, currentStatus string) tea.Cmd {
+	return func() tea.Msg {
+		var err error
+		if currentStatus == task.StatusDone {
+			// Uncomplete the task
+			_, err = m.taskService.Uncomplete([]int64{taskID})
+			return taskToggledMsg{taskID: taskID, done: false, err: err}
+		}
+		// Complete the task
+		_, err = m.taskService.Complete([]int64{taskID})
+		return taskToggledMsg{taskID: taskID, done: true, err: err}
 	}
 }
 

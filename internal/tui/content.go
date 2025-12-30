@@ -357,9 +357,11 @@ func (c Content) renderTaskRow(t *task.Task, index int) string {
 	theme := c.styles.Theme
 	isSelected := c.focused && index == c.selectedIndex
 
-	// Prefix: selection indicator, flag for due, star for planned today
+	// Prefix: selection indicator, check for done, flag for due, star for planned today
 	prefix := "  "
-	if c.isDueOrOverdue(t) {
+	if t.Status == task.StatusDone {
+		prefix = theme.Success.Render(theme.Icons.Done) + " "
+	} else if c.isDueOrOverdue(t) {
 		prefix = theme.Warning.Render(theme.Icons.Due) + " "
 	} else if c.isPlannedForToday(t) {
 		prefix = theme.Accent.Render(theme.Icons.Planned) + " "
@@ -535,6 +537,24 @@ func (c Content) SelectedTask() *task.Task {
 		return nil
 	}
 	return &c.displayTasks[c.selectedIndex]
+}
+
+// UpdateTaskStatus updates a task's status in-place and refreshes the viewport
+func (c Content) UpdateTaskStatus(taskID int64, done bool) Content {
+	for i := range c.displayTasks {
+		if c.displayTasks[i].ID == taskID {
+			if done {
+				c.displayTasks[i].Status = task.StatusDone
+			} else {
+				c.displayTasks[i].Status = task.StatusTodo
+			}
+			break
+		}
+	}
+	if c.ready {
+		c.viewport.SetContent(c.buildTaskList())
+	}
+	return c
 }
 
 // computeDisplayOrder returns tasks sorted by the given grouping mode

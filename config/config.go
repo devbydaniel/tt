@@ -53,6 +53,7 @@ type IconConfig struct {
 	Planned string `toml:"planned"` // indicator for tasks planned today or earlier (default: ★)
 	Due     string `toml:"due"`     // indicator for due/overdue tasks (default: ⚑)
 	Date    string `toml:"date"`    // prefix for planned dates (default: 📅)
+	Done    string `toml:"done"`    // indicator for completed tasks (default: ✓)
 }
 
 // GetSort returns the sort setting for a list view.

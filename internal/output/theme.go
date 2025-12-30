@@ -23,6 +23,7 @@ type Icons struct {
 	Planned string
 	Due     string
 	Date    string
+	Done    string
 }
 
 // themeColors holds the raw color values for a theme preset
@@ -118,6 +119,7 @@ func DefaultTheme() *Theme {
 			Planned: "★",
 			Due:     "⚑",
 			Date:    "›",
+			Done:    "✓",
 		},
 	}
 }
@@ -177,6 +179,9 @@ func NewTheme(cfg *config.ThemeConfig) *Theme {
 	}
 	if cfg.Icons.Date != "" {
 		theme.Icons.Date = cfg.Icons.Date
+	}
+	if cfg.Icons.Done != "" {
+		theme.Icons.Done = cfg.Icons.Done
 	}
 
 	return theme
