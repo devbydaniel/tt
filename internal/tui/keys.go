@@ -126,15 +126,48 @@ func (k addKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
+// detailKeyMap provides help bindings when detail pane is focused
+type detailKeyMap struct{}
+
+func (k detailKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		keys.Up,
+		keys.Down,
+		keys.Enter,
+		keys.Escape,
+	}
+}
+
+func (k detailKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
+// descriptionKeyMap provides help bindings for description modal
+type descriptionKeyMap struct{}
+
+func (k descriptionKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("ctrl+s", "save")),
+		key.NewBinding(key.WithKeys("alt+enter"), key.WithHelp("alt+enter", "save")),
+		keys.Escape,
+	}
+}
+
+func (k descriptionKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
 var (
-	sidebarKeys    = sidebarKeyMap{}
-	contentKeys    = contentKeyMap{}
-	renameKeys     = renameKeyMap{}
-	moveKeys       = moveKeyMap{}
-	tagKeys        = tagKeyMap{}
-	dateInputKeys  = dateInputKeyMap{}
-	datePickerKeys = datePickerKeyMap{}
-	addKeys        = addKeyMap{}
+	sidebarKeys     = sidebarKeyMap{}
+	contentKeys     = contentKeyMap{}
+	renameKeys      = renameKeyMap{}
+	moveKeys        = moveKeyMap{}
+	tagKeys         = tagKeyMap{}
+	dateInputKeys   = dateInputKeyMap{}
+	datePickerKeys  = datePickerKeyMap{}
+	addKeys         = addKeyMap{}
+	detailKeys      = detailKeyMap{}
+	descriptionKeys = descriptionKeyMap{}
 )
 
 var keys = keyMap{

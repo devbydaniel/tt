@@ -21,6 +21,7 @@ type FocusArea int
 const (
 	FocusSidebar FocusArea = iota
 	FocusContent
+	FocusDetail
 )
 
 // Model is the root TUI model
@@ -42,15 +43,18 @@ type Model struct {
 	gap    int // Gap between sidebar and content (can be 0 for tight layouts)
 
 	// Components
-	sidebar     Sidebar
-	content     Content
-	renameModal RenameModal
-	moveModal   MoveModal
-	dateModal   DateModal
-	addModal    AddModal
-	tagModal    TagModal
-	help        help.Model
-	focusArea   FocusArea
+	sidebar          Sidebar
+	content          Content
+	detailPane       DetailPane
+	renameModal      RenameModal
+	moveModal        MoveModal
+	dateModal        DateModal
+	addModal         AddModal
+	tagModal         TagModal
+	descriptionModal DescriptionModal
+	help             help.Model
+	focusArea        FocusArea
+	detailVisible    bool // whether the detail pane is shown
 
 	// Cached data
 	areas    []area.Area
@@ -72,20 +76,22 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 	helpModel.Styles.ShortSeparator = theme.Muted
 
 	return Model{
-		taskService:    taskService,
-		areaService:    areaService,
-		projectService: projectService,
-		config:         cfg,
-		styles:         styles,
-		gap:            1, // Default gap, adjusted on resize
-		sidebar:        NewSidebar(styles),
-		content:        NewContent(styles),
-		renameModal:    NewRenameModal(styles),
-		moveModal:      NewMoveModal(styles),
-		dateModal:      NewDateModal(styles),
-		addModal:       NewAddModal(styles),
-		tagModal:       NewTagModal(styles),
-		help:           helpModel,
+		taskService:      taskService,
+		areaService:      areaService,
+		projectService:   projectService,
+		config:           cfg,
+		styles:           styles,
+		gap:              1, // Default gap, adjusted on resize
+		sidebar:          NewSidebar(styles),
+		content:          NewContent(styles),
+		detailPane:       NewDetailPane(styles),
+		renameModal:      NewRenameModal(styles),
+		moveModal:        NewMoveModal(styles),
+		dateModal:        NewDateModal(styles),
+		addModal:         NewAddModal(styles),
+		tagModal:         NewTagModal(styles),
+		descriptionModal: NewDescriptionModal(styles),
+		help:             helpModel,
 	}
 }
 
@@ -207,6 +213,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Route keys to description modal when active
+		if m.descriptionModal.Active() {
+			var result *DescriptionResult
+			m.descriptionModal, result = m.descriptionModal.Update(msg)
+			if result != nil && !result.Canceled {
+				return m, m.setTaskDescription(result.TaskID, result.Description)
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -218,12 +234,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.content = m.content.SetFocused(true)
 				return m, nil
 			}
+			if m.focusArea == FocusContent {
+				// Enter from content opens detail pane
+				return m.openDetailPane()
+			}
+			if m.focusArea == FocusDetail {
+				// Open modal for focused field
+				return m.openDetailFieldModal()
+			}
 
 		case key.Matches(msg, keys.Escape), key.Matches(msg, keys.FocusSidebar):
+			if m.focusArea == FocusDetail {
+				// Close detail pane, return to content
+				m.focusArea = FocusContent
+				m.detailPane = m.detailPane.SetFocused(false)
+				m.detailVisible = false
+				m.content = m.content.SetShowSelection(false)
+				m.content = m.content.SetFocused(true)
+				m = m.recalculateLayout()
+				return m, nil
+			}
 			if m.focusArea == FocusContent {
 				m.focusArea = FocusSidebar
 				m.sidebar = m.sidebar.SetFocused(true)
+				m.content = m.content.SetShowSelection(false)
 				m.content = m.content.SetFocused(false)
+				m.detailVisible = false
+				m = m.recalculateLayout()
 				return m, nil
 			}
 
@@ -233,6 +270,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sidebar = m.sidebar.SetFocused(false)
 				m.content = m.content.SetFocused(true)
 				return m, nil
+			}
+			if m.focusArea == FocusContent {
+				// l from content opens detail pane
+				return m.openDetailPane()
 			}
 
 		case key.Matches(msg, keys.Rename):
@@ -299,14 +340,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.Tab):
+			if m.focusArea == FocusDetail {
+				m.detailPane = m.detailPane.NextField()
+				return m, nil
+			}
 			m.sidebar = m.sidebar.NextSection()
 			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.ShiftTab):
+			if m.focusArea == FocusDetail {
+				m.detailPane = m.detailPane.PrevField()
+				return m, nil
+			}
 			m.sidebar = m.sidebar.PrevSection()
 			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.Up):
+			if m.focusArea == FocusDetail {
+				m.detailPane = m.detailPane.PrevField()
+				return m, nil
+			}
 			if m.focusArea == FocusContent {
 				m.content = m.content.MoveUp()
 				return m, nil
@@ -315,6 +368,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.Down):
+			if m.focusArea == FocusDetail {
+				m.detailPane = m.detailPane.NextField()
+				return m, nil
+			}
 			if m.focusArea == FocusContent {
 				m.content = m.content.MoveDown()
 				return m, nil
@@ -343,22 +400,54 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			sidebarWidth = maxSidebar
 		}
 
-		// Gap between sidebar and content (can be reduced for tight spaces)
+		// Gap between panels (can be reduced for tight spaces)
 		gap := 1
 		minContentWidth := 20
+		minDetailWidth := 25
 
-		// Calculate content width
-		contentWidth := m.width - sidebarWidth - gap
+		// Calculate widths based on whether detail pane is visible
+		var contentWidth, detailWidth int
+		if m.detailVisible {
+			// Three-column layout: sidebar | content | detail
+			remainingWidth := m.width - sidebarWidth - gap*2
+			// Split remaining between content (60%) and detail (40%)
+			contentWidth = remainingWidth * 60 / 100
+			detailWidth = remainingWidth - contentWidth
 
-		// If content would be too small, shrink sidebar to give content more room
-		if contentWidth < minContentWidth {
-			sidebarWidth = m.width - minContentWidth - gap
-			if sidebarWidth < 10 { // Absolute minimum sidebar
-				sidebarWidth = 10
-				gap = 0 // Remove gap entirely when very tight
-				contentWidth = m.width - sidebarWidth
-			} else {
+			// Ensure minimum widths
+			if contentWidth < minContentWidth {
 				contentWidth = minContentWidth
+			}
+			if detailWidth < minDetailWidth {
+				detailWidth = minDetailWidth
+			}
+
+			// If we exceed available space, reduce proportionally
+			totalNeeded := sidebarWidth + contentWidth + detailWidth + gap*2
+			if totalNeeded > m.width {
+				// Reduce sidebar first
+				sidebarWidth = m.width - contentWidth - detailWidth - gap*2
+				if sidebarWidth < 10 {
+					sidebarWidth = 10
+					gap = 0
+					contentWidth = (m.width - sidebarWidth - minDetailWidth) * 60 / 100
+					detailWidth = m.width - sidebarWidth - contentWidth
+				}
+			}
+		} else {
+			// Two-column layout: sidebar | content
+			contentWidth = m.width - sidebarWidth - gap
+
+			// If content would be too small, shrink sidebar to give content more room
+			if contentWidth < minContentWidth {
+				sidebarWidth = m.width - minContentWidth - gap
+				if sidebarWidth < 10 { // Absolute minimum sidebar
+					sidebarWidth = 10
+					gap = 0 // Remove gap entirely when very tight
+					contentWidth = m.width - sidebarWidth
+				} else {
+					contentWidth = minContentWidth
+				}
 			}
 		}
 
@@ -371,11 +460,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Calculate sidebar height that's evenly divisible by 3 (number of sections)
-		// This ensures both columns end at the same row
+		// This ensures all columns end at the same row
 		sidebarHeight := (availableHeight / 3) * 3
 
 		m.sidebar = m.sidebar.SetSize(sidebarWidth, sidebarHeight)
 		m.content = m.content.SetSize(contentWidth, sidebarHeight)
+		if m.detailVisible {
+			m.detailPane = m.detailPane.SetSize(detailWidth, sidebarHeight)
+		}
 		m.help.Width = m.width
 		m.gap = gap // Store gap for View()
 		return m, nil
@@ -416,6 +508,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		// Update detail pane if showing this task
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
+			m.detailPane = m.detailPane.UpdateTask(msg.task)
+		}
 		// Reload tasks to show the updated title
 		return m, m.loadTasksForSelection
 
@@ -424,6 +520,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		// Update detail pane if showing this task
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
+			m.detailPane = m.detailPane.UpdateTask(msg.task)
+		}
 		// Reload tasks to reflect the move
 		return m, m.loadTasksForSelection
 
@@ -431,6 +531,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
+		}
+		// Update detail pane if showing this task
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
+			m.detailPane = m.detailPane.UpdateTask(msg.task)
 		}
 		// Reload tasks to reflect the date change
 		return m, m.loadTasksForSelection
@@ -457,8 +561,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		// Update detail pane if showing this task
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
+			m.detailPane = m.detailPane.UpdateTask(msg.task)
+		}
 		// Reload tasks and tags (tags cache may have new tags)
 		return m, m.loadDataAfterTagUpdate
+
+	case taskDescriptionUpdatedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Update detail pane if showing this task
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
+			m.detailPane = m.detailPane.UpdateTask(msg.task)
+		}
+		// Reload tasks to reflect the description change
+		return m, m.loadTasksForSelection
 
 	case tagsAndTasksUpdatedMsg:
 		m.tags = msg.tags
@@ -528,6 +648,12 @@ type taskToggledMsg struct {
 
 // taskTagsUpdatedMsg carries the result of updating tags
 type taskTagsUpdatedMsg struct {
+	task *task.Task
+	err  error
+}
+
+// taskDescriptionUpdatedMsg carries the result of updating description
+type taskDescriptionUpdatedMsg struct {
 	task *task.Task
 	err  error
 }
@@ -690,6 +816,150 @@ func (m Model) setTaskTags(taskID int64, tags []string) tea.Cmd {
 	}
 }
 
+// setTaskDescription creates a command to set a task's description
+func (m Model) setTaskDescription(taskID int64, description *string) tea.Cmd {
+	return func() tea.Msg {
+		updated, err := m.taskService.SetDescription(taskID, description)
+		return taskDescriptionUpdatedMsg{task: updated, err: err}
+	}
+}
+
+// openDetailPane opens the detail pane with the selected task
+func (m Model) openDetailPane() (tea.Model, tea.Cmd) {
+	selectedTask := m.content.SelectedTask()
+	if selectedTask == nil {
+		return m, nil
+	}
+
+	m.detailVisible = true
+	m.focusArea = FocusDetail
+	m.content = m.content.SetShowSelection(true) // Keep showing selection
+	m.content = m.content.SetFocused(false)
+	m.detailPane = m.detailPane.SetTask(selectedTask)
+	m.detailPane = m.detailPane.SetFocused(true)
+
+	// Recalculate layout for three-column mode
+	m = m.recalculateLayout()
+
+	return m, nil
+}
+
+// recalculateLayout recalculates component sizes based on current state
+func (m Model) recalculateLayout() Model {
+	if m.width == 0 || m.height == 0 {
+		return m
+	}
+
+	// Reserve 1 row for help bar at the bottom
+	helpHeight := 1
+	availableHeight := m.height - helpHeight
+
+	// Calculate sidebar width: 1/4 of total, constrained between min/max
+	sidebarWidth := m.width / 4
+	minSidebar := 20
+	maxSidebar := 40
+
+	if sidebarWidth < minSidebar {
+		sidebarWidth = minSidebar
+	}
+	if sidebarWidth > maxSidebar {
+		sidebarWidth = maxSidebar
+	}
+
+	// Gap between panels
+	gap := 1
+	minContentWidth := 20
+	minDetailWidth := 25
+
+	var contentWidth, detailWidth int
+	if m.detailVisible {
+		// Three-column layout
+		remainingWidth := m.width - sidebarWidth - gap*2
+		contentWidth = remainingWidth * 60 / 100
+		detailWidth = remainingWidth - contentWidth
+
+		if contentWidth < minContentWidth {
+			contentWidth = minContentWidth
+		}
+		if detailWidth < minDetailWidth {
+			detailWidth = minDetailWidth
+		}
+
+		totalNeeded := sidebarWidth + contentWidth + detailWidth + gap*2
+		if totalNeeded > m.width {
+			sidebarWidth = m.width - contentWidth - detailWidth - gap*2
+			if sidebarWidth < 10 {
+				sidebarWidth = 10
+				gap = 0
+				contentWidth = (m.width - sidebarWidth - minDetailWidth) * 60 / 100
+				detailWidth = m.width - sidebarWidth - contentWidth
+			}
+		}
+	} else {
+		// Two-column layout
+		contentWidth = m.width - sidebarWidth - gap
+		if contentWidth < minContentWidth {
+			sidebarWidth = m.width - minContentWidth - gap
+			if sidebarWidth < 10 {
+				sidebarWidth = 10
+				gap = 0
+				contentWidth = m.width - sidebarWidth
+			} else {
+				contentWidth = minContentWidth
+			}
+		}
+	}
+
+	if sidebarWidth < 1 {
+		sidebarWidth = 1
+	}
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+
+	sidebarHeight := (availableHeight / 3) * 3
+
+	m.sidebar = m.sidebar.SetSize(sidebarWidth, sidebarHeight)
+	m.content = m.content.SetSize(contentWidth, sidebarHeight)
+	if m.detailVisible && detailWidth > 0 {
+		m.detailPane = m.detailPane.SetSize(detailWidth, sidebarHeight)
+	}
+	m.gap = gap
+
+	return m
+}
+
+// openDetailFieldModal opens the appropriate modal for the currently focused field
+func (m Model) openDetailFieldModal() (tea.Model, tea.Cmd) {
+	selectedTask := m.detailPane.Task()
+	if selectedTask == nil {
+		return m, nil
+	}
+
+	switch m.detailPane.FocusedField() {
+	case DetailFieldTitle:
+		m.renameModal = m.renameModal.SetSize(m.width, m.height-1)
+		m.renameModal = m.renameModal.Open(selectedTask.ID, selectedTask.Title)
+	case DetailFieldDescription:
+		m.descriptionModal = m.descriptionModal.SetSize(m.width, m.height-1)
+		m.descriptionModal = m.descriptionModal.Open(selectedTask.ID, selectedTask.Description)
+	case DetailFieldScope:
+		m.moveModal = m.moveModal.SetSize(m.width, m.height-1)
+		m.moveModal = m.moveModal.Open(selectedTask.ID, m.projects, m.areas)
+	case DetailFieldPlanned:
+		m.dateModal = m.dateModal.SetSize(m.width, m.height-1)
+		m.dateModal = m.dateModal.Open(selectedTask.ID, DateModalPlanned, selectedTask.PlannedDate)
+	case DetailFieldDue:
+		m.dateModal = m.dateModal.SetSize(m.width, m.height-1)
+		m.dateModal = m.dateModal.Open(selectedTask.ID, DateModalDue, selectedTask.DueDate)
+	case DetailFieldTags:
+		m.tagModal = m.tagModal.SetSize(m.width, m.height-1)
+		m.tagModal = m.tagModal.Open(selectedTask.ID, selectedTask.Tags, m.tags)
+	}
+
+	return m, nil
+}
+
 // loadDataAfterTagUpdate reloads tags and current tasks
 func (m Model) loadDataAfterTagUpdate() tea.Msg {
 	// Reload tags list (may have new tags)
@@ -760,8 +1030,12 @@ func (m Model) View() string {
 		}
 	case m.tagModal.Active():
 		helpView = m.help.View(tagKeys)
+	case m.descriptionModal.Active():
+		helpView = m.help.View(descriptionKeys)
 	case m.focusArea == FocusSidebar:
 		helpView = m.help.View(sidebarKeys)
+	case m.focusArea == FocusDetail:
+		helpView = m.help.View(detailKeys)
 	default:
 		helpView = m.help.View(contentKeys)
 	}
@@ -783,10 +1057,21 @@ func (m Model) View() string {
 	if m.tagModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.tagModal.View(), helpView)
 	}
+	if m.descriptionModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.descriptionModal.View(), helpView)
+	}
 
 	// Render sidebar and content side by side (gap can be 0 for tight layouts)
 	contentView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.content.View())
-	mainView := lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView)
+	var mainView string
+	if m.detailVisible {
+		// Three-column layout: sidebar | content | detail
+		detailView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.detailPane.View())
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView, detailView)
+	} else {
+		// Two-column layout: sidebar | content
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView)
+	}
 
 	// Combine main view with help bar at the bottom
 	return lipgloss.JoinVertical(lipgloss.Left, mainView, helpView)

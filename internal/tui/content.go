@@ -13,19 +13,20 @@ import (
 
 // Content displays the task list in the right panel
 type Content struct {
-	title         string
-	displayTasks  []task.Task    // tasks in display order (computed once when set)
-	taskSchedules map[int64]string // task ID -> schedule name (for schedule grouping)
-	groupBy       string         // grouping mode: none, project, area, date, schedule
-	hideScope     bool           // whether to hide the project/area column
-	width         int
-	height        int
-	viewport      viewport.Model
-	ready         bool
-	styles        *Styles
-	card          *Card
-	focused       bool // whether content panel has focus
-	selectedIndex int  // index into displayTasks (-1 = none)
+	title          string
+	displayTasks   []task.Task      // tasks in display order (computed once when set)
+	taskSchedules  map[int64]string // task ID -> schedule name (for schedule grouping)
+	groupBy        string           // grouping mode: none, project, area, date, schedule
+	hideScope      bool             // whether to hide the project/area column
+	width          int
+	height         int
+	viewport       viewport.Model
+	ready          bool
+	styles         *Styles
+	card           *Card
+	focused        bool // whether content panel has focus
+	showSelection  bool // whether to show selection indicator (even when not focused)
+	selectedIndex  int  // index into displayTasks (-1 = none)
 }
 
 // NewContent creates a new content panel
@@ -355,7 +356,7 @@ func (c Content) TotalLines() int {
 // renderTaskRow formats a single task row
 func (c Content) renderTaskRow(t *task.Task, index int) string {
 	theme := c.styles.Theme
-	isSelected := c.focused && index == c.selectedIndex
+	isSelected := (c.focused || c.showSelection) && index == c.selectedIndex
 
 	// Prefix: selection indicator, check for done, flag for due, star for planned today
 	prefix := "  "
@@ -499,10 +500,21 @@ func (c Content) isDueOrOverdue(t *task.Task) bool {
 func (c Content) SetFocused(focused bool) Content {
 	c.focused = focused
 	if focused && len(c.displayTasks) > 0 {
-		c.selectedIndex = 0
-	} else {
+		if c.selectedIndex < 0 {
+			c.selectedIndex = 0
+		}
+	} else if !c.showSelection {
 		c.selectedIndex = -1
 	}
+	if c.ready {
+		c.viewport.SetContent(c.buildTaskList())
+	}
+	return c
+}
+
+// SetShowSelection sets whether to show the selection indicator even when not focused
+func (c Content) SetShowSelection(show bool) Content {
+	c.showSelection = show
 	if c.ready {
 		c.viewport.SetContent(c.buildTaskList())
 	}
