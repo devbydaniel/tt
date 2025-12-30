@@ -635,3 +635,21 @@ func (s *Service) RemoveTag(id int64, tagName string) (*Task, error) {
 func (s *Service) ListTags() ([]string, error) {
 	return s.repo.ListTags()
 }
+
+// SetTags replaces all tags on a task.
+func (s *Service) SetTags(id int64, tags []string) (*Task, error) {
+	// Verify task exists
+	if _, err := s.repo.GetByID(id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	if err := s.repo.SetTags(id, tags); err != nil {
+		return nil, err
+	}
+
+	// Reload to get updated task with tags
+	return s.repo.GetByID(id)
+}

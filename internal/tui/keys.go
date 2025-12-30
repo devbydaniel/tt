@@ -15,6 +15,7 @@ type keyMap struct {
 	Move         key.Binding
 	Planned      key.Binding
 	Due          key.Binding
+	Tags         key.Binding
 	Add          key.Binding
 	Toggle       key.Binding
 	Quit         key.Binding
@@ -35,11 +36,11 @@ func (k sidebarKeyMap) FullHelp() [][]key.Binding {
 type contentKeyMap struct{}
 
 func (k contentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Add, keys.Toggle, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Quit}
 }
 
 func (k contentKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Toggle, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Toggle, keys.Quit}}
 }
 
 // renameKeyMap provides help bindings for rename modal
@@ -62,6 +63,20 @@ func (k moveKeyMap) ShortHelp() []key.Binding {
 
 func (k moveKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{keys.Up, keys.Down, keys.Enter, keys.Escape}}
+}
+
+// tagKeyMap provides help bindings for tag modal
+type tagKeyMap struct{}
+
+func (k tagKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "toggle")),
+		keys.Up, keys.Down, keys.Enter, keys.Escape,
+	}
+}
+
+func (k tagKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
 }
 
 // dateInputKeyMap provides help bindings for date modal when input is focused
@@ -116,6 +131,7 @@ var (
 	contentKeys    = contentKeyMap{}
 	renameKeys     = renameKeyMap{}
 	moveKeys       = moveKeyMap{}
+	tagKeys        = tagKeyMap{}
 	dateInputKeys  = dateInputKeyMap{}
 	datePickerKeys = datePickerKeyMap{}
 	addKeys        = addKeyMap{}
@@ -169,6 +185,10 @@ var keys = keyMap{
 	Due: key.NewBinding(
 		key.WithKeys("d"),
 		key.WithHelp("d", "set due date"),
+	),
+	Tags: key.NewBinding(
+		key.WithKeys("t"),
+		key.WithHelp("t", "edit tags"),
 	),
 	Add: key.NewBinding(
 		key.WithKeys("a"),

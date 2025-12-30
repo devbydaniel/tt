@@ -47,6 +47,7 @@ type Model struct {
 	moveModal   MoveModal
 	dateModal   DateModal
 	addModal    AddModal
+	tagModal    TagModal
 	help        help.Model
 	focusArea   FocusArea
 
@@ -81,6 +82,7 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 		moveModal:      NewMoveModal(styles),
 		dateModal:      NewDateModal(styles),
 		addModal:       NewAddModal(styles),
+		tagModal:       NewTagModal(styles),
 		help:           helpModel,
 	}
 }
@@ -193,6 +195,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Route keys to tag modal when active
+		if m.tagModal.Active() {
+			var result *TagResult
+			m.tagModal, result = m.tagModal.Update(msg)
+			if result != nil && !result.Canceled {
+				return m, m.setTaskTags(result.TaskID, result.Tags)
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -250,6 +262,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
 					m.dateModal = m.dateModal.SetSize(m.width, m.height-1) // -1 for help bar
 					m.dateModal = m.dateModal.Open(selectedTask.ID, DateModalDue, selectedTask.DueDate)
+					return m, nil
+				}
+			}
+
+		case key.Matches(msg, keys.Tags):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					m.tagModal = m.tagModal.SetSize(m.width, m.height-1) // -1 for help bar
+					m.tagModal = m.tagModal.Open(selectedTask.ID, selectedTask.Tags, m.tags)
 					return m, nil
 				}
 			}
@@ -392,6 +413,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update the task status in-place (don't reload to keep task visible)
 		m.content = m.content.UpdateTaskStatus(msg.taskID, msg.done)
 		return m, nil
+
+	case taskTagsUpdatedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload tasks and tags (tags cache may have new tags)
+		return m, m.loadDataAfterTagUpdate
+
+	case tagsAndTasksUpdatedMsg:
+		m.tags = msg.tags
+		m.sidebar = m.sidebar.SetData(m.areas, m.projects, msg.tags)
+		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope)
+		return m, nil
 	}
 
 	return m, nil
@@ -451,6 +486,12 @@ type taskToggledMsg struct {
 	taskID int64
 	done   bool // true if task was marked done, false if undone
 	err    error
+}
+
+// taskTagsUpdatedMsg carries the result of updating tags
+type taskTagsUpdatedMsg struct {
+	task *task.Task
+	err  error
 }
 
 // loadTasksForSelection loads tasks based on sidebar selection
@@ -603,6 +644,57 @@ func (m Model) toggleTask(taskID int64, currentStatus string) tea.Cmd {
 	}
 }
 
+// setTaskTags creates a command to set a task's tags
+func (m Model) setTaskTags(taskID int64, tags []string) tea.Cmd {
+	return func() tea.Msg {
+		updated, err := m.taskService.SetTags(taskID, tags)
+		return taskTagsUpdatedMsg{task: updated, err: err}
+	}
+}
+
+// loadDataAfterTagUpdate reloads tags and current tasks
+func (m Model) loadDataAfterTagUpdate() tea.Msg {
+	// Reload tags list (may have new tags)
+	tags, err := m.taskService.ListTags()
+	if err != nil {
+		return loadDataMsg{err: err}
+	}
+
+	// Build current task list options
+	item := m.sidebar.SelectedItem()
+	configKey := m.configKeyForSelection()
+	sortStr := m.config.GetSort(configKey)
+	sortOpts, _ := task.ParseSort(sortStr)
+	groupBy := m.config.GetGroup(configKey)
+	hideScope := m.config.GetHideScope(configKey)
+
+	opts := m.buildListOptions(item)
+	opts.Sort = sortOpts
+
+	tasks, err := m.taskService.List(opts)
+	if err != nil {
+		return loadDataMsg{err: err}
+	}
+
+	// Return combined update
+	return tagsAndTasksUpdatedMsg{
+		tags:      tags,
+		tasks:     tasks,
+		title:     strings.TrimSpace(item.Label),
+		groupBy:   groupBy,
+		hideScope: hideScope,
+	}
+}
+
+// tagsAndTasksUpdatedMsg carries updated tags and tasks
+type tagsAndTasksUpdatedMsg struct {
+	tags      []string
+	tasks     []task.Task
+	title     string
+	groupBy   string
+	hideScope bool
+}
+
 // View implements tea.Model
 func (m Model) View() string {
 	if m.err != nil {
@@ -628,6 +720,8 @@ func (m Model) View() string {
 		} else {
 			helpView = m.help.View(datePickerKeys)
 		}
+	case m.tagModal.Active():
+		helpView = m.help.View(tagKeys)
 	case m.focusArea == FocusSidebar:
 		helpView = m.help.View(sidebarKeys)
 	default:
@@ -647,6 +741,9 @@ func (m Model) View() string {
 	}
 	if m.dateModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.dateModal.View(), helpView)
+	}
+	if m.tagModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.tagModal.View(), helpView)
 	}
 
 	// Render sidebar and content side by side with 1-char gap
