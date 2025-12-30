@@ -515,6 +515,7 @@ func (c Content) MoveUp() Content {
 		c.selectedIndex--
 		if c.ready {
 			c.viewport.SetContent(c.buildTaskList())
+			c = c.ensureSelectionVisible()
 		}
 	}
 	return c
@@ -526,8 +527,104 @@ func (c Content) MoveDown() Content {
 		c.selectedIndex++
 		if c.ready {
 			c.viewport.SetContent(c.buildTaskList())
+			c = c.ensureSelectionVisible()
 		}
 	}
+	return c
+}
+
+// selectedTaskLine calculates the line number of the selected task in rendered output
+func (c Content) selectedTaskLine() int {
+	if c.selectedIndex < 0 || len(c.displayTasks) == 0 {
+		return 0
+	}
+
+	// For flat lists, line = index
+	if c.groupBy == "" || c.groupBy == "none" {
+		return c.selectedIndex
+	}
+
+	// For grouped lists, count headers and blank lines
+	var getGroup func(*task.Task) string
+	switch c.groupBy {
+	case "project":
+		getGroup = func(t *task.Task) string {
+			if t.ProjectName == nil {
+				if t.AreaName == nil {
+					return "No Project"
+				}
+				return *t.AreaName
+			}
+			if t.AreaName != nil {
+				return *t.AreaName + " > " + *t.ProjectName
+			}
+			return *t.ProjectName
+		}
+	case "area":
+		getGroup = func(t *task.Task) string {
+			if t.AreaName == nil {
+				return "No Area"
+			}
+			return *t.AreaName
+		}
+	case "schedule":
+		getGroup = func(t *task.Task) string {
+			if sched, ok := c.taskSchedules[t.ID]; ok {
+				return sched
+			}
+			return "Unknown"
+		}
+	case "date":
+		now := time.Now()
+		todayYear, todayMonth, todayDay := now.Date()
+		today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
+		tomorrow := today.AddDate(0, 0, 1)
+		endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
+		endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local)
+		endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
+		getGroup = func(t *task.Task) string {
+			return c.getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
+		}
+	default:
+		return c.selectedIndex
+	}
+
+	line := 0
+	currentGroup := ""
+	for i := 0; i <= c.selectedIndex; i++ {
+		t := &c.displayTasks[i]
+		group := getGroup(t)
+		if group != currentGroup {
+			if currentGroup != "" {
+				line++ // blank line between groups
+			}
+			line++ // header line
+			currentGroup = group
+		}
+		if i == c.selectedIndex {
+			return line
+		}
+		line++ // task line
+	}
+	return line
+}
+
+// ensureSelectionVisible scrolls viewport to keep selected task visible
+func (c Content) ensureSelectionVisible() Content {
+	if !c.ready || c.selectedIndex < 0 {
+		return c
+	}
+
+	line := c.selectedTaskLine()
+	yOffset := c.viewport.YOffset
+	height := c.viewport.Height
+
+	if line < yOffset {
+		c.viewport.SetYOffset(line)
+	} else if line >= yOffset+height {
+		c.viewport.SetYOffset(line - height + 1)
+	}
+
 	return c
 }
 
