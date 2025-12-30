@@ -180,11 +180,11 @@ var keys = keyMap{
 	),
 	Planned: key.NewBinding(
 		key.WithKeys("p"),
-		key.WithHelp("p", "set planned date"),
+		key.WithHelp("p", "plan"),
 	),
 	Due: key.NewBinding(
 		key.WithKeys("d"),
-		key.WithHelp("d", "set due date"),
+		key.WithHelp("d", "set due"),
 	),
 	Tags: key.NewBinding(
 		key.WithKeys("t"),
@@ -192,11 +192,11 @@ var keys = keyMap{
 	),
 	Add: key.NewBinding(
 		key.WithKeys("a"),
-		key.WithHelp("a", "add task"),
+		key.WithHelp("a", "add"),
 	),
 	Toggle: key.NewBinding(
 		key.WithKeys(" "),
-		key.WithHelp("space", "toggle done"),
+		key.WithHelp("space", "done"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),

@@ -39,6 +39,7 @@ type Model struct {
 	// Dimensions
 	width  int
 	height int
+	gap    int // Gap between sidebar and content (can be 0 for tight layouts)
 
 	// Components
 	sidebar     Sidebar
@@ -76,6 +77,7 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 		projectService: projectService,
 		config:         cfg,
 		styles:         styles,
+		gap:            1, // Default gap, adjusted on resize
 		sidebar:        NewSidebar(styles),
 		content:        NewContent(styles),
 		renameModal:    NewRenameModal(styles),
@@ -326,12 +328,44 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		helpHeight := 1
 		availableHeight := m.height - helpHeight
 
-		// Sidebar gets 1/4, content gets rest minus 1-char gap between columns
+		// Calculate sidebar width: 1/4 of total, constrained between min/max
 		sidebarWidth := m.width / 4
-		if sidebarWidth < 20 {
-			sidebarWidth = 20
+		minSidebar := 20
+		maxSidebar := 40
+
+		if sidebarWidth < minSidebar {
+			sidebarWidth = minSidebar
 		}
-		contentWidth := m.width - sidebarWidth - 1
+		if sidebarWidth > maxSidebar {
+			sidebarWidth = maxSidebar
+		}
+
+		// Gap between sidebar and content (can be reduced for tight spaces)
+		gap := 1
+		minContentWidth := 20
+
+		// Calculate content width
+		contentWidth := m.width - sidebarWidth - gap
+
+		// If content would be too small, shrink sidebar to give content more room
+		if contentWidth < minContentWidth {
+			sidebarWidth = m.width - minContentWidth - gap
+			if sidebarWidth < 10 { // Absolute minimum sidebar
+				sidebarWidth = 10
+				gap = 0 // Remove gap entirely when very tight
+				contentWidth = m.width - sidebarWidth
+			} else {
+				contentWidth = minContentWidth
+			}
+		}
+
+		// Ensure nothing goes negative
+		if sidebarWidth < 1 {
+			sidebarWidth = 1
+		}
+		if contentWidth < 1 {
+			contentWidth = 1
+		}
 
 		// Calculate sidebar height that's evenly divisible by 3 (number of sections)
 		// This ensures both columns end at the same row
@@ -340,6 +374,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar = m.sidebar.SetSize(sidebarWidth, sidebarHeight)
 		m.content = m.content.SetSize(contentWidth, sidebarHeight)
 		m.help.Width = m.width
+		m.gap = gap // Store gap for View()
 		return m, nil
 
 	case loadDataMsg:
@@ -746,8 +781,8 @@ func (m Model) View() string {
 		return lipgloss.JoinVertical(lipgloss.Left, m.tagModal.View(), helpView)
 	}
 
-	// Render sidebar and content side by side with 1-char gap
-	contentView := lipgloss.NewStyle().MarginLeft(1).Render(m.content.View())
+	// Render sidebar and content side by side (gap can be 0 for tight layouts)
+	contentView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.content.View())
 	mainView := lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView)
 
 	// Combine main view with help bar at the bottom

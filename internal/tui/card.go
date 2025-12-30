@@ -20,13 +20,13 @@ func (c *Card) Render(title, content string, width, height int, focused bool) st
 		borderStyle = c.styles.FocusedSection
 	}
 
-	// Render header (use base style without margin to control spacing ourselves)
+	// Render header
 	header := c.styles.Theme.Header.Bold(true).Render(title)
 
 	// Combine header and content with blank line between
 	innerContent := header + "\n\n" + content
 
-	// Inner dimensions: total - border(2) - horizontal padding(2)
+	// Inner dimensions accounting for border(2) and padding(2)
 	innerWidth := width - 4
 	innerHeight := height - 2
 
@@ -40,8 +40,12 @@ func (c *Card) Render(title, content string, width, height int, focused bool) st
 	// Place content at top-left within fixed-size container
 	placed := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, innerContent)
 
-	// Apply horizontal padding (1 char left/right)
-	padded := lipgloss.NewStyle().Padding(0, 1).Render(placed)
+	// Apply padding and set fixed width to enforce box dimensions
+	// MaxWidth truncates lines that are too long (handles ANSI codes properly)
+	padded := lipgloss.NewStyle().
+		Padding(0, 1).
+		MaxWidth(width - 2). // Total width minus border
+		Render(placed)
 
 	return borderStyle.Render(padded)
 }
