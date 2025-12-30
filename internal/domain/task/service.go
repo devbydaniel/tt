@@ -194,6 +194,23 @@ func (s *Service) Complete(ids []int64) ([]CompleteResult, error) {
 	return results, nil
 }
 
+func (s *Service) Uncomplete(ids []int64) ([]Task, error) {
+	var tasks []Task
+
+	for _, id := range ids {
+		if err := s.repo.Uncomplete(id); err != nil {
+			return tasks, err
+		}
+		task, err := s.repo.GetByID(id)
+		if err != nil {
+			return tasks, err
+		}
+		tasks = append(tasks, *task)
+	}
+
+	return tasks, nil
+}
+
 // regenerateTask creates the next occurrence of a recurring task.
 func (s *Service) regenerateTask(task *Task, completedAt time.Time) *Task {
 	// Check if past end date

@@ -268,6 +268,26 @@ func (r *Repository) Complete(id int64, completedAt time.Time) error {
 	return nil
 }
 
+func (r *Repository) Uncomplete(id int64) error {
+	result, err := r.db.Conn.Exec(
+		`UPDATE tasks SET status = ?, completed_at = NULL WHERE id = ? AND status = ?`,
+		StatusTodo, id, StatusDone,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrTaskNotFound
+	}
+
+	return nil
+}
+
 func (r *Repository) Delete(id int64) error {
 	result, err := r.db.Conn.Exec(`DELETE FROM tasks WHERE id = ?`, id)
 	if err != nil {

@@ -458,6 +458,12 @@ func (f *Formatter) TasksCompleted(results []task.CompleteResult) {
 	}
 }
 
+func (f *Formatter) TasksUncompleted(tasks []task.Task) {
+	for _, t := range tasks {
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Uncompleted #%d: %s", t.ID, sanitizeTitle(t.Title))))
+	}
+}
+
 func (f *Formatter) TasksDeleted(tasks []task.Task) {
 	for _, t := range tasks {
 		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted #%d: %s", t.ID, sanitizeTitle(t.Title))))

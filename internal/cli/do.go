@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewDoneCmd(deps *Dependencies) *cobra.Command {
+func NewDoCmd(deps *Dependencies) *cobra.Command {
 	return &cobra.Command{
-		Use:   "done <id> [id...]",
+		Use:   "do <id> [id...]",
 		Short: "Mark task(s) as complete",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
