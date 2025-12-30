@@ -46,6 +46,7 @@ type Model struct {
 	renameModal RenameModal
 	moveModal   MoveModal
 	dateModal   DateModal
+	addModal    AddModal
 	help        help.Model
 	focusArea   FocusArea
 
@@ -79,6 +80,7 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 		renameModal:    NewRenameModal(styles),
 		moveModal:      NewMoveModal(styles),
 		dateModal:      NewDateModal(styles),
+		addModal:       NewAddModal(styles),
 		help:           helpModel,
 	}
 }
@@ -150,6 +152,16 @@ func (m Model) loadData() tea.Msg {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Route keys to add modal when active
+		if m.addModal.Active() {
+			var result *AddResult
+			m.addModal, result = m.addModal.Update(msg)
+			if result != nil && !result.Canceled {
+				return m, m.createTask(result)
+			}
+			return m, nil
+		}
+
 		// Route keys to rename modal when active
 		if m.renameModal.Active() {
 			var result *RenameResult
@@ -241,6 +253,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			}
+
+		case key.Matches(msg, keys.Add):
+			// Open add modal, pre-fill scope if viewing a project or area
+			sidebarItem := m.sidebar.SelectedItem()
+			var prefill *SidebarItem
+			if sidebarItem.Type == "project" || sidebarItem.Type == "area" {
+				prefill = &sidebarItem
+			}
+			m.addModal = m.addModal.SetSize(m.width, m.height-1)
+			m.addModal = m.addModal.Open(m.projects, m.areas, prefill)
+			return m, nil
 
 		case key.Matches(msg, keys.Tab):
 			m.sidebar = m.sidebar.NextSection()
@@ -345,6 +368,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Reload tasks to reflect the date change
 		return m, m.loadTasksForSelection
+
+	case taskCreatedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload tasks to show the new task
+		return m, m.loadTasksForSelection
 	}
 
 	return m, nil
@@ -389,6 +420,12 @@ type taskMovedMsg struct {
 
 // taskDateUpdatedMsg carries the result of a date update
 type taskDateUpdatedMsg struct {
+	task *task.Task
+	err  error
+}
+
+// taskCreatedMsg carries the result of creating a task
+type taskCreatedMsg struct {
 	task *task.Task
 	err  error
 }
@@ -511,6 +548,23 @@ func (m Model) setTaskDate(taskID int64, date *time.Time, mode DateModalMode) te
 	}
 }
 
+// createTask creates a command to create a new task
+func (m Model) createTask(result *AddResult) tea.Cmd {
+	return func() tea.Msg {
+		opts := &task.CreateOptions{
+			ProjectName: result.ProjectName,
+			AreaName:    result.AreaName,
+			Description: result.Description,
+			PlannedDate: result.PlannedDate,
+			DueDate:     result.DueDate,
+			Tags:        result.Tags,
+		}
+
+		created, err := m.taskService.Create(result.Title, opts)
+		return taskCreatedMsg{task: created, err: err}
+	}
+}
+
 // View implements tea.Model
 func (m Model) View() string {
 	if m.err != nil {
@@ -524,6 +578,8 @@ func (m Model) View() string {
 	// Determine which help keys to show based on current state
 	var helpView string
 	switch {
+	case m.addModal.Active():
+		helpView = m.help.View(addKeys)
 	case m.renameModal.Active():
 		helpView = m.help.View(renameKeys)
 	case m.moveModal.Active():
@@ -542,6 +598,9 @@ func (m Model) View() string {
 	helpView = lipgloss.PlaceHorizontal(m.width, lipgloss.Center, helpView)
 
 	// Render modal if active (with help bar below)
+	if m.addModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.addModal.View(), helpView)
+	}
 	if m.renameModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.renameModal.View(), helpView)
 	}

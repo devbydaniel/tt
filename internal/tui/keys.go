@@ -15,6 +15,7 @@ type keyMap struct {
 	Move         key.Binding
 	Planned      key.Binding
 	Due          key.Binding
+	Add          key.Binding
 	Quit         key.Binding
 }
 
@@ -22,7 +23,7 @@ type keyMap struct {
 type sidebarKeyMap struct{}
 
 func (k sidebarKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Tab, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Tab, keys.FocusContent, keys.Add, keys.Quit}
 }
 
 func (k sidebarKeyMap) FullHelp() [][]key.Binding {
@@ -33,7 +34,7 @@ func (k sidebarKeyMap) FullHelp() [][]key.Binding {
 type contentKeyMap struct{}
 
 func (k contentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Add, keys.Quit}
 }
 
 func (k contentKeyMap) FullHelp() [][]key.Binding {
@@ -93,6 +94,22 @@ func (k datePickerKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
+// addKeyMap provides help bindings for add modal
+type addKeyMap struct{}
+
+func (k addKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field")),
+		key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("s-tab", "prev field")),
+		keys.Enter,
+		keys.Escape,
+	}
+}
+
+func (k addKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
 var (
 	sidebarKeys    = sidebarKeyMap{}
 	contentKeys    = contentKeyMap{}
@@ -100,6 +117,7 @@ var (
 	moveKeys       = moveKeyMap{}
 	dateInputKeys  = dateInputKeyMap{}
 	datePickerKeys = datePickerKeyMap{}
+	addKeys        = addKeyMap{}
 )
 
 var keys = keyMap{
@@ -150,6 +168,10 @@ var keys = keyMap{
 	Due: key.NewBinding(
 		key.WithKeys("d"),
 		key.WithHelp("d", "set due date"),
+	),
+	Add: key.NewBinding(
+		key.WithKeys("a"),
+		key.WithHelp("a", "add task"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
