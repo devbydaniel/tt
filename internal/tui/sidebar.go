@@ -15,6 +15,7 @@ type Sidebar struct {
 	width         int
 	height        int
 	boxHeight     int // height of each individual box
+	focused       bool // whether sidebar has focus (vs content area)
 	styles        *Styles
 	card          *Card
 }
@@ -28,9 +29,16 @@ func NewSidebar(styles *Styles) Sidebar {
 			NewTagsSection(styles),
 		},
 		activeSection: 0,
+		focused:       true, // Sidebar starts with focus
 		styles:        styles,
 		card:          NewCard(styles),
 	}
+}
+
+// SetFocused sets whether the sidebar has focus
+func (s Sidebar) SetFocused(focused bool) Sidebar {
+	s.focused = focused
+	return s
 }
 
 // SetData updates sidebar sections with loaded data
@@ -95,15 +103,31 @@ func (s Sidebar) PrevSection() Sidebar {
 	return s
 }
 
-// MoveUp moves selection up in current section
+// MoveUp moves selection up in current section, or jumps to previous section if at first element
 func (s Sidebar) MoveUp() Sidebar {
-	s.sections[s.activeSection] = s.sections[s.activeSection].MoveUp()
+	if s.sections[s.activeSection].AtFirst() {
+		// Jump to previous section and select its last item
+		s.sections[s.activeSection] = s.sections[s.activeSection].SetFocused(false)
+		s.activeSection = (s.activeSection - 1 + len(s.sections)) % len(s.sections)
+		s.sections[s.activeSection] = s.sections[s.activeSection].SetFocused(true)
+		s.sections[s.activeSection] = s.sections[s.activeSection].SelectLast()
+	} else {
+		s.sections[s.activeSection] = s.sections[s.activeSection].MoveUp()
+	}
 	return s
 }
 
-// MoveDown moves selection down in current section
+// MoveDown moves selection down in current section, or jumps to next section if at last element
 func (s Sidebar) MoveDown() Sidebar {
-	s.sections[s.activeSection] = s.sections[s.activeSection].MoveDown()
+	if s.sections[s.activeSection].AtLast() {
+		// Jump to next section and select its first item
+		s.sections[s.activeSection] = s.sections[s.activeSection].SetFocused(false)
+		s.activeSection = (s.activeSection + 1) % len(s.sections)
+		s.sections[s.activeSection] = s.sections[s.activeSection].SetFocused(true)
+		s.sections[s.activeSection] = s.sections[s.activeSection].SelectFirst()
+	} else {
+		s.sections[s.activeSection] = s.sections[s.activeSection].MoveDown()
+	}
 	return s
 }
 
@@ -118,7 +142,8 @@ func (s Sidebar) View() string {
 	var boxes []string
 
 	for i, section := range s.sections {
-		focused := i == s.activeSection
+		// Only highlight active section when sidebar has focus
+		focused := s.focused && i == s.activeSection
 		box := s.card.Render(headers[i], section.View(), s.width, s.boxHeight, focused)
 		boxes = append(boxes, box)
 	}
@@ -142,6 +167,10 @@ type Section interface {
 	SetWidth(int) Section
 	MoveUp() Section
 	MoveDown() Section
+	AtFirst() bool
+	AtLast() bool
+	SelectFirst() Section
+	SelectLast() Section
 }
 
 // ListsSection shows static list items (Inbox, Today, etc.)
@@ -176,8 +205,6 @@ func (s *ListsSection) View() string {
 		line := "  " + item.Label
 		if i == s.selected && s.focused {
 			line = s.styles.SelectedItem.Render("> " + item.Label)
-		} else if i == s.selected {
-			line = "> " + item.Label
 		}
 		lines = append(lines, line)
 	}
@@ -213,6 +240,26 @@ func (s *ListsSection) MoveUp() Section {
 func (s *ListsSection) MoveDown() Section {
 	if s.selected < len(s.items)-1 {
 		s.selected++
+	}
+	return s
+}
+
+func (s *ListsSection) AtFirst() bool {
+	return s.selected == 0
+}
+
+func (s *ListsSection) AtLast() bool {
+	return s.selected >= len(s.items)-1
+}
+
+func (s *ListsSection) SelectFirst() Section {
+	s.selected = 0
+	return s
+}
+
+func (s *ListsSection) SelectLast() Section {
+	if len(s.items) > 0 {
+		s.selected = len(s.items) - 1
 	}
 	return s
 }
@@ -321,8 +368,6 @@ func (s *ScopesSection) View() string {
 		line := "  " + item.Label
 		if i == s.selected && s.focused {
 			line = s.styles.SelectedItem.Render("> " + item.Label)
-		} else if i == s.selected {
-			line = "> " + item.Label
 		}
 		lines = append(lines, line)
 	}
@@ -361,6 +406,27 @@ func (s *ScopesSection) MoveUp() Section {
 func (s *ScopesSection) MoveDown() Section {
 	if s.selected < len(s.items)-1 {
 		s.selected++
+	}
+	return s
+}
+
+func (s *ScopesSection) AtFirst() bool {
+	return len(s.items) == 0 || s.selected == 0
+}
+
+func (s *ScopesSection) AtLast() bool {
+	return len(s.items) == 0 || s.selected >= len(s.items)-1
+}
+
+func (s *ScopesSection) SelectFirst() Section {
+	s.selected = 0
+	s.offset = 0
+	return s
+}
+
+func (s *ScopesSection) SelectLast() Section {
+	if len(s.items) > 0 {
+		s.selected = len(s.items) - 1
 	}
 	return s
 }
@@ -420,8 +486,6 @@ func (s *TagsSection) View() string {
 		line := "  " + item.Label
 		if i == s.selected && s.focused {
 			line = s.styles.SelectedItem.Render("> " + item.Label)
-		} else if i == s.selected {
-			line = "> " + item.Label
 		}
 		lines = append(lines, line)
 	}
@@ -460,6 +524,27 @@ func (s *TagsSection) MoveUp() Section {
 func (s *TagsSection) MoveDown() Section {
 	if s.selected < len(s.items)-1 {
 		s.selected++
+	}
+	return s
+}
+
+func (s *TagsSection) AtFirst() bool {
+	return len(s.items) == 0 || s.selected == 0
+}
+
+func (s *TagsSection) AtLast() bool {
+	return len(s.items) == 0 || s.selected >= len(s.items)-1
+}
+
+func (s *TagsSection) SelectFirst() Section {
+	s.selected = 0
+	s.offset = 0
+	return s
+}
+
+func (s *TagsSection) SelectLast() Section {
+	if len(s.items) > 0 {
+		s.selected = len(s.items) - 1
 	}
 	return s
 }

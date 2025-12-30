@@ -214,6 +214,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			if m.focusArea == FocusSidebar {
 				m.focusArea = FocusContent
+				m.sidebar = m.sidebar.SetFocused(false)
 				m.content = m.content.SetFocused(true)
 				return m, nil
 			}
@@ -221,6 +222,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Escape), key.Matches(msg, keys.FocusSidebar):
 			if m.focusArea == FocusContent {
 				m.focusArea = FocusSidebar
+				m.sidebar = m.sidebar.SetFocused(true)
 				m.content = m.content.SetFocused(false)
 				return m, nil
 			}
@@ -228,6 +230,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.FocusContent):
 			if m.focusArea == FocusSidebar {
 				m.focusArea = FocusContent
+				m.sidebar = m.sidebar.SetFocused(false)
 				m.content = m.content.SetFocused(true)
 				return m, nil
 			}
