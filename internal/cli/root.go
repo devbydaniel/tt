@@ -8,14 +8,9 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/project"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
+	"github.com/devbydaniel/tt/internal/tui"
 	"github.com/spf13/cobra"
 )
-
-// validDefaultLists are the allowed values for default_list config
-var validDefaultLists = map[string]bool{
-	"today": true, "upcoming": true, "anytime": true,
-	"someday": true, "inbox": true, "all": true,
-}
 
 type Dependencies struct {
 	TaskService    *task.Service
@@ -30,7 +25,7 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 		Use:   "tt",
 		Short: "A CLI task manager",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(deps)
+			return tui.Run(deps.TaskService, deps.AreaService, deps.ProjectService, deps.Theme, deps.Config)
 		},
 	}
 
@@ -64,16 +59,6 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd.AddCommand(NewTUICmd(deps))
 
 	return rootCmd
-}
-
-func runList(deps *Dependencies) error {
-	// Build options based on default_list config (defaults to "today")
-	defaultList := deps.Config.DefaultList
-	if !validDefaultLists[defaultList] {
-		defaultList = "today"
-	}
-
-	return RunListView(deps, defaultList, "", "", false)
 }
 
 // RunListView runs a list view with the given view name, optional sort and group overrides.

@@ -16,10 +16,9 @@ type ListSettings struct {
 }
 
 type Config struct {
-	Database    string
-	DefaultList string // default view: today, upcoming, anytime, someday, inbox, all
-	Sort        string // global default sort
-	Group       string // global default group
+	Database string
+	Sort     string // global default sort
+	Group    string // global default group
 	Today         ListSettings
 	Upcoming      ListSettings
 	Anytime       ListSettings
@@ -166,10 +165,9 @@ func (c *Config) GetHideScope(listName string) bool {
 
 // fileConfig represents the TOML config file structure
 type fileConfig struct {
-	DataDir     string       `toml:"data_dir"`
-	DefaultList string       `toml:"default_list"`
-	Sort        string       `toml:"sort"`
-	Group       string       `toml:"group"`
+	DataDir string `toml:"data_dir"`
+	Sort    string `toml:"sort"`
+	Group   string `toml:"group"`
 	Today         ListSettings `toml:"today"`
 	Upcoming      ListSettings `toml:"upcoming"`
 	Anytime       ListSettings `toml:"anytime"`
@@ -198,7 +196,6 @@ func Load() (*Config, error) {
 	if configPath := configFilePath(); configPath != "" {
 		var fc fileConfig
 		if _, err := toml.DecodeFile(configPath, &fc); err == nil {
-			cfg.DefaultList = fc.DefaultList
 			cfg.Sort = fc.Sort
 			cfg.Group = fc.Group
 			cfg.Today = fc.Today
