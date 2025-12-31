@@ -794,7 +794,7 @@ func (m Model) createTask(result *AddResult) tea.Cmd {
 }
 
 // toggleTask creates a command to toggle a task's done status
-func (m Model) toggleTask(taskID int64, currentStatus string) tea.Cmd {
+func (m Model) toggleTask(taskID int64, currentStatus task.Status) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		if currentStatus == task.StatusDone {

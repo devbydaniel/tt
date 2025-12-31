@@ -142,8 +142,8 @@ type Task struct {
 	AreaID      *int64     `json:"areaId,omitempty"`
 	PlannedDate *time.Time `json:"plannedDate,omitempty"`
 	DueDate     *time.Time `json:"dueDate,omitempty"`
-	State       string     `json:"state"`
-	Status      string     `json:"status"`
+	State       State      `json:"state"`
+	Status      Status     `json:"status"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	CompletedAt *time.Time `json:"completedAt,omitempty"`
 
@@ -168,10 +168,18 @@ const (
 	RecurTypeRelative = "relative"
 )
 
-const (
-	StatusTodo = "todo"
-	StatusDone = "done"
+// Status represents the completion state of a task
+type Status string
 
-	StateActive  = "active"
-	StateSomeday = "someday"
+const (
+	StatusTodo Status = "todo"
+	StatusDone Status = "done"
+)
+
+// State represents the planning state of a task
+type State string
+
+const (
+	StateActive  State = "active"
+	StateSomeday State = "someday"
 )

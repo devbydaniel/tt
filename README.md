@@ -11,6 +11,7 @@ Built for people who live in the terminal and want a simple, powerful way to man
 - **Natural dates** - Use `tomorrow`, `friday`, `+3d`, or `2025-01-15`
 - **Smart recurrence** - `every monday`, `daily`, or `3d after done`
 - **Flexible organization** - Areas, projects, and tags
+- **Interactive TUI** - Full-featured terminal UI with vim-style navigation
 - **Shell completion** - Tab completion for bash, zsh, and fish
 - **Themeable** - Preset themes (Dracula, Nord, etc.) or custom colors
 - **Fast** - Instant startup, instant results
@@ -20,7 +21,7 @@ Built for people who live in the terminal and want a simple, powerful way to man
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/tt.git
+git clone https://github.com/devbydaniel/tt.git
 cd tt
 make build
 ```
@@ -38,20 +39,15 @@ mv tt /usr/local/bin/
 ## Quick Start
 
 ```bash
-# Add your first task
-tt add "Buy groceries"
-
-# Add a task with a due date
-tt add "Submit report" --due friday
-
-# See today's tasks
+# Launch the interactive TUI
 tt
 
-# Mark a task done
-tt done 1
-
-# See all commands
-tt --help
+# Or use CLI commands directly:
+tt add "Buy groceries"
+tt add "Submit report" --due friday
+tt today                  # See today's tasks
+tt done 1                 # Mark a task done
+tt --help                 # See all commands
 ```
 
 ## Usage
@@ -69,6 +65,7 @@ tt add "Someday task" --someday
 ```
 
 **Flags:**
+
 - `--description, -d` - Task description
 - `--due, -D` - Due date
 - `--planned, -P` - Planned/start date
@@ -82,26 +79,24 @@ tt add "Someday task" --someday
 ### Listing Tasks
 
 ```bash
-tt                        # Today's tasks + overdue (default)
-tt list                   # Same as above
-tt today                  # Shorthand for tt list (today's tasks + overdue)
+tt list                   # All incomplete tasks
+tt today                  # Today's tasks + overdue
 tt upcoming               # Future planned tasks (or: tt list --upcoming)
 tt someday                # Someday/maybe tasks (or: tt list --someday)
 tt anytime                # Tasks with no dates but with a project/area (or: tt list --anytime)
 tt inbox                  # Tasks with no project, area, or dates (or: tt list --inbox)
-tt list --all             # All incomplete tasks
 
-# Filter by organization
+# Filter (with tab completion)
 tt list --project Work
 tt list --area Health
 tt list --tag urgent
 
 # Group output
-tt list --all --group=schedule  # Group by schedule (Today, Upcoming, Anytime, Someday)
-tt list --all --group=project   # Group by Area > Project
-tt list --all --group=area      # Group by area
-tt list --all --group=date      # Group by date (Overdue, Today, Tomorrow, etc.)
-tt list --all --group=none      # Flat list (default)
+tt list --group=schedule  # Group by schedule (Today, Upcoming, Anytime, Someday)
+tt list --group=project   # Group by Area > Project
+tt list --group=area      # Group by area
+tt list --group=date      # Group by date (Overdue, Today, Tomorrow, etc.)
+tt list --group=none      # Flat list (default)
 
 # Filter by project/area
 tt list --project "Backend API"
@@ -126,6 +121,7 @@ tt list -s project:asc,title    # By project name, then title
 **Sort fields:** `id`, `title`, `planned`, `due`, `created`, `project`, `area`
 
 **Defaults:**
+
 - Default sort is `id:asc` (oldest first) unless configured otherwise
 - Date fields (`planned`, `due`, `created`) default to descending (newest first)
 - Other fields (`id`, `title`, `project`, `area`) default to ascending
@@ -187,6 +183,7 @@ tt due 1 --clear
 ```
 
 **Supported date formats:**
+
 - Keywords: `today`, `tomorrow`
 - Weekdays: `monday`, `friday`, `next tuesday`
 - Relative: `+3d` (3 days), `+1w` (1 week), `+2m` (2 months)
@@ -211,6 +208,7 @@ tt recur 1 --show               # Show recurrence details
 ```
 
 **Recurrence patterns:**
+
 - Fixed: `daily`, `weekly`, `monthly`, `every monday`, `every 2 weeks`
 - Relative: `3d after done`, `1w after done` (creates next task N days/weeks after completion)
 
@@ -262,6 +260,39 @@ tt delete 1
 tt delete 1 2 3
 ```
 
+### Interactive TUI
+
+Running `tt` without arguments launches the interactive terminal UI:
+
+```bash
+tt
+```
+
+The TUI provides a three-pane interface:
+
+- **Sidebar** - Navigate between Inbox, Today, Upcoming, Anytime, Someday, and your areas/projects/tags
+- **Task list** - View and manage tasks for the selected filter
+- **Detail pane** - Edit task properties (opens with Enter or `l`)
+
+**Keyboard shortcuts:**
+| Key | Action |
+|-----|--------|
+| `j/k` or `↑/↓` | Navigate up/down |
+| `h/l` | Switch between sidebar and content |
+| `Tab` | Next section in sidebar |
+| `Enter` | Open detail pane / edit field |
+| `a` | Add new task |
+| `r` | Rename task |
+| `m` | Move to project/area |
+| `p` | Set planned date |
+| `d` | Set due date |
+| `t` | Edit tags |
+| `Space` | Mark done/undone |
+| `Esc` | Go back / close |
+| `q` | Quit |
+
+The TUI respects your theme and sort/group settings from the config file.
+
 ## Configuration
 
 Configuration file location: `~/.config/tt/config.toml` (or `$XDG_CONFIG_HOME/tt/config.toml`)
@@ -269,10 +300,6 @@ Configuration file location: `~/.config/tt/config.toml` (or `$XDG_CONFIG_HOME/tt
 ```toml
 # Custom data directory (optional)
 data_dir = "/path/to/data"
-
-# Default view for `tt` and `tt list` commands
-# Options: today, upcoming, anytime, someday, inbox, all
-default_list = "today"
 
 # Global defaults for all list views
 sort = "created"       # created, title, planned, due, id, project, area
@@ -300,7 +327,7 @@ group = "date"
 group = "area"         # area or none
 ```
 
-The `--sort` and `--group` flags always override config settings. View flags like `--today` or `--upcoming` override `default_list`.
+The `--sort` and `--group` flags always override config settings.
 
 ### Theming
 
@@ -313,13 +340,13 @@ name = "dracula"  # Use a preset theme
 
 **Available presets:**
 
-| Theme | Type |
-|-------|------|
-| `dracula` | Dark |
-| `nord` | Dark |
-| `gruvbox` | Dark |
-| `tokyo-night` | Dark |
-| `solarized-light` | Light |
+| Theme              | Type  |
+| ------------------ | ----- |
+| `dracula`          | Dark  |
+| `nord`             | Dark  |
+| `gruvbox`          | Dark  |
+| `tokyo-night`      | Dark  |
+| `solarized-light`  | Light |
 | `catppuccin-latte` | Light |
 
 **Custom colors:**
@@ -415,6 +442,7 @@ Areas (e.g., "Work", "Health")
 ```
 
 Tasks have two independent dimensions:
+
 - **Status**: `todo` or `done`
 - **State**: `active` or `someday`
 
