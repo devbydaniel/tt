@@ -690,9 +690,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
 		}
-		// Update project cache if this is a project
+		// If it's a project, reload everything to update sidebar (project may appear/disappear)
 		if m.isProjectID(msg.task.ID) {
-			m.updateProjectCache(msg.task)
+			return m, m.loadData
 		}
 		// Reload tasks to reflect the state change
 		return m, m.loadTasksForSelection
