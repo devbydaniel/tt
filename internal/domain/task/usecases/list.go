@@ -61,6 +61,7 @@ func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
 			filter.Upcoming = true
 		case "anytime":
 			filter.Anytime = true
+			filter.TaskType = task.TaskTypeTask // Only show tasks, not projects
 		case "inbox":
 			filter.Inbox = true
 		case "someday":
