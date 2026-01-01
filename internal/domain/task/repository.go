@@ -184,8 +184,9 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 		if filter.Anytime {
 			// no planned_date and no due_date, must have parent or area (excludes inbox)
 			// enforces active state (someday tasks are excluded)
-			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL AND (t.parent_id IS NOT NULL OR t.area_id IS NOT NULL) AND t.state = ?`
-			args = append(args, StateActive)
+			// also excludes tasks whose parent project is someday
+			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL AND (t.parent_id IS NOT NULL OR t.area_id IS NOT NULL) AND t.state = ? AND (t.parent_id IS NULL OR parent.state = ?)`
+			args = append(args, StateActive, StateActive)
 		}
 		if filter.Inbox {
 			// no parent, no area, no planned_date, no due_date

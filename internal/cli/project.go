@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"errors"
 	"os"
 	"time"
 
+	"github.com/devbydaniel/tt/internal/dateparse"
 	"github.com/devbydaniel/tt/internal/domain/task/usecases"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
@@ -20,6 +22,9 @@ func NewProjectCmd(deps *Dependencies) *cobra.Command {
 	cmd.AddCommand(newProjectDeleteCmd(deps))
 	cmd.AddCommand(newProjectRenameCmd(deps))
 	cmd.AddCommand(newProjectMoveCmd(deps))
+	cmd.AddCommand(newProjectDoCmd(deps))
+	cmd.AddCommand(newProjectUndoCmd(deps))
+	cmd.AddCommand(newProjectEditCmd(deps))
 
 	return cmd
 }
@@ -251,4 +256,263 @@ func parseDate(s string) (time.Time, error) {
 	default:
 		return time.Parse("2006-01-02", s)
 	}
+}
+
+func newProjectDoCmd(deps *Dependencies) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "do <name>",
+		Short: "Mark a project as complete",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Look up project by name
+			project, err := deps.App.GetProjectByName.Execute(args[0])
+			if err != nil {
+				return err
+			}
+
+			// Complete the project (and its children)
+			completed, err := deps.App.CompleteTasks.Execute([]int64{project.ID})
+			if err != nil {
+				return err
+			}
+
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
+			formatter.ProjectsCompleted(completed)
+			return nil
+		},
+	}
+
+	// Register project name completion
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.ProjectCompletion()
+
+	return cmd
+}
+
+func newProjectUndoCmd(deps *Dependencies) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "undo <name>",
+		Short: "Mark a project as not complete",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Look up project by name
+			project, err := deps.App.GetProjectByName.Execute(args[0])
+			if err != nil {
+				return err
+			}
+
+			// Uncomplete the project
+			uncompleted, err := deps.App.UncompleteTasks.Execute([]int64{project.ID})
+			if err != nil {
+				return err
+			}
+
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
+			formatter.ProjectsUncompleted(uncompleted)
+			return nil
+		},
+	}
+
+	// Register project name completion
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.ProjectCompletion()
+
+	return cmd
+}
+
+func newProjectEditCmd(deps *Dependencies) *cobra.Command {
+	var title string
+	var description string
+	var areaName string
+	var plannedStr string
+	var dueStr string
+	var today bool
+	var addTags []string
+	var removeTags []string
+	var clearPlanned bool
+	var clearDue bool
+	var clearArea bool
+	var clearDescription bool
+
+	cmd := &cobra.Command{
+		Use:   "edit <name>",
+		Short: "Edit a project",
+		Long: `Edit project properties.
+
+Examples:
+  tt project edit "My Project" --title "New Title"
+  tt project edit "My Project" --area Work
+  tt project edit "My Project" --due tomorrow
+  tt project edit "My Project" --planned +3d
+  tt project edit "My Project" --tag urgent --tag priority
+  tt project edit "My Project" --untag old-tag
+  tt project edit "My Project" --clear-area`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectName := args[0]
+
+			// Look up project by name
+			project, err := deps.App.GetProjectByName.Execute(projectName)
+			if err != nil {
+				return err
+			}
+
+			// Validate mutual exclusivity
+			if areaName != "" && clearArea {
+				return errors.New("cannot specify both --area and --clear-area")
+			}
+			if plannedStr != "" && clearPlanned {
+				return errors.New("cannot specify both --planned and --clear-planned")
+			}
+			if today && plannedStr != "" {
+				return errors.New("cannot specify both --today and --planned")
+			}
+			if today && clearPlanned {
+				return errors.New("cannot specify both --today and --clear-planned")
+			}
+			if today {
+				plannedStr = "today"
+			}
+			if dueStr != "" && clearDue {
+				return errors.New("cannot specify both --due and --clear-due")
+			}
+			if description != "" && clearDescription {
+				return errors.New("cannot specify both --description and --clear-description")
+			}
+
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
+
+			// If no changes specified, show details
+			hasChanges := title != "" || description != "" || areaName != "" ||
+				plannedStr != "" || dueStr != "" || today || clearPlanned || clearDue ||
+				clearArea || clearDescription || len(addTags) > 0 || len(removeTags) > 0
+
+			if !hasChanges {
+				formatter.ProjectDetails(project)
+				return nil
+			}
+
+			// Build changes list
+			var changes []string
+			if title != "" {
+				changes = append(changes, "title")
+			}
+			if description != "" {
+				changes = append(changes, "description")
+			} else if clearDescription {
+				changes = append(changes, "description cleared")
+			}
+			if areaName != "" {
+				changes = append(changes, "area")
+			} else if clearArea {
+				changes = append(changes, "area cleared")
+			}
+			if plannedStr != "" {
+				changes = append(changes, "planned date")
+			} else if clearPlanned {
+				changes = append(changes, "planned date cleared")
+			}
+			if dueStr != "" {
+				changes = append(changes, "due date")
+			} else if clearDue {
+				changes = append(changes, "due date cleared")
+			}
+			if len(addTags) > 0 {
+				changes = append(changes, "tags added")
+			}
+			if len(removeTags) > 0 {
+				changes = append(changes, "tags removed")
+			}
+
+			// Apply changes
+			if title != "" {
+				if _, err := deps.App.SetTaskTitle.Execute(project.ID, title); err != nil {
+					return err
+				}
+			}
+
+			if description != "" {
+				if _, err := deps.App.SetTaskDescription.Execute(project.ID, &description); err != nil {
+					return err
+				}
+			} else if clearDescription {
+				if _, err := deps.App.SetTaskDescription.Execute(project.ID, nil); err != nil {
+					return err
+				}
+			}
+
+			if areaName != "" {
+				if _, err := deps.App.SetTaskArea.Execute(project.ID, areaName); err != nil {
+					return err
+				}
+			} else if clearArea {
+				if _, err := deps.App.SetTaskArea.Execute(project.ID, ""); err != nil {
+					return err
+				}
+			}
+
+			if plannedStr != "" {
+				planned, err := dateparse.Parse(plannedStr)
+				if err != nil {
+					return err
+				}
+				if _, err := deps.App.SetPlannedDate.Execute(project.ID, &planned); err != nil {
+					return err
+				}
+			} else if clearPlanned {
+				if _, err := deps.App.SetPlannedDate.Execute(project.ID, nil); err != nil {
+					return err
+				}
+			}
+
+			if dueStr != "" {
+				due, err := dateparse.Parse(dueStr)
+				if err != nil {
+					return err
+				}
+				if _, err := deps.App.SetDueDate.Execute(project.ID, &due); err != nil {
+					return err
+				}
+			} else if clearDue {
+				if _, err := deps.App.SetDueDate.Execute(project.ID, nil); err != nil {
+					return err
+				}
+			}
+
+			for _, tag := range addTags {
+				if _, err := deps.App.AddTag.Execute(project.ID, tag); err != nil {
+					return err
+				}
+			}
+
+			for _, tag := range removeTags {
+				if _, err := deps.App.RemoveTag.Execute(project.ID, tag); err != nil {
+					return err
+				}
+			}
+
+			formatter.ProjectEdited(projectName, changes)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&title, "title", "", "Set project title")
+	cmd.Flags().StringVarP(&description, "description", "d", "", "Set project description")
+	cmd.Flags().StringVarP(&areaName, "area", "a", "", "Assign to area")
+	cmd.Flags().StringVarP(&plannedStr, "planned", "P", "", "Set planned date")
+	cmd.Flags().BoolVarP(&today, "today", "T", false, "Set planned date to today")
+	cmd.Flags().StringVarP(&dueStr, "due", "D", "", "Set due date")
+	cmd.Flags().StringArrayVarP(&addTags, "tag", "t", nil, "Add tag (repeatable)")
+	cmd.Flags().StringArrayVar(&removeTags, "untag", nil, "Remove tag (repeatable)")
+	cmd.Flags().BoolVar(&clearPlanned, "clear-planned", false, "Clear planned date")
+	cmd.Flags().BoolVar(&clearDue, "clear-due", false, "Clear due date")
+	cmd.Flags().BoolVar(&clearArea, "clear-area", false, "Remove from area")
+	cmd.Flags().BoolVar(&clearDescription, "clear-description", false, "Clear description")
+
+	// Register completions
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.ProjectCompletion()
+	registry.RegisterAreaFlag(cmd)
+
+	return cmd
 }

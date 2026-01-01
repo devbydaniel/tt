@@ -74,17 +74,29 @@ func (f *Formatter) GroupedTaskList(tasks []task.Task, groupBy string) {
 // groupedByScope displays tasks grouped by scope ("Area > Project", "Area", or "Project")
 // Tasks with area but no project appear under just the area name,
 // sorted before "Area > Project" groups (alphabetically, area-only headers come first)
+// Projects appear as standalone header-style lines with metadata but no ID.
 func (f *Formatter) groupedByScope(tasks []task.Task) {
 	idWidth := maxIDWidth(tasks)
 
-	// Group tasks:
+	// Separate projects from regular tasks
+	var projects []task.Task
+	var regularTasks []task.Task
+	for _, t := range tasks {
+		if t.IsProject() {
+			projects = append(projects, t)
+		} else {
+			regularTasks = append(regularTasks, t)
+		}
+	}
+
+	// Group regular tasks:
 	// - No area, no project -> "No Scope"
 	// - Area but no project -> area name (e.g., "Work")
 	// - Project -> "Area > Project" or just "Project"
 	noScopeTasks := make([]task.Task, 0)
 	groups := make(map[string][]task.Task)
 
-	for _, t := range tasks {
+	for _, t := range regularTasks {
 		if t.ParentName == nil {
 			if t.AreaName == nil {
 				noScopeTasks = append(noScopeTasks, t)
@@ -103,23 +115,42 @@ func (f *Formatter) groupedByScope(tasks []task.Task) {
 		groups[header] = append(groups[header], t)
 	}
 
+	// Build project scope map for sorting
+	projectsByScope := make(map[string]*task.Task)
+	for i := range projects {
+		p := &projects[i]
+		scope := sanitizeTitle(p.Title)
+		if p.AreaName != nil {
+			scope = *p.AreaName + " > " + sanitizeTitle(p.Title)
+		}
+		projectsByScope[scope] = p
+	}
+
 	// Render: No Scope first
 	if len(noScopeTasks) > 0 {
 		fmt.Fprintln(f.w, f.theme.Header.Render("No Scope"))
 		f.renderTaskRows(noScopeTasks, 0, false, idWidth)
 	}
 
-	// Render groups alphabetically
-	// Natural sort order puts "Area" before "Area > Project"
-	headers := make([]string, 0, len(groups))
+	// Combine all headers (group headers + project scopes) and sort
+	allHeaders := make([]string, 0, len(groups)+len(projectsByScope))
 	for h := range groups {
-		headers = append(headers, h)
+		allHeaders = append(allHeaders, h)
 	}
-	sort.Strings(headers)
+	for h := range projectsByScope {
+		allHeaders = append(allHeaders, h)
+	}
+	sort.Strings(allHeaders)
 
-	for _, header := range headers {
-		fmt.Fprintln(f.w, f.theme.Header.Render(header))
-		f.renderTaskRows(groups[header], 0, false, idWidth)
+	// Render sorted headers (both groups and projects)
+	for _, header := range allHeaders {
+		if proj, isProject := projectsByScope[header]; isProject {
+			// Render project as header-style line (no ID, with metadata)
+			f.renderProjectHeaderLine(proj)
+		} else if tasks, isGroup := groups[header]; isGroup {
+			fmt.Fprintln(f.w, f.theme.Header.Render(header))
+			f.renderTaskRows(tasks, 0, false, idWidth)
+		}
 	}
 }
 
@@ -231,29 +262,37 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 		idStr := fmt.Sprintf("%*d", idWidth, t.ID)
 		id := f.theme.ID.Render(idStr)
 
-		// Task title with optional scope prefix
-		title := ""
-		if showScope {
-			scope := formatScope(t.AreaName, t.ParentName)
-			if scope != "" {
-				title = f.theme.Scope.Render(scope) + "  "
+		// Build display differently for projects vs tasks
+		var display string
+		if t.IsProject() {
+			// For projects: scope IS the project name (Area > ProjectName), no separate title
+			display = f.theme.Scope.Render(formatProjectScope(t.AreaName, t.Title))
+		} else {
+			// For regular tasks: optional scope prefix + title
+			if showScope {
+				scope := formatScope(t.AreaName, t.ParentName)
+				if scope != "" {
+					display = f.theme.Scope.Render(scope) + "  "
+				}
+			}
+			display += formatTaskTitle(&t)
+			if recur := formatRecurIndicator(&t); recur != "" {
+				display += " " + f.theme.Muted.Render(recur)
 			}
 		}
-		title += formatTaskTitle(&t)
-		if recur := formatRecurIndicator(&t); recur != "" {
-			title += " " + f.theme.Muted.Render(recur)
-		}
+
+		// Add dates and tags (common to both projects and tasks)
 		if t.PlannedDate != nil && !f.hidePlannedDate {
-			title += " " + f.theme.Muted.Render(f.theme.Icons.Date+" "+t.PlannedDate.Format("Jan 2"))
+			display += " " + f.theme.Muted.Render(f.theme.Icons.Date+" "+t.PlannedDate.Format("Jan 2"))
 		}
 		if t.DueDate != nil {
-			title += " " + f.theme.Muted.Render(f.theme.Icons.Due+" "+t.DueDate.Format("Jan 2"))
+			display += " " + f.theme.Muted.Render(f.theme.Icons.Due+" "+t.DueDate.Format("Jan 2"))
 		}
 		if len(t.Tags) > 0 {
-			title += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
+			display += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
 		}
 
-		fmt.Fprintf(f.w, "%s%s%s  %s\n", indentStr, prefix, id, title)
+		fmt.Fprintf(f.w, "%s%s%s  %s\n", indentStr, prefix, id, display)
 	}
 }
 
@@ -270,6 +309,38 @@ func formatScope(areaName, projectName *string) string {
 		return *areaName
 	}
 	return ""
+}
+
+// formatProjectScope returns the scope display for a project row.
+// Shows "area > projectTitle" when area exists, just "projectTitle" otherwise.
+func formatProjectScope(areaName *string, projectTitle string) string {
+	if areaName != nil {
+		return *areaName + " > " + sanitizeTitle(projectTitle)
+	}
+	return sanitizeTitle(projectTitle)
+}
+
+// renderProjectHeaderLine renders a project as a standalone header-style line
+// for scope-grouped views. Format: [Area > ProjectName]  [planned] [due] [tags]
+func (f *Formatter) renderProjectHeaderLine(p *task.Task) {
+	// Show full scope: "Area > ProjectName" or just "ProjectName"
+	scope := sanitizeTitle(p.Title)
+	if p.AreaName != nil {
+		scope = *p.AreaName + " > " + scope
+	}
+	parts := []string{f.theme.Header.Render(scope)}
+
+	if p.PlannedDate != nil && !f.hidePlannedDate {
+		parts = append(parts, f.theme.Muted.Render(f.theme.Icons.Date+" "+p.PlannedDate.Format("Jan 2")))
+	}
+	if p.DueDate != nil {
+		parts = append(parts, f.theme.Muted.Render(f.theme.Icons.Due+" "+p.DueDate.Format("Jan 2")))
+	}
+	if len(p.Tags) > 0 {
+		parts = append(parts, f.theme.Muted.Render(formatTagsForTable(p.Tags)))
+	}
+
+	fmt.Fprintln(f.w, strings.Join(parts, "  "))
 }
 
 func formatRecurIndicator(t *task.Task) string {
@@ -648,6 +719,45 @@ func (f *Formatter) ProjectMoved(p *task.Task, areaName string) {
 
 func (f *Formatter) ProjectAreaCleared(p *task.Task) {
 	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Cleared area from project: %s", p.Title)))
+}
+
+func (f *Formatter) ProjectsCompleted(results []task.CompleteResult) {
+	for _, r := range results {
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Completed project: %s", sanitizeTitle(r.Completed.Title))))
+	}
+}
+
+func (f *Formatter) ProjectsUncompleted(projects []task.Task) {
+	for _, p := range projects {
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Uncompleted project: %s", sanitizeTitle(p.Title))))
+	}
+}
+
+func (f *Formatter) ProjectEdited(name string, changes []string) {
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Updated project '%s': %s", name, joinChanges(changes))))
+}
+
+func (f *Formatter) ProjectDetails(p *task.Task) {
+	fmt.Fprintf(f.w, "Project: %s\n", sanitizeTitle(p.Title))
+
+	if p.Description != nil && *p.Description != "" {
+		fmt.Fprintf(f.w, "  Description: %s\n", *p.Description)
+	}
+	if p.AreaName != nil {
+		fmt.Fprintf(f.w, "  Area: %s\n", *p.AreaName)
+	}
+	if p.PlannedDate != nil {
+		fmt.Fprintf(f.w, "  Planned: %s\n", p.PlannedDate.Format("Jan 2, 2006"))
+	}
+	if p.DueDate != nil {
+		fmt.Fprintf(f.w, "  Due: %s\n", p.DueDate.Format("Jan 2, 2006"))
+	}
+	if p.State == task.StateSomeday {
+		fmt.Fprintln(f.w, "  State: someday")
+	}
+	if len(p.Tags) > 0 {
+		fmt.Fprintf(f.w, "  Tags: %s\n", formatTagList(p.Tags))
+	}
 }
 
 func (f *Formatter) TaskPlannedDateSet(t *task.Task) {
