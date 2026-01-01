@@ -131,6 +131,16 @@ func (m Model) isProjectID(id int64) bool {
 	return false
 }
 
+// updateProjectCache updates a project in the cached m.projects slice
+func (m *Model) updateProjectCache(updated *task.Task) {
+	for i := range m.projects {
+		if m.projects[i].ID == updated.ID {
+			m.projects[i] = *updated
+			return
+		}
+	}
+}
+
 // Init implements tea.Model
 func (m Model) Init() tea.Cmd {
 	return m.loadData
@@ -599,6 +609,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
 		}
+		// Update project cache if this is a project (so header title updates)
+		if m.isProjectID(msg.task.ID) {
+			m.updateProjectCache(msg.task)
+		}
 		// Reload tasks to reflect the date change
 		return m, m.loadTasksForSelection
 
@@ -627,6 +641,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update detail pane if showing this task
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
+		}
+		// Update project cache if this is a project (so header title updates)
+		if m.isProjectID(msg.task.ID) {
+			m.updateProjectCache(msg.task)
 		}
 		// Reload tasks and tags (tags cache may have new tags)
 		return m, m.loadDataAfterTagUpdate
@@ -721,10 +739,43 @@ type taskDescriptionUpdatedMsg struct {
 	err  error
 }
 
+// formatProjectTitle builds a project title with metadata for the content header.
+// Format: "ProjectName  📅 Jan 2  🏁 Jan 15  #tag1 #tag2"
+func (m Model) formatProjectTitle(proj *task.Task) string {
+	theme := m.styles.Theme
+	parts := []string{strings.TrimSpace(proj.Title)}
+
+	if proj.PlannedDate != nil {
+		parts = append(parts, theme.Muted.Render(theme.Icons.Date+" "+proj.PlannedDate.Format("Jan 2")))
+	}
+	if proj.DueDate != nil {
+		parts = append(parts, theme.Muted.Render(theme.Icons.Due+" "+proj.DueDate.Format("Jan 2")))
+	}
+	if len(proj.Tags) > 0 {
+		var tagParts []string
+		for _, tag := range proj.Tags {
+			tagParts = append(tagParts, "#"+tag)
+		}
+		parts = append(parts, theme.Muted.Render(strings.Join(tagParts, " ")))
+	}
+
+	return strings.Join(parts, "  ")
+}
+
 // loadTasksForSelection loads tasks based on sidebar selection
 func (m Model) loadTasksForSelection() tea.Msg {
 	item := m.sidebar.SelectedItem()
 	title := strings.TrimSpace(item.Label)
+
+	// For projects, include metadata in the title
+	if item.Type == "project" {
+		for i := range m.projects {
+			if m.projects[i].Title == item.Key {
+				title = m.formatProjectTitle(&m.projects[i])
+				break
+			}
+		}
+	}
 
 	// Get sort, group, and hideScope settings from config
 	configKey := m.configKeyForSelection()
