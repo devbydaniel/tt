@@ -282,28 +282,92 @@ Running `tt` without arguments launches the interactive terminal UI:
 tt
 ```
 
-The TUI provides a three-pane interface:
+#### Layout
 
-- **Sidebar** - Navigate between Inbox, Today, Upcoming, Anytime, Someday, and your areas/projects/tags
-- **Task list** - View and manage tasks for the selected filter
-- **Detail pane** - Edit task properties (opens with Enter or `l`)
+The TUI has three panes:
 
-**Keyboard shortcuts:**
+- **Sidebar** (left) - Navigate between views (Inbox, Today, Upcoming, Anytime, Someday) and your areas/projects/tags
+- **Task list** (center) - View and manage tasks for the selected filter
+- **Detail pane** (right) - Edit task properties, opens with `Enter` or `l`
+
+#### Navigation
+
+These keys work throughout the TUI:
+
 | Key | Action |
 |-----|--------|
-| `j/k` or `↑/↓` | Navigate up/down |
-| `h/l` | Switch between sidebar and content |
-| `Tab` | Next section in sidebar |
-| `Enter` | Open detail pane / edit field |
-| `a` | Add new task |
+| `j/k` or `↑/↓` | Move up/down |
+| `h/l` | Switch panes left/right |
+| `Tab` / `Shift+Tab` | Cycle between sections |
+| `Enter` | Select / edit field |
+| `Esc` | Go back / close |
+| `q` | Quit |
+
+#### Sidebar
+
+The sidebar has three sections you can cycle through with `Tab`:
+
+1. **Lists** - Inbox, Today, Upcoming, Anytime, Someday
+2. **Scopes** - Your areas and projects (hierarchical)
+3. **Tags** - All tags in use
+
+**Creating items:**
+- `a` - Add new task (from Lists section), or add new project (from Scopes section)
+- `A` - Add new area (from Scopes section)
+
+**When a project is selected:**
+| Key | Action |
+|-----|--------|
+| `r` | Rename project |
+| `m` | Move to different area |
+| `s` | Toggle someday/active |
+| `Backspace` | Delete project |
+
+**When an area is selected:**
+| Key | Action |
+|-----|--------|
+| `r` | Rename area |
+| `Backspace` | Delete area |
+
+#### Task List (Content Pane)
+
+| Key | Action |
+|-----|--------|
+| `Space` | Mark done/undone |
 | `r` | Rename task |
 | `m` | Move to project/area |
 | `p` | Set planned date |
 | `d` | Set due date |
 | `t` | Edit tags |
-| `Space` | Mark done/undone |
-| `Esc` | Go back / close |
-| `q` | Quit |
+| `s` | Toggle someday/active |
+| `a` | Add new task |
+| `Backspace` | Delete task |
+| `Enter` or `l` | Open detail pane |
+
+#### Detail Pane
+
+The detail pane shows editable fields for the selected task:
+
+- **Title** - Task name
+- **Description** - Multi-line notes
+- **Scope** - Project/area assignment
+- **Planned** - Start date
+- **Due** - Due date
+- **Tags** - Associated tags
+
+Navigate with `j/k` and press `Enter` to edit any field.
+
+#### Modals
+
+**Add Task** - Multi-field form. Use `Tab` to move between fields, `Enter` to submit, `Esc` to cancel.
+
+**Date Picker** - Type natural dates (e.g., `tomorrow`, `+3d`, `friday`) or press `Tab` to switch to a calendar picker. Use arrow keys to navigate the calendar.
+
+**Move** - Searchable list of projects and areas. Type to fuzzy-filter, `Enter` to select.
+
+**Tags** - Toggle tags with `Space`, type to filter existing tags or create new ones.
+
+**Description** - Multi-line text editor. Save with `Ctrl+S` or `Alt+Enter`.
 
 The TUI respects your theme and sort/group settings from the config file.
 
