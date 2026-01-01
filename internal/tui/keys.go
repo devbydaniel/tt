@@ -32,6 +32,17 @@ func (k sidebarKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{keys.Up, keys.Down, keys.Tab, keys.ShiftTab, keys.FocusContent, keys.Quit}}
 }
 
+// sidebarProjectKeyMap provides help bindings when a project is selected in sidebar
+type sidebarProjectKeyMap struct{}
+
+func (k sidebarProjectKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.FocusContent, keys.Quit}
+}
+
+func (k sidebarProjectKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.FocusContent, keys.Quit}}
+}
+
 // contentKeyMap provides help bindings when content is focused
 type contentKeyMap struct{}
 
@@ -158,8 +169,9 @@ func (k descriptionKeyMap) FullHelp() [][]key.Binding {
 }
 
 var (
-	sidebarKeys     = sidebarKeyMap{}
-	contentKeys     = contentKeyMap{}
+	sidebarKeys        = sidebarKeyMap{}
+	sidebarProjectKeys = sidebarProjectKeyMap{}
+	contentKeys        = contentKeyMap{}
 	renameKeys      = renameKeyMap{}
 	moveKeys        = moveKeyMap{}
 	tagKeys         = tagKeyMap{}

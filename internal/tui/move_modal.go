@@ -63,6 +63,26 @@ func (m MoveModal) Open(taskID int64, projects []task.Task, areas []area.Area) M
 	return m
 }
 
+// OpenForProject shows the modal with only areas (projects can't be nested under other projects)
+func (m MoveModal) OpenForProject(taskID int64, areas []area.Area) MoveModal {
+	m.active = true
+	m.taskID = taskID
+	m.selected = 0
+	var items []MoveItem
+	for _, a := range areas {
+		items = append(items, MoveItem{
+			Type:  "area",
+			Name:  a.Name,
+			Label: a.Name,
+		})
+	}
+	m.allItems = items
+	m.filtered = items
+	m.input.SetValue("")
+	m.input.Focus()
+	return m
+}
+
 // buildItems creates the list of selectable destinations
 func (m MoveModal) buildItems(projects []task.Task, areas []area.Area) []MoveItem {
 	var items []MoveItem
@@ -192,7 +212,7 @@ func (m MoveModal) View() string {
 		return ""
 	}
 
-	title := m.styles.ModalTitle.Render("Move Task")
+	title := m.styles.ModalTitle.Render("Move")
 	input := m.input.View()
 	list := m.renderList()
 

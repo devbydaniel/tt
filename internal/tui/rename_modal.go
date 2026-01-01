@@ -104,7 +104,7 @@ func (m RenameModal) View() string {
 	}
 
 	// Modal content
-	title := m.styles.ModalTitle.Render("Rename Task")
+	title := m.styles.ModalTitle.Render("Rename")
 	input := m.input.View()
 
 	content := lipgloss.JoinVertical(lipgloss.Left, title, input)

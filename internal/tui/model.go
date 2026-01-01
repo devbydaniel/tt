@@ -107,6 +107,30 @@ func (m Model) configKeyForSelection() string {
 	return "all"
 }
 
+// getSelectedProject returns the project selected in the sidebar, or nil
+func (m Model) getSelectedProject() *task.Task {
+	item := m.sidebar.SelectedItem()
+	if item.Type != "project" {
+		return nil
+	}
+	for i := range m.projects {
+		if m.projects[i].Title == item.Key {
+			return &m.projects[i]
+		}
+	}
+	return nil
+}
+
+// isProjectID returns true if the given ID belongs to a project
+func (m Model) isProjectID(id int64) bool {
+	for _, p := range m.projects {
+		if p.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
 // Init implements tea.Model
 func (m Model) Init() tea.Cmd {
 	return m.loadData
@@ -280,12 +304,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			}
+			if m.focusArea == FocusSidebar {
+				if proj := m.getSelectedProject(); proj != nil {
+					m.renameModal = m.renameModal.SetSize(m.width, m.height-1)
+					m.renameModal = m.renameModal.Open(proj.ID, proj.Title)
+					return m, nil
+				}
+			}
 
 		case key.Matches(msg, keys.Move):
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
 					m.moveModal = m.moveModal.SetSize(m.width, m.height-1) // -1 for help bar
 					m.moveModal = m.moveModal.Open(selectedTask.ID, m.projects, m.areas)
+					return m, nil
+				}
+			}
+			if m.focusArea == FocusSidebar {
+				if proj := m.getSelectedProject(); proj != nil {
+					m.moveModal = m.moveModal.SetSize(m.width, m.height-1)
+					m.moveModal = m.moveModal.OpenForProject(proj.ID, m.areas)
 					return m, nil
 				}
 			}
@@ -298,6 +336,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			}
+			if m.focusArea == FocusSidebar {
+				if proj := m.getSelectedProject(); proj != nil {
+					m.dateModal = m.dateModal.SetSize(m.width, m.height-1)
+					m.dateModal = m.dateModal.Open(proj.ID, DateModalPlanned, proj.PlannedDate)
+					return m, nil
+				}
+			}
 
 		case key.Matches(msg, keys.Due):
 			if m.focusArea == FocusContent {
@@ -307,12 +352,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			}
+			if m.focusArea == FocusSidebar {
+				if proj := m.getSelectedProject(); proj != nil {
+					m.dateModal = m.dateModal.SetSize(m.width, m.height-1)
+					m.dateModal = m.dateModal.Open(proj.ID, DateModalDue, proj.DueDate)
+					return m, nil
+				}
+			}
 
 		case key.Matches(msg, keys.Tags):
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
 					m.tagModal = m.tagModal.SetSize(m.width, m.height-1) // -1 for help bar
 					m.tagModal = m.tagModal.Open(selectedTask.ID, selectedTask.Tags, m.tags)
+					return m, nil
+				}
+			}
+			if m.focusArea == FocusSidebar {
+				if proj := m.getSelectedProject(); proj != nil {
+					m.tagModal = m.tagModal.SetSize(m.width, m.height-1)
+					m.tagModal = m.tagModal.Open(proj.ID, proj.Tags, m.tags)
 					return m, nil
 				}
 			}
@@ -508,6 +567,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
 		}
+		// If a project was renamed, reload sidebar too
+		if m.isProjectID(msg.task.ID) {
+			return m, m.loadData
+		}
 		// Reload tasks to show the updated title
 		return m, m.loadTasksForSelection
 
@@ -519,6 +582,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update detail pane if showing this task
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
+		}
+		// If a project was moved, reload sidebar too
+		if m.isProjectID(msg.task.ID) {
+			return m, m.loadData
 		}
 		// Reload tasks to reflect the move
 		return m, m.loadTasksForSelection
@@ -1029,7 +1096,11 @@ func (m Model) View() string {
 	case m.descriptionModal.Active():
 		helpView = m.help.View(descriptionKeys)
 	case m.focusArea == FocusSidebar:
-		helpView = m.help.View(sidebarKeys)
+		if m.getSelectedProject() != nil {
+			helpView = m.help.View(sidebarProjectKeys)
+		} else {
+			helpView = m.help.View(sidebarKeys)
+		}
 	case m.focusArea == FocusDetail:
 		helpView = m.help.View(detailKeys)
 	default:
