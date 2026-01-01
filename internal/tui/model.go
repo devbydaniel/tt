@@ -404,6 +404,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+		case key.Matches(msg, keys.Someday):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					return m, m.toggleTaskState(selectedTask.ID, selectedTask.State)
+				}
+			}
+			if m.focusArea == FocusSidebar {
+				if proj := m.getSelectedProject(); proj != nil {
+					return m, m.toggleTaskState(proj.ID, proj.State)
+				}
+			}
+
 		case key.Matches(msg, keys.Tab):
 			if m.focusArea == FocusDetail {
 				m.detailPane = m.detailPane.NextField()
@@ -633,6 +645,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.content = m.content.UpdateTaskStatus(msg.taskID, msg.done)
 		return m, nil
 
+	case taskStateUpdatedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Update detail pane if showing this task
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
+			m.detailPane = m.detailPane.UpdateTask(msg.task)
+		}
+		// Update project cache if this is a project
+		if m.isProjectID(msg.task.ID) {
+			m.updateProjectCache(msg.task)
+		}
+		// Reload tasks to reflect the state change
+		return m, m.loadTasksForSelection
+
 	case taskTagsUpdatedMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -725,6 +753,12 @@ type taskToggledMsg struct {
 	taskID int64
 	done   bool // true if task was marked done, false if undone
 	err    error
+}
+
+// taskStateUpdatedMsg carries the result of toggling a task's someday/active state
+type taskStateUpdatedMsg struct {
+	task *task.Task
+	err  error
 }
 
 // taskTagsUpdatedMsg carries the result of updating tags
@@ -919,6 +953,20 @@ func (m Model) toggleTask(taskID int64, currentStatus task.Status) tea.Cmd {
 		// Complete the task
 		_, err = m.app.CompleteTasks.Execute([]int64{taskID})
 		return taskToggledMsg{taskID: taskID, done: true, err: err}
+	}
+}
+
+// toggleTaskState creates a command to toggle a task's someday/active state
+func (m Model) toggleTaskState(taskID int64, currentState task.State) tea.Cmd {
+	return func() tea.Msg {
+		var updated *task.Task
+		var err error
+		if currentState == task.StateSomeday {
+			updated, err = m.app.ActivateTask.Execute(taskID)
+		} else {
+			updated, err = m.app.DeferTask.Execute(taskID)
+		}
+		return taskStateUpdatedMsg{task: updated, err: err}
 	}
 }
 

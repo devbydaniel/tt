@@ -18,6 +18,7 @@ type keyMap struct {
 	Tags         key.Binding
 	Add          key.Binding
 	Toggle       key.Binding
+	Someday      key.Binding
 	Quit         key.Binding
 }
 
@@ -36,22 +37,22 @@ func (k sidebarKeyMap) FullHelp() [][]key.Binding {
 type sidebarProjectKeyMap struct{}
 
 func (k sidebarProjectKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarProjectKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.FocusContent, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.FocusContent, keys.Quit}}
 }
 
 // contentKeyMap provides help bindings when content is focused
 type contentKeyMap struct{}
 
 func (k contentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Someday, keys.Quit}
 }
 
 func (k contentKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Toggle, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Toggle, keys.Someday, keys.Quit}}
 }
 
 // renameKeyMap provides help bindings for rename modal
@@ -242,6 +243,10 @@ var keys = keyMap{
 	Toggle: key.NewBinding(
 		key.WithKeys(" "),
 		key.WithHelp("space", "done"),
+	),
+	Someday: key.NewBinding(
+		key.WithKeys("s"),
+		key.WithHelp("s", "someday"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
