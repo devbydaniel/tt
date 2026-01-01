@@ -90,7 +90,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 
 			// JSON output: single call, all tasks
 			if jsonOutput {
-				tasks, err := deps.TaskService.List(&task.ListOptions{
+				tasks, err := deps.App.ListTasks.Execute(&task.ListOptions{
 					ProjectName: projectName,
 					AreaName:    areaName,
 					TagName:     tagName,
@@ -117,7 +117,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				}
 
 				for _, sched := range schedules {
-					tasks, err := deps.TaskService.List(&task.ListOptions{
+					tasks, err := deps.App.ListTasks.Execute(&task.ListOptions{
 						ProjectName: projectName,
 						AreaName:    areaName,
 						TagName:     tagName,
@@ -137,7 +137,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 			}
 
 			// Other groupings: single call, client-side grouping
-			tasks, err := deps.TaskService.List(&task.ListOptions{
+			tasks, err := deps.App.ListTasks.Execute(&task.ListOptions{
 				ProjectName: projectName,
 				AreaName:    areaName,
 				TagName:     tagName,
@@ -163,7 +163,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().BoolVar(&someday, "someday", false, "Show someday tasks")
 	cmd.Flags().BoolVar(&anytime, "anytime", false, "Show active tasks with no dates")
 	cmd.Flags().BoolVar(&inbox, "inbox", false, "Show tasks with no project, area, or dates")
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: schedule, project, area, date, none")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: schedule, scope, date, none")
 	cmd.Flags().BoolVar(&hideScope, "hide-scope", false, "Hide project/area columns")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 

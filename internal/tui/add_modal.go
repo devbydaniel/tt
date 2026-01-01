@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/devbydaniel/tt/internal/dateparse"
 	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/project"
+	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/sahilm/fuzzy"
 )
 
@@ -104,20 +104,20 @@ func NewAddModal(styles *Styles) AddModal {
 }
 
 // buildScopes creates the list of selectable scopes
-func (m AddModal) buildScopes(projects []project.ProjectWithArea, areas []area.Area) []MoveItem {
+func (m AddModal) buildScopes(projects []task.Task, areas []area.Area) []MoveItem {
 	items := []MoveItem{
 		{Type: "none", Name: "", Label: "None (Inbox)"},
 	}
 
 	// Add projects
 	for _, p := range projects {
-		label := p.Name
+		label := p.Title
 		if p.AreaName != nil {
-			label = *p.AreaName + " > " + p.Name
+			label = *p.AreaName + " > " + p.Title
 		}
 		items = append(items, MoveItem{
 			Type:  "project",
-			Name:  p.Name,
+			Name:  p.Title,
 			Label: label,
 		})
 	}
@@ -135,7 +135,7 @@ func (m AddModal) buildScopes(projects []project.ProjectWithArea, areas []area.A
 }
 
 // Open shows the modal with optional pre-filled scope from sidebar context
-func (m AddModal) Open(projects []project.ProjectWithArea, areas []area.Area, sidebarItem *SidebarItem) AddModal {
+func (m AddModal) Open(projects []task.Task, areas []area.Area, sidebarItem *SidebarItem) AddModal {
 	m.active = true
 	m.activeField = AddFieldTitle
 	m.err = nil

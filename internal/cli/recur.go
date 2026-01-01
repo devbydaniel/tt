@@ -45,7 +45,7 @@ Examples:
 
 			// Handle --show
 			if show {
-				t, err := deps.TaskService.GetByID(id)
+				t, err := deps.App.GetTask.Execute(id)
 				if err != nil {
 					return err
 				}
@@ -55,7 +55,7 @@ Examples:
 
 			// Handle --clear
 			if clear {
-				t, err := deps.TaskService.SetRecurrence(id, nil, nil, nil)
+				t, err := deps.App.SetRecurrence.Execute(id, nil, nil, nil)
 				if err != nil {
 					return err
 				}
@@ -65,7 +65,7 @@ Examples:
 
 			// Handle --pause
 			if pause {
-				t, err := deps.TaskService.PauseRecurrence(id)
+				t, err := deps.App.PauseRecurrence.Execute(id)
 				if err != nil {
 					return err
 				}
@@ -75,7 +75,7 @@ Examples:
 
 			// Handle --resume
 			if resume {
-				t, err := deps.TaskService.ResumeRecurrence(id)
+				t, err := deps.App.ResumeRecurrence.Execute(id)
 				if err != nil {
 					return err
 				}
@@ -91,7 +91,7 @@ Examples:
 					return err
 				}
 				endDate = &end
-				t, err := deps.TaskService.SetRecurrenceEnd(id, endDate)
+				t, err := deps.App.SetRecurrenceEnd.Execute(id, endDate)
 				if err != nil {
 					return err
 				}
@@ -127,7 +127,7 @@ Examples:
 				endDate = &end
 			}
 
-			t, err := deps.TaskService.SetRecurrence(id, &recurType, &ruleJSON, endDate)
+			t, err := deps.App.SetRecurrence.Execute(id, &recurType, &ruleJSON, endDate)
 			if err != nil {
 				return err
 			}

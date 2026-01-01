@@ -4,8 +4,7 @@ import (
 	"os"
 
 	"github.com/devbydaniel/tt/config"
-	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/project"
+	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/devbydaniel/tt/internal/tui"
@@ -13,11 +12,9 @@ import (
 )
 
 type Dependencies struct {
-	TaskService    *task.Service
-	AreaService    *area.Service
-	ProjectService *project.Service
-	Config         *config.Config
-	Theme          *output.Theme
+	App    *app.App
+	Config *config.Config
+	Theme  *output.Theme
 }
 
 func NewRootCmd(deps *Dependencies) *cobra.Command {
@@ -25,7 +22,7 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 		Use:   "tt",
 		Short: "A CLI task manager",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return tui.Run(deps.TaskService, deps.AreaService, deps.ProjectService, deps.Theme, deps.Config)
+			return tui.Run(deps.App, deps.Theme, deps.Config)
 		},
 	}
 
@@ -92,7 +89,7 @@ func RunListView(deps *Dependencies, viewCmd, sortOverride, groupOverride string
 	}
 	opts.Sort = sortOpts
 
-	tasks, err := deps.TaskService.List(opts)
+	tasks, err := deps.App.ListTasks.Execute(opts)
 	if err != nil {
 		return err
 	}

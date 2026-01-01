@@ -24,7 +24,7 @@ func NewDoCmd(deps *Dependencies) *cobra.Command {
 				ids = append(ids, id)
 			}
 
-			completed, err := deps.TaskService.Complete(ids)
+			completed, err := deps.App.CompleteTasks.Execute(ids)
 			if err != nil {
 				return err
 			}

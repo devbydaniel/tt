@@ -93,7 +93,7 @@ Examples:
 
 			if !hasChanges {
 				if len(ids) == 1 {
-					t, err := deps.TaskService.GetByID(ids[0])
+					t, err := deps.App.GetTask.Execute(ids[0])
 					if err != nil {
 						return err
 					}
@@ -144,37 +144,37 @@ Examples:
 			// Apply changes to all tasks
 			for _, id := range ids {
 				if title != "" {
-					if _, err := deps.TaskService.SetTitle(id, title); err != nil {
+					if _, err := deps.App.SetTaskTitle.Execute(id, title); err != nil {
 						return err
 					}
 				}
 
 				if description != "" {
-					if _, err := deps.TaskService.SetDescription(id, &description); err != nil {
+					if _, err := deps.App.SetTaskDescription.Execute(id, &description); err != nil {
 						return err
 					}
 				} else if clearDescription {
-					if _, err := deps.TaskService.SetDescription(id, nil); err != nil {
+					if _, err := deps.App.SetTaskDescription.Execute(id, nil); err != nil {
 						return err
 					}
 				}
 
 				if projectName != "" {
-					if _, err := deps.TaskService.SetProject(id, projectName); err != nil {
+					if _, err := deps.App.SetTaskProject.Execute(id, projectName); err != nil {
 						return err
 					}
 				} else if clearProject {
-					if _, err := deps.TaskService.SetProject(id, ""); err != nil {
+					if _, err := deps.App.SetTaskProject.Execute(id, ""); err != nil {
 						return err
 					}
 				}
 
 				if areaName != "" {
-					if _, err := deps.TaskService.SetArea(id, areaName); err != nil {
+					if _, err := deps.App.SetTaskArea.Execute(id, areaName); err != nil {
 						return err
 					}
 				} else if clearArea {
-					if _, err := deps.TaskService.SetArea(id, ""); err != nil {
+					if _, err := deps.App.SetTaskArea.Execute(id, ""); err != nil {
 						return err
 					}
 				}
@@ -184,11 +184,11 @@ Examples:
 					if err != nil {
 						return err
 					}
-					if _, err := deps.TaskService.SetPlannedDate(id, &planned); err != nil {
+					if _, err := deps.App.SetPlannedDate.Execute(id, &planned); err != nil {
 						return err
 					}
 				} else if clearPlanned {
-					if _, err := deps.TaskService.SetPlannedDate(id, nil); err != nil {
+					if _, err := deps.App.SetPlannedDate.Execute(id, nil); err != nil {
 						return err
 					}
 				}
@@ -198,23 +198,23 @@ Examples:
 					if err != nil {
 						return err
 					}
-					if _, err := deps.TaskService.SetDueDate(id, &due); err != nil {
+					if _, err := deps.App.SetDueDate.Execute(id, &due); err != nil {
 						return err
 					}
 				} else if clearDue {
-					if _, err := deps.TaskService.SetDueDate(id, nil); err != nil {
+					if _, err := deps.App.SetDueDate.Execute(id, nil); err != nil {
 						return err
 					}
 				}
 
 				for _, tag := range addTags {
-					if _, err := deps.TaskService.AddTag(id, tag); err != nil {
+					if _, err := deps.App.AddTag.Execute(id, tag); err != nil {
 						return err
 					}
 				}
 
 				for _, tag := range removeTags {
-					if _, err := deps.TaskService.RemoveTag(id, tag); err != nil {
+					if _, err := deps.App.RemoveTag.Execute(id, tag); err != nil {
 						return err
 					}
 				}

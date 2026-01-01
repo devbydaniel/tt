@@ -35,9 +35,15 @@ func (r *Repository) Create(task *Task) error {
 		recurEnd = &s
 	}
 
+	// Default task_type to "task" if not set
+	taskType := task.TaskType
+	if taskType == "" {
+		taskType = TaskTypeTask
+	}
+
 	result, err := r.db.Conn.Exec(
-		`INSERT INTO tasks (uuid, title, description, project_id, area_id, planned_date, due_date, state, status, created_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		task.UUID, task.Title, task.Description, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.Status, task.CreatedAt.Format(time.RFC3339),
+		`INSERT INTO tasks (uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		task.UUID, task.Title, task.Description, taskType, task.ParentID, task.AreaID, plannedDate, dueDate, task.State, task.Status, task.CreatedAt.Format(time.RFC3339),
 		task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.RecurParentID,
 	)
 	if err != nil {
@@ -50,20 +56,22 @@ func (r *Repository) Create(task *Task) error {
 	}
 
 	task.ID = id
+	task.TaskType = taskType
 	return nil
 }
 
 type ListFilter struct {
-	ProjectID *int64
-	AreaID    *int64
-	State     State        // filter by state (active, someday)
-	Today     bool         // planned_date = today OR overdue
-	Upcoming  bool         // future planned/due dates
-	Anytime   bool         // no planned_date and no due_date (active only)
-	Inbox     bool         // no project, no area, no dates
-	TagName   string       // filter by tag
-	Search    string       // case-insensitive title search
-	Sort      []SortOption // sort options (default: created desc)
+	TaskType TaskType     // filter by task type ("task", "project", or empty for all)
+	ParentID *int64       // filter by parent project ID
+	AreaID   *int64
+	State    State        // filter by state (active, someday)
+	Today    bool         // planned_date = today OR overdue
+	Upcoming bool         // future planned/due dates
+	Anytime  bool         // no planned_date and no due_date (active only)
+	Inbox    bool         // no project, no area, no dates
+	TagName  string       // filter by tag
+	Search   string       // case-insensitive title search
+	Sort     []SortOption // sort options (default: created desc)
 }
 
 // buildOrderByClause builds the ORDER BY clause from sort options
@@ -108,9 +116,9 @@ func sortFieldToColumn(f SortField) string {
 	case SortByCreated:
 		return "t.created_at"
 	case SortByProject:
-		return "p.name"
+		return "parent.title"
 	case SortByArea:
-		return "COALESCE(a.name, pa.name)"
+		return "COALESCE(a.name, parent_area.name)"
 	default:
 		return "t.id"
 	}
@@ -126,10 +134,10 @@ func isNullableField(f SortField) bool {
 }
 
 func (r *Repository) List(filter *ListFilter) ([]Task, error) {
-	query := `SELECT t.id, t.uuid, t.title, t.description, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name) FROM tasks t`
-	query += ` LEFT JOIN projects p ON t.project_id = p.id`
+	query := `SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name) FROM tasks t`
+	query += ` LEFT JOIN tasks parent ON t.parent_id = parent.id`
 	query += ` LEFT JOIN areas a ON t.area_id = a.id`
-	query += ` LEFT JOIN areas pa ON p.area_id = pa.id`
+	query += ` LEFT JOIN areas parent_area ON parent.area_id = parent_area.id`
 	args := []any{}
 
 	// Join with task_tags if filtering by tag
@@ -141,13 +149,17 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 	args = append(args, StatusTodo)
 
 	if filter != nil {
+		if filter.TaskType != "" {
+			query += ` AND t.task_type = ?`
+			args = append(args, filter.TaskType)
+		}
 		if filter.TagName != "" {
 			query += ` AND tt.tag_name = ?`
 			args = append(args, filter.TagName)
 		}
-		if filter.ProjectID != nil {
-			query += ` AND t.project_id = ?`
-			args = append(args, *filter.ProjectID)
+		if filter.ParentID != nil {
+			query += ` AND t.parent_id = ?`
+			args = append(args, *filter.ParentID)
 		}
 		if filter.AreaID != nil {
 			query += ` AND t.area_id = ?`
@@ -170,15 +182,15 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 			args = append(args, today, today)
 		}
 		if filter.Anytime {
-			// no planned_date and no due_date, must have project or area (excludes inbox)
+			// no planned_date and no due_date, must have parent or area (excludes inbox)
 			// enforces active state (someday tasks are excluded)
-			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL AND (t.project_id IS NOT NULL OR t.area_id IS NOT NULL) AND t.state = ?`
+			query += ` AND t.planned_date IS NULL AND t.due_date IS NULL AND (t.parent_id IS NOT NULL OR t.area_id IS NOT NULL) AND t.state = ?`
 			args = append(args, StateActive)
 		}
 		if filter.Inbox {
-			// no project, no area, no planned_date, no due_date
+			// no parent, no area, no planned_date, no due_date
 			// enforces active state (someday tasks are excluded)
-			query += ` AND t.project_id IS NULL AND t.area_id IS NULL AND t.planned_date IS NULL AND t.due_date IS NULL AND t.state = ?`
+			query += ` AND t.parent_id IS NULL AND t.area_id IS NULL AND t.planned_date IS NULL AND t.due_date IS NULL AND t.state = ?`
 			args = append(args, StateActive)
 		}
 		if filter.Search != "" {
@@ -210,7 +222,7 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 
 func (r *Repository) GetByID(id int64) (*Task, error) {
 	row := r.db.Conn.QueryRow(
-		`SELECT id, uuid, title, description, project_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE id = ?`,
+		`SELECT id, uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE id = ?`,
 		id,
 	)
 
@@ -219,7 +231,7 @@ func (r *Repository) GetByID(id int64) (*Task, error) {
 	var createdAt string
 	var completedAt *string
 	var recurEnd *string
-	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.Description, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
+	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.Description, &t.TaskType, &t.ParentID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
 		return nil, err
 	}
 	if plannedDate != nil {
@@ -313,22 +325,22 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 
 	if since != nil {
 		rows, err = r.db.Conn.Query(
-			`SELECT t.id, t.uuid, t.title, t.description, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name)
+			`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
 			 FROM tasks t
-			 LEFT JOIN projects p ON t.project_id = p.id
+			 LEFT JOIN tasks parent ON t.parent_id = parent.id
 			 LEFT JOIN areas a ON t.area_id = a.id
-			 LEFT JOIN areas pa ON p.area_id = pa.id
+			 LEFT JOIN areas parent_area ON parent.area_id = parent_area.id
 			 WHERE t.status = ? AND t.completed_at >= ?
 			 ORDER BY t.completed_at DESC`,
 			StatusDone, since.Format(time.RFC3339),
 		)
 	} else {
 		rows, err = r.db.Conn.Query(
-			`SELECT t.id, t.uuid, t.title, t.description, t.project_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, p.name, COALESCE(a.name, pa.name)
+			`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
 			 FROM tasks t
-			 LEFT JOIN projects p ON t.project_id = p.id
+			 LEFT JOIN tasks parent ON t.parent_id = parent.id
 			 LEFT JOIN areas a ON t.area_id = a.id
-			 LEFT JOIN areas pa ON p.area_id = pa.id
+			 LEFT JOIN areas parent_area ON parent.area_id = parent_area.id
 			 WHERE t.status = ?
 			 ORDER BY t.completed_at DESC`,
 			StatusDone,
@@ -368,8 +380,8 @@ func (r *Repository) Update(task *Task) error {
 	}
 
 	result, err := r.db.Conn.Exec(
-		`UPDATE tasks SET title = ?, description = ?, project_id = ?, area_id = ?, planned_date = ?, due_date = ?, state = ?, recur_type = ?, recur_rule = ?, recur_end = ?, recur_paused = ? WHERE id = ?`,
-		task.Title, task.Description, task.ProjectID, task.AreaID, plannedDate, dueDate, task.State, task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.ID,
+		`UPDATE tasks SET title = ?, description = ?, parent_id = ?, area_id = ?, planned_date = ?, due_date = ?, state = ?, recur_type = ?, recur_rule = ?, recur_end = ?, recur_paused = ? WHERE id = ?`,
+		task.Title, task.Description, task.ParentID, task.AreaID, plannedDate, dueDate, task.State, task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.ID,
 	)
 	if err != nil {
 		return err
@@ -394,7 +406,7 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 		var createdAt string
 		var completedAt *string
 		var recurEnd *string
-		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.Description, &t.ProjectID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID, &t.ProjectName, &t.AreaName); err != nil {
+		if err := rows.Scan(&t.ID, &t.UUID, &t.Title, &t.Description, &t.TaskType, &t.ParentID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID, &t.ParentName, &t.AreaName); err != nil {
 			return nil, err
 		}
 		if plannedDate != nil {
@@ -535,4 +547,86 @@ func (r *Repository) SetTags(taskID int64, tags []string) error {
 		}
 	}
 	return nil
+}
+
+// GetByName finds a task by title and type (for project lookup)
+func (r *Repository) GetByName(name string, taskType TaskType) (*Task, error) {
+	row := r.db.Conn.QueryRow(
+		`SELECT id, uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE title = ? AND task_type = ?`,
+		name, taskType,
+	)
+
+	var t Task
+	var plannedDate, dueDate *string
+	var createdAt string
+	var completedAt *string
+	var recurEnd *string
+	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.Description, &t.TaskType, &t.ParentID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+	if plannedDate != nil {
+		parsed, _ := time.Parse(dateFormat, *plannedDate)
+		t.PlannedDate = &parsed
+	}
+	if dueDate != nil {
+		parsed, _ := time.Parse(dateFormat, *dueDate)
+		t.DueDate = &parsed
+	}
+	t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	if completedAt != nil {
+		parsed, _ := time.Parse(time.RFC3339, *completedAt)
+		t.CompletedAt = &parsed
+	}
+	if recurEnd != nil {
+		parsed, _ := time.Parse(dateFormat, *recurEnd)
+		t.RecurEnd = &parsed
+	}
+
+	// Load tags
+	tags, err := r.getTagsForTask(t.ID)
+	if err != nil {
+		return nil, err
+	}
+	t.Tags = tags
+
+	return &t, nil
+}
+
+// CompleteWithChildren completes a task and all its child tasks (for projects)
+func (r *Repository) CompleteWithChildren(id int64, completedAt time.Time) error {
+	// Complete all child tasks first
+	_, err := r.db.Conn.Exec(
+		`UPDATE tasks SET status = ?, completed_at = ? WHERE parent_id = ? AND status = ?`,
+		StatusDone, completedAt.Format(time.RFC3339), id, StatusTodo,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Complete the parent task
+	result, err := r.db.Conn.Exec(
+		`UPDATE tasks SET status = ?, completed_at = ? WHERE id = ? AND status = ?`,
+		StatusDone, completedAt.Format(time.RFC3339), id, StatusTodo,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrTaskNotFound
+	}
+
+	return nil
+}
+
+// ListChildren returns all child tasks of a given parent (project)
+func (r *Repository) ListChildren(parentID int64) ([]Task, error) {
+	return r.List(&ListFilter{ParentID: &parentID, TaskType: TaskTypeTask})
 }

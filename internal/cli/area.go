@@ -29,7 +29,7 @@ func newAreaListCmd(deps *Dependencies) *cobra.Command {
 		Short: "List all areas",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			areas, err := deps.AreaService.List()
+			areas, err := deps.App.ListAreas.Execute()
 			if err != nil {
 				return err
 			}
@@ -54,7 +54,7 @@ func newAreaAddCmd(deps *Dependencies) *cobra.Command {
 		Short: "Create a new area",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			area, err := deps.AreaService.Create(args[0])
+			area, err := deps.App.CreateArea.Execute(args[0])
 			if err != nil {
 				return err
 			}
@@ -72,7 +72,7 @@ func newAreaDeleteCmd(deps *Dependencies) *cobra.Command {
 		Short: "Delete an area",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			area, err := deps.AreaService.Delete(args[0])
+			area, err := deps.App.DeleteArea.Execute(args[0])
 			if err != nil {
 				return err
 			}
@@ -99,7 +99,7 @@ func newAreaRenameCmd(deps *Dependencies) *cobra.Command {
 			oldName := args[0]
 			newName := args[1]
 
-			_, err := deps.AreaService.Rename(oldName, newName)
+			_, err := deps.App.RenameArea.Execute(oldName, newName)
 			if err != nil {
 				return err
 			}

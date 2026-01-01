@@ -5,7 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/project"
+	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
 // Sidebar contains the left panel with 3 sections
@@ -42,7 +42,7 @@ func (s Sidebar) SetFocused(focused bool) Sidebar {
 }
 
 // SetData updates sidebar sections with loaded data
-func (s Sidebar) SetData(areas []area.Area, projects []project.ProjectWithArea, tags []string) Sidebar {
+func (s Sidebar) SetData(areas []area.Area, projects []task.Task, tags []string) Sidebar {
 	// Update scopes section
 	if scopes, ok := s.sections[1].(*ScopesSection); ok {
 		s.sections[1] = scopes.SetData(areas, projects)
@@ -284,12 +284,12 @@ func NewScopesSection(styles *Styles) *ScopesSection {
 }
 
 // SetData populates the scopes section with areas and projects nested under areas
-func (s *ScopesSection) SetData(areas []area.Area, projects []project.ProjectWithArea) *ScopesSection {
+func (s *ScopesSection) SetData(areas []area.Area, projects []task.Task) *ScopesSection {
 	var items []SidebarItem
 
 	// Build a map of area name -> projects
-	projectsByArea := make(map[string][]project.ProjectWithArea)
-	var noAreaProjects []project.ProjectWithArea
+	projectsByArea := make(map[string][]task.Task)
+	var noAreaProjects []task.Task
 
 	for _, p := range projects {
 		if p.AreaName != nil {
@@ -317,26 +317,26 @@ func (s *ScopesSection) SetData(areas []area.Area, projects []project.ProjectWit
 		// Add projects under this area (indented)
 		areaProjects := projectsByArea[a.Name]
 		sort.Slice(areaProjects, func(i, j int) bool {
-			return areaProjects[i].Name < areaProjects[j].Name
+			return areaProjects[i].Title < areaProjects[j].Title
 		})
 		for _, p := range areaProjects {
 			items = append(items, SidebarItem{
 				Type:  "project",
-				Key:   p.Name,
-				Label: "  " + p.Name, // Indent projects
+				Key:   p.Title,
+				Label: "  " + p.Title, // Indent projects
 			})
 		}
 	}
 
 	// Add projects without areas at the end
 	sort.Slice(noAreaProjects, func(i, j int) bool {
-		return noAreaProjects[i].Name < noAreaProjects[j].Name
+		return noAreaProjects[i].Title < noAreaProjects[j].Title
 	})
 	for _, p := range noAreaProjects {
 		items = append(items, SidebarItem{
 			Type:  "project",
-			Key:   p.Name,
-			Label: p.Name,
+			Key:   p.Title,
+			Label: p.Title,
 		})
 	}
 

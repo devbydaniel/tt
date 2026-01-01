@@ -138,7 +138,8 @@ type Task struct {
 	UUID        string     `json:"uuid"`
 	Title       string     `json:"title"`
 	Description *string    `json:"description,omitempty"`
-	ProjectID   *int64     `json:"projectId,omitempty"`
+	TaskType    TaskType   `json:"taskType"`
+	ParentID    *int64     `json:"parentId,omitempty"`
 	AreaID      *int64     `json:"areaId,omitempty"`
 	PlannedDate *time.Time `json:"plannedDate,omitempty"`
 	DueDate     *time.Time `json:"dueDate,omitempty"`
@@ -158,8 +159,18 @@ type Task struct {
 	Tags []string `json:"tags,omitempty"`
 
 	// Display fields (populated by queries with JOINs, not persisted)
-	ProjectName *string `json:"projectName,omitempty"`
-	AreaName    *string `json:"areaName,omitempty"`
+	ParentName *string `json:"parentName,omitempty"`
+	AreaName   *string `json:"areaName,omitempty"`
+}
+
+// IsProject returns true if this task is a project
+func (t *Task) IsProject() bool {
+	return t.TaskType == TaskTypeProject
+}
+
+// IsTask returns true if this task is a regular task (not a project)
+func (t *Task) IsTask() bool {
+	return t.TaskType == TaskTypeTask
 }
 
 // Recurrence type constants
@@ -183,3 +194,46 @@ const (
 	StateActive  State = "active"
 	StateSomeday State = "someday"
 )
+
+// TaskType represents whether this is a regular task or a project
+type TaskType string
+
+const (
+	TaskTypeTask    TaskType = "task"
+	TaskTypeProject TaskType = "project"
+)
+
+// CreateOptions contains options for creating a task
+type CreateOptions struct {
+	TaskType    TaskType // "task" (default) or "project"
+	ProjectName string   // user-facing: assigns to a project (internally sets ParentID)
+	AreaName    string
+	Description string
+	PlannedDate *time.Time
+	DueDate     *time.Time
+	Someday     bool     // if true, create in someday state
+	Tags        []string // tags to assign
+
+	// Recurrence options
+	RecurType     *string    // "fixed" or "relative"
+	RecurRule     *string    // JSON rule
+	RecurEnd      *time.Time // optional end date
+	RecurParentID *int64     // for linking regenerated tasks
+}
+
+// ListOptions contains options for listing tasks
+type ListOptions struct {
+	TaskType    TaskType     // filter by task type ("task", "project", or empty for all)
+	ProjectName string       // user-facing: filter by project name (internally uses ParentID)
+	AreaName    string
+	TagName     string       // filter by tag
+	Schedule    string       // "today", "upcoming", "anytime", "inbox", "someday"
+	Search      string       // case-insensitive title search
+	Sort        []SortOption // sort options (default: created desc)
+}
+
+// CompleteResult represents the result of completing a task
+type CompleteResult struct {
+	Completed Task
+	NextTask  *Task // non-nil if a recurring task was regenerated
+}

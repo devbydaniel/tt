@@ -118,11 +118,11 @@ func (d DetailPane) buildContent() string {
 
 	// Scope (Area > Project)
 	scope := "None"
-	if d.task.ProjectName != nil {
+	if d.task.ParentName != nil {
 		if d.task.AreaName != nil {
-			scope = *d.task.AreaName + " > " + *d.task.ProjectName
+			scope = *d.task.AreaName + " > " + *d.task.ParentName
 		} else {
-			scope = *d.task.ProjectName
+			scope = *d.task.ParentName
 		}
 	} else if d.task.AreaName != nil {
 		scope = *d.task.AreaName

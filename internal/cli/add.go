@@ -93,7 +93,7 @@ func NewAddCmd(deps *Dependencies) *cobra.Command {
 				opts.RecurEnd = &recurEnd
 			}
 
-			t, err := deps.TaskService.Create(title, opts)
+			t, err := deps.App.CreateTask.Execute(title, opts)
 			if err != nil {
 				return err
 			}

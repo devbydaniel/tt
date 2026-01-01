@@ -5,11 +5,9 @@ import (
 	"os"
 
 	"github.com/devbydaniel/tt/config"
+	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/cli"
 	"github.com/devbydaniel/tt/internal/database"
-	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/project"
-	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
 )
 
@@ -37,23 +35,13 @@ func run() error {
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
-	areaRepo := area.NewRepository(db)
-	areaService := area.NewService(areaRepo)
-
-	projectRepo := project.NewRepository(db)
-	projectService := project.NewService(projectRepo, areaService)
-
-	taskRepo := task.NewRepository(db)
-	taskService := task.NewService(taskRepo, projectService, areaService)
-
+	application := app.New(db)
 	theme := output.NewTheme(&cfg.Theme)
 
 	deps := &cli.Dependencies{
-		TaskService:    taskService,
-		AreaService:    areaService,
-		ProjectService: projectService,
-		Config:         cfg,
-		Theme:          theme,
+		App:    application,
+		Config: cfg,
+		Theme:  theme,
 	}
 
 	return cli.NewRootCmd(deps).Execute()

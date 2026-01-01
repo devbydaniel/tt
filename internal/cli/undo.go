@@ -24,7 +24,7 @@ func NewUndoCmd(deps *Dependencies) *cobra.Command {
 				ids = append(ids, id)
 			}
 
-			uncompleted, err := deps.TaskService.Uncomplete(ids)
+			uncompleted, err := deps.App.UncompleteTasks.Execute(ids)
 			if err != nil {
 				return err
 			}

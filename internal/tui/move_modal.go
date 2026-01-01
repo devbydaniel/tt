@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/project"
+	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/sahilm/fuzzy"
 )
 
@@ -52,7 +52,7 @@ func NewMoveModal(styles *Styles) MoveModal {
 }
 
 // Open shows the modal with available destinations
-func (m MoveModal) Open(taskID int64, projects []project.ProjectWithArea, areas []area.Area) MoveModal {
+func (m MoveModal) Open(taskID int64, projects []task.Task, areas []area.Area) MoveModal {
 	m.active = true
 	m.taskID = taskID
 	m.selected = 0
@@ -64,18 +64,18 @@ func (m MoveModal) Open(taskID int64, projects []project.ProjectWithArea, areas 
 }
 
 // buildItems creates the list of selectable destinations
-func (m MoveModal) buildItems(projects []project.ProjectWithArea, areas []area.Area) []MoveItem {
+func (m MoveModal) buildItems(projects []task.Task, areas []area.Area) []MoveItem {
 	var items []MoveItem
 
 	// Add projects
 	for _, p := range projects {
-		label := p.Name
+		label := p.Title
 		if p.AreaName != nil {
-			label = *p.AreaName + " > " + p.Name
+			label = *p.AreaName + " > " + p.Title
 		}
 		items = append(items, MoveItem{
 			Type:  "project",
-			Name:  p.Name,
+			Name:  p.Title,
 			Label: label,
 		})
 	}

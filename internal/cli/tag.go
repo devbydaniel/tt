@@ -31,7 +31,7 @@ func newTagListCmd(deps *Dependencies) *cobra.Command {
 		Short: "List all tags in use",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tags, err := deps.TaskService.ListTags()
+			tags, err := deps.App.ListTags.Execute()
 			if err != nil {
 				return err
 			}
@@ -66,7 +66,7 @@ func newTagAddCmd(deps *Dependencies) *cobra.Command {
 				return errors.New("tag name cannot be empty")
 			}
 
-			t, err := deps.TaskService.AddTag(id, tagName)
+			t, err := deps.App.AddTag.Execute(id, tagName)
 			if err != nil {
 				return err
 			}
@@ -95,7 +95,7 @@ func newTagRemoveCmd(deps *Dependencies) *cobra.Command {
 				return errors.New("tag name cannot be empty")
 			}
 
-			t, err := deps.TaskService.RemoveTag(id, tagName)
+			t, err := deps.App.RemoveTag.Execute(id, tagName)
 			if err != nil {
 				return err
 			}

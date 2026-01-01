@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/devbydaniel/tt/config"
+	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/project"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
 )
@@ -26,10 +26,8 @@ const (
 
 // Model is the root TUI model
 type Model struct {
-	// Services
-	taskService    *task.Service
-	areaService    *area.Service
-	projectService *project.Service
+	// Application
+	app *app.App
 
 	// Config
 	config *config.Config
@@ -58,7 +56,7 @@ type Model struct {
 
 	// Cached data
 	areas    []area.Area
-	projects []project.ProjectWithArea
+	projects []task.Task
 	tags     []string
 
 	// Error state
@@ -66,7 +64,7 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model
-func NewModel(taskService *task.Service, areaService *area.Service, projectService *project.Service, theme *output.Theme, cfg *config.Config) Model {
+func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Model {
 	styles := NewStyles(theme)
 
 	// Initialize help with theme-matching styles
@@ -76,9 +74,7 @@ func NewModel(taskService *task.Service, areaService *area.Service, projectServi
 	helpModel.Styles.ShortSeparator = theme.Muted
 
 	return Model{
-		taskService:      taskService,
-		areaService:      areaService,
-		projectService:   projectService,
+		app:              application,
 		config:           cfg,
 		styles:           styles,
 		gap:              1, // Default gap, adjusted on resize
@@ -119,7 +115,7 @@ func (m Model) Init() tea.Cmd {
 // loadDataMsg carries loaded data
 type loadDataMsg struct {
 	areas    []area.Area
-	projects []project.ProjectWithArea
+	projects []task.Task
 	tags     []string
 	tasks    []task.Task
 	err      error
@@ -127,17 +123,17 @@ type loadDataMsg struct {
 
 // loadData fetches initial data
 func (m Model) loadData() tea.Msg {
-	areas, err := m.areaService.List()
+	areas, err := m.app.ListAreas.Execute()
 	if err != nil {
 		return loadDataMsg{err: err}
 	}
 
-	projects, err := m.projectService.ListWithArea()
+	projects, err := m.app.ListProjectsWithArea.Execute()
 	if err != nil {
 		return loadDataMsg{err: err}
 	}
 
-	tags, err := m.taskService.ListTags()
+	tags, err := m.app.ListTags.Execute()
 	if err != nil {
 		return loadDataMsg{err: err}
 	}
@@ -145,7 +141,7 @@ func (m Model) loadData() tea.Msg {
 	// Load today's tasks by default with sort from config
 	sortStr := m.config.GetSort("today")
 	sortOpts, _ := task.ParseSort(sortStr)
-	tasks, err := m.taskService.List(&task.ListOptions{Schedule: "today", Sort: sortOpts})
+	tasks, err := m.app.ListTasks.Execute(&task.ListOptions{Schedule: "today", Sort: sortOpts})
 	if err != nil {
 		return loadDataMsg{err: err}
 	}
@@ -679,7 +675,7 @@ func (m Model) loadTasksForSelection() tea.Msg {
 	opts := m.buildListOptions(item)
 	opts.Sort = sortOpts
 
-	tasks, err := m.taskService.List(opts)
+	tasks, err := m.app.ListTasks.Execute(opts)
 	if err != nil {
 		return tasksLoadedMsg{err: err}
 	}
@@ -724,7 +720,7 @@ func (m Model) loadScheduleGroups(item SidebarItem, title string, sortOpts []tas
 		opts.Schedule = sched.schedule
 		opts.Sort = sortOpts
 
-		tasks, err := m.taskService.List(opts)
+		tasks, err := m.app.ListTasks.Execute(opts)
 		if err != nil {
 			return scheduleTasksLoadedMsg{err: err}
 		}
@@ -737,7 +733,7 @@ func (m Model) loadScheduleGroups(item SidebarItem, title string, sortOpts []tas
 // renameTask creates a command to rename a task
 func (m Model) renameTask(taskID int64, newTitle string) tea.Cmd {
 	return func() tea.Msg {
-		updated, err := m.taskService.SetTitle(taskID, newTitle)
+		updated, err := m.app.SetTaskTitle.Execute(taskID, newTitle)
 		return taskRenamedMsg{task: updated, err: err}
 	}
 }
@@ -750,9 +746,9 @@ func (m Model) moveTask(taskID int64, itemType, name string) tea.Cmd {
 
 		switch itemType {
 		case "project":
-			updated, err = m.taskService.SetProject(taskID, name)
+			updated, err = m.app.SetTaskProject.Execute(taskID, name)
 		case "area":
-			updated, err = m.taskService.SetArea(taskID, name)
+			updated, err = m.app.SetTaskArea.Execute(taskID, name)
 		}
 
 		return taskMovedMsg{task: updated, err: err}
@@ -767,9 +763,9 @@ func (m Model) setTaskDate(taskID int64, date *time.Time, mode DateModalMode) te
 
 		switch mode {
 		case DateModalPlanned:
-			updated, err = m.taskService.SetPlannedDate(taskID, date)
+			updated, err = m.app.SetPlannedDate.Execute(taskID, date)
 		case DateModalDue:
-			updated, err = m.taskService.SetDueDate(taskID, date)
+			updated, err = m.app.SetDueDate.Execute(taskID, date)
 		}
 
 		return taskDateUpdatedMsg{task: updated, err: err}
@@ -788,7 +784,7 @@ func (m Model) createTask(result *AddResult) tea.Cmd {
 			Tags:        result.Tags,
 		}
 
-		created, err := m.taskService.Create(result.Title, opts)
+		created, err := m.app.CreateTask.Execute(result.Title, opts)
 		return taskCreatedMsg{task: created, err: err}
 	}
 }
@@ -799,11 +795,11 @@ func (m Model) toggleTask(taskID int64, currentStatus task.Status) tea.Cmd {
 		var err error
 		if currentStatus == task.StatusDone {
 			// Uncomplete the task
-			_, err = m.taskService.Uncomplete([]int64{taskID})
+			_, err = m.app.UncompleteTasks.Execute([]int64{taskID})
 			return taskToggledMsg{taskID: taskID, done: false, err: err}
 		}
 		// Complete the task
-		_, err = m.taskService.Complete([]int64{taskID})
+		_, err = m.app.CompleteTasks.Execute([]int64{taskID})
 		return taskToggledMsg{taskID: taskID, done: true, err: err}
 	}
 }
@@ -811,7 +807,7 @@ func (m Model) toggleTask(taskID int64, currentStatus task.Status) tea.Cmd {
 // setTaskTags creates a command to set a task's tags
 func (m Model) setTaskTags(taskID int64, tags []string) tea.Cmd {
 	return func() tea.Msg {
-		updated, err := m.taskService.SetTags(taskID, tags)
+		updated, err := m.app.SetTags.Execute(taskID, tags)
 		return taskTagsUpdatedMsg{task: updated, err: err}
 	}
 }
@@ -819,7 +815,7 @@ func (m Model) setTaskTags(taskID int64, tags []string) tea.Cmd {
 // setTaskDescription creates a command to set a task's description
 func (m Model) setTaskDescription(taskID int64, description *string) tea.Cmd {
 	return func() tea.Msg {
-		updated, err := m.taskService.SetDescription(taskID, description)
+		updated, err := m.app.SetTaskDescription.Execute(taskID, description)
 		return taskDescriptionUpdatedMsg{task: updated, err: err}
 	}
 }
@@ -963,7 +959,7 @@ func (m Model) openDetailFieldModal() (tea.Model, tea.Cmd) {
 // loadDataAfterTagUpdate reloads tags and current tasks
 func (m Model) loadDataAfterTagUpdate() tea.Msg {
 	// Reload tags list (may have new tags)
-	tags, err := m.taskService.ListTags()
+	tags, err := m.app.ListTags.Execute()
 	if err != nil {
 		return loadDataMsg{err: err}
 	}
@@ -979,7 +975,7 @@ func (m Model) loadDataAfterTagUpdate() tea.Msg {
 	opts := m.buildListOptions(item)
 	opts.Sort = sortOpts
 
-	tasks, err := m.taskService.List(opts)
+	tasks, err := m.app.ListTasks.Execute(opts)
 	if err != nil {
 		return loadDataMsg{err: err}
 	}

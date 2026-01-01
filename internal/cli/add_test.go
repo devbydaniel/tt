@@ -5,10 +5,8 @@ import (
 	"testing"
 
 	"github.com/devbydaniel/tt/config"
+	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/cli"
-	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/project"
-	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/testutil"
 )
 
@@ -16,20 +14,11 @@ func setupCLI(t *testing.T) *cli.Dependencies {
 	t.Helper()
 	db := testutil.NewTestDB(t)
 
-	areaRepo := area.NewRepository(db)
-	areaSvc := area.NewService(areaRepo)
-
-	projectRepo := project.NewRepository(db)
-	projectSvc := project.NewService(projectRepo, areaSvc)
-
-	taskRepo := task.NewRepository(db)
-	taskSvc := task.NewService(taskRepo, projectSvc, areaSvc)
+	application := app.New(db)
 
 	return &cli.Dependencies{
-		TaskService:    taskSvc,
-		AreaService:    areaSvc,
-		ProjectService: projectSvc,
-		Config:         &config.Config{},
+		App:    application,
+		Config: &config.Config{},
 	}
 }
 
@@ -37,7 +26,7 @@ func TestAddWithPlannedShorthand(t *testing.T) {
 	deps := setupCLI(t)
 
 	// Create an area first
-	_, err := deps.AreaService.Create("work")
+	_, err := deps.App.CreateArea.Execute("work")
 	if err != nil {
 		t.Fatalf("failed to create area: %v", err)
 	}
@@ -55,7 +44,7 @@ func TestAddWithPlannedShorthand(t *testing.T) {
 	}
 
 	// Verify task was created with correct area
-	tasks, err := deps.TaskService.List(nil)
+	tasks, err := deps.App.ListTasks.Execute(nil)
 	if err != nil {
 		t.Fatalf("list failed: %v", err)
 	}
@@ -71,8 +60,8 @@ func TestAddWithPlannedShorthand(t *testing.T) {
 	if tasks[0].PlannedDate == nil {
 		t.Error("PlannedDate should be set")
 	}
-	if tasks[0].ProjectID != nil {
-		t.Error("ProjectID should be nil when only area is specified")
+	if tasks[0].ParentID != nil {
+		t.Error("ParentID should be nil when only area is specified")
 	}
 }
 
@@ -80,7 +69,7 @@ func TestAddWithAreaAndPlannedLongFlag(t *testing.T) {
 	deps := setupCLI(t)
 
 	// Create an area first
-	_, err := deps.AreaService.Create("personal")
+	_, err := deps.App.CreateArea.Execute("personal")
 	if err != nil {
 		t.Fatalf("failed to create area: %v", err)
 	}
@@ -98,7 +87,7 @@ func TestAddWithAreaAndPlannedLongFlag(t *testing.T) {
 	}
 
 	// Verify task was created
-	tasks, err := deps.TaskService.List(nil)
+	tasks, err := deps.App.ListTasks.Execute(nil)
 	if err != nil {
 		t.Fatalf("list failed: %v", err)
 	}
@@ -117,11 +106,11 @@ func TestAddCannotSpecifyBothProjectAndArea(t *testing.T) {
 	deps := setupCLI(t)
 
 	// Create both project and area
-	_, err := deps.AreaService.Create("health")
+	_, err := deps.App.CreateArea.Execute("health")
 	if err != nil {
 		t.Fatalf("failed to create area: %v", err)
 	}
-	_, err = deps.ProjectService.Create("work", "")
+	_, err = deps.App.CreateProject.Execute("work", nil)
 	if err != nil {
 		t.Fatalf("failed to create project: %v", err)
 	}
@@ -144,7 +133,7 @@ func TestAddWithTodayShorthand(t *testing.T) {
 	deps := setupCLI(t)
 
 	// Create an area first
-	_, err := deps.AreaService.Create("work")
+	_, err := deps.App.CreateArea.Execute("work")
 	if err != nil {
 		t.Fatalf("failed to create area: %v", err)
 	}
@@ -162,7 +151,7 @@ func TestAddWithTodayShorthand(t *testing.T) {
 	}
 
 	// Verify task was created with planned date set to today
-	tasks, err := deps.TaskService.List(nil)
+	tasks, err := deps.App.ListTasks.Execute(nil)
 	if err != nil {
 		t.Fatalf("list failed: %v", err)
 	}

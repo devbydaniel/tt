@@ -16,7 +16,7 @@ type Content struct {
 	title          string
 	displayTasks   []task.Task      // tasks in display order (computed once when set)
 	taskSchedules  map[int64]string // task ID -> schedule name (for schedule grouping)
-	groupBy        string           // grouping mode: none, project, area, date, schedule
+	groupBy        string           // grouping mode: none, scope, date, schedule
 	hideScope      bool             // whether to hide the project/area column
 	width          int
 	height         int
@@ -131,10 +131,8 @@ func (c Content) buildTaskList() string {
 	}
 
 	switch c.groupBy {
-	case "project":
-		return c.buildGroupedByProject()
-	case "area":
-		return c.buildGroupedByArea()
+	case "scope":
+		return c.buildGroupedByScope()
 	case "date":
 		return c.buildGroupedByDate()
 	case "schedule":
@@ -153,29 +151,19 @@ func (c Content) buildFlatTaskList() string {
 	return strings.Join(rows, "\n")
 }
 
-// buildGroupedByProject groups tasks by "Area > Project" hierarchy
-func (c Content) buildGroupedByProject() string {
+// buildGroupedByScope groups tasks by scope ("Area > Project", "Area", or "Project")
+func (c Content) buildGroupedByScope() string {
 	return c.buildGroupedList(func(t *task.Task) string {
-		if t.ProjectName == nil {
+		if t.ParentName == nil {
 			if t.AreaName == nil {
-				return "No Project"
+				return "No Scope"
 			}
 			return *t.AreaName
 		}
 		if t.AreaName != nil {
-			return *t.AreaName + " > " + *t.ProjectName
+			return *t.AreaName + " > " + *t.ParentName
 		}
-		return *t.ProjectName
-	})
-}
-
-// buildGroupedByArea groups tasks by area
-func (c Content) buildGroupedByArea() string {
-	return c.buildGroupedList(func(t *task.Task) string {
-		if t.AreaName == nil {
-			return "No Area"
-		}
-		return *t.AreaName
+		return *t.ParentName
 	})
 }
 
@@ -372,7 +360,7 @@ func (c Content) renderTaskRow(t *task.Task, index int) string {
 	id := theme.ID.Render(fmt.Sprintf("%d", t.ID))
 
 	// Scope: "area > project" or just one
-	scope := c.formatScope(t.AreaName, t.ProjectName)
+	scope := c.formatScope(t.AreaName, t.ParentName)
 	if scope != "" {
 		scope = theme.Scope.Render(scope)
 	}
@@ -559,25 +547,18 @@ func (c Content) selectedTaskLine() int {
 	// For grouped lists, count headers and blank lines
 	var getGroup func(*task.Task) string
 	switch c.groupBy {
-	case "project":
+	case "scope":
 		getGroup = func(t *task.Task) string {
-			if t.ProjectName == nil {
+			if t.ParentName == nil {
 				if t.AreaName == nil {
-					return "No Project"
+					return "No Scope"
 				}
 				return *t.AreaName
 			}
 			if t.AreaName != nil {
-				return *t.AreaName + " > " + *t.ProjectName
+				return *t.AreaName + " > " + *t.ParentName
 			}
-			return *t.ProjectName
-		}
-	case "area":
-		getGroup = func(t *task.Task) string {
-			if t.AreaName == nil {
-				return "No Area"
-			}
-			return *t.AreaName
+			return *t.ParentName
 		}
 	case "schedule":
 		getGroup = func(t *task.Task) string {
@@ -669,10 +650,8 @@ func (c Content) UpdateTaskStatus(taskID int64, done bool) Content {
 // computeDisplayOrder returns tasks sorted by the given grouping mode
 func (c Content) computeDisplayOrder(tasks []task.Task, groupBy string) []task.Task {
 	switch groupBy {
-	case "project":
-		return c.orderByProject(tasks)
-	case "area":
-		return c.orderByArea(tasks)
+	case "scope":
+		return c.orderByScope(tasks)
 	case "date":
 		return c.orderByDate(tasks)
 	default:
@@ -680,29 +659,29 @@ func (c Content) computeDisplayOrder(tasks []task.Task, groupBy string) []task.T
 	}
 }
 
-// orderByProject sorts tasks by project grouping
-func (c Content) orderByProject(tasks []task.Task) []task.Task {
-	noProjectNoArea := make([]task.Task, 0)
+// orderByScope sorts tasks by scope grouping
+func (c Content) orderByScope(tasks []task.Task) []task.Task {
+	noScope := make([]task.Task, 0)
 	groups := make(map[string][]task.Task)
 
 	for _, t := range tasks {
-		if t.ProjectName == nil {
+		if t.ParentName == nil {
 			if t.AreaName == nil {
-				noProjectNoArea = append(noProjectNoArea, t)
+				noScope = append(noScope, t)
 			} else {
 				groups[*t.AreaName] = append(groups[*t.AreaName], t)
 			}
 			continue
 		}
-		header := *t.ProjectName
+		header := *t.ParentName
 		if t.AreaName != nil {
-			header = *t.AreaName + " > " + *t.ProjectName
+			header = *t.AreaName + " > " + *t.ParentName
 		}
 		groups[header] = append(groups[header], t)
 	}
 
 	var result []task.Task
-	result = append(result, noProjectNoArea...)
+	result = append(result, noScope...)
 
 	headers := make([]string, 0, len(groups))
 	for h := range groups {
@@ -712,34 +691,6 @@ func (c Content) orderByProject(tasks []task.Task) []task.Task {
 
 	for _, header := range headers {
 		result = append(result, groups[header]...)
-	}
-	return result
-}
-
-// orderByArea sorts tasks by area grouping
-func (c Content) orderByArea(tasks []task.Task) []task.Task {
-	noArea := make([]task.Task, 0)
-	areaGroups := make(map[string][]task.Task)
-
-	for _, t := range tasks {
-		if t.AreaName == nil {
-			noArea = append(noArea, t)
-		} else {
-			areaGroups[*t.AreaName] = append(areaGroups[*t.AreaName], t)
-		}
-	}
-
-	var result []task.Task
-	result = append(result, noArea...)
-
-	areaNames := make([]string, 0, len(areaGroups))
-	for name := range areaGroups {
-		areaNames = append(areaNames, name)
-	}
-	sort.Strings(areaNames)
-
-	for _, aName := range areaNames {
-		result = append(result, areaGroups[aName]...)
 	}
 	return result
 }

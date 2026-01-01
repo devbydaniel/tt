@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/project"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/recurparse"
 )
@@ -50,7 +49,7 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 }
 
 // GroupedTaskList displays tasks grouped by the specified field.
-// groupBy can be: "project", "area", "date", or "none" (falls back to TaskList)
+// groupBy can be: "scope", "date", or "none" (falls back to TaskList)
 func (f *Formatter) GroupedTaskList(tasks []task.Task, groupBy string) {
 	if groupBy == "none" || groupBy == "" {
 		f.TaskList(tasks)
@@ -63,10 +62,8 @@ func (f *Formatter) GroupedTaskList(tasks []task.Task, groupBy string) {
 	}
 
 	switch groupBy {
-	case "project":
-		f.groupedByProject(tasks)
-	case "area":
-		f.groupedByArea(tasks)
+	case "scope":
+		f.groupedByScope(tasks)
 	case "date":
 		f.groupedByDate(tasks)
 	default:
@@ -74,23 +71,23 @@ func (f *Formatter) GroupedTaskList(tasks []task.Task, groupBy string) {
 	}
 }
 
-// groupedByProject displays tasks grouped by "Area > Project"
+// groupedByScope displays tasks grouped by scope ("Area > Project", "Area", or "Project")
 // Tasks with area but no project appear under just the area name,
 // sorted before "Area > Project" groups (alphabetically, area-only headers come first)
-func (f *Formatter) groupedByProject(tasks []task.Task) {
+func (f *Formatter) groupedByScope(tasks []task.Task) {
 	idWidth := maxIDWidth(tasks)
 
 	// Group tasks:
-	// - No area, no project -> "No Project"
+	// - No area, no project -> "No Scope"
 	// - Area but no project -> area name (e.g., "Work")
 	// - Project -> "Area > Project" or just "Project"
-	noProjectNoAreaTasks := make([]task.Task, 0)
+	noScopeTasks := make([]task.Task, 0)
 	groups := make(map[string][]task.Task)
 
 	for _, t := range tasks {
-		if t.ProjectName == nil {
+		if t.ParentName == nil {
 			if t.AreaName == nil {
-				noProjectNoAreaTasks = append(noProjectNoAreaTasks, t)
+				noScopeTasks = append(noScopeTasks, t)
 			} else {
 				// Area but no project - use area name as header
 				groups[*t.AreaName] = append(groups[*t.AreaName], t)
@@ -99,17 +96,17 @@ func (f *Formatter) groupedByProject(tasks []task.Task) {
 		}
 
 		// Build header: "Area > Project" or just "Project"
-		header := *t.ProjectName
+		header := *t.ParentName
 		if t.AreaName != nil {
-			header = *t.AreaName + " > " + *t.ProjectName
+			header = *t.AreaName + " > " + *t.ParentName
 		}
 		groups[header] = append(groups[header], t)
 	}
 
-	// Render: No Project (no area) first
-	if len(noProjectNoAreaTasks) > 0 {
-		fmt.Fprintln(f.w, f.theme.Header.Render("No Project"))
-		f.renderTaskRows(noProjectNoAreaTasks, 0, false, idWidth)
+	// Render: No Scope first
+	if len(noScopeTasks) > 0 {
+		fmt.Fprintln(f.w, f.theme.Header.Render("No Scope"))
+		f.renderTaskRows(noScopeTasks, 0, false, idWidth)
 	}
 
 	// Render groups alphabetically
@@ -123,41 +120,6 @@ func (f *Formatter) groupedByProject(tasks []task.Task) {
 	for _, header := range headers {
 		fmt.Fprintln(f.w, f.theme.Header.Render(header))
 		f.renderTaskRows(groups[header], 0, false, idWidth)
-	}
-}
-
-// groupedByArea displays tasks grouped by area
-func (f *Formatter) groupedByArea(tasks []task.Task) {
-	idWidth := maxIDWidth(tasks)
-
-	// Group by area
-	noAreaTasks := make([]task.Task, 0)
-	areaGroups := make(map[string][]task.Task)
-
-	for _, t := range tasks {
-		if t.AreaName == nil {
-			noAreaTasks = append(noAreaTasks, t)
-		} else {
-			areaGroups[*t.AreaName] = append(areaGroups[*t.AreaName], t)
-		}
-	}
-
-	// Render: No Area first
-	if len(noAreaTasks) > 0 {
-		fmt.Fprintln(f.w, f.theme.Header.Render("No Area"))
-		f.renderTaskRows(noAreaTasks, 0, true, idWidth)
-	}
-
-	// Render areas alphabetically
-	areaNames := make([]string, 0, len(areaGroups))
-	for name := range areaGroups {
-		areaNames = append(areaNames, name)
-	}
-	sort.Strings(areaNames)
-
-	for _, aName := range areaNames {
-		fmt.Fprintln(f.w, f.theme.Header.Render(aName))
-		f.renderTaskRows(areaGroups[aName], 0, true, idWidth)
 	}
 }
 
@@ -272,7 +234,7 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 		// Task title with optional scope prefix
 		title := ""
 		if showScope {
-			scope := formatScope(t.AreaName, t.ProjectName)
+			scope := formatScope(t.AreaName, t.ParentName)
 			if scope != "" {
 				title = f.theme.Scope.Render(scope) + "  "
 			}
@@ -499,10 +461,8 @@ func (f *Formatter) GroupedLogbook(tasks []task.Task, groupBy string) {
 	}
 
 	switch groupBy {
-	case "project":
-		f.logbookByProject(tasks)
-	case "area":
-		f.logbookByArea(tasks)
+	case "scope":
+		f.logbookByScope(tasks)
 	case "date":
 		f.logbookByDate(tasks)
 	default:
@@ -510,30 +470,30 @@ func (f *Formatter) GroupedLogbook(tasks []task.Task, groupBy string) {
 	}
 }
 
-func (f *Formatter) logbookByProject(tasks []task.Task) {
-	noProjectNoAreaTasks := make([]task.Task, 0)
+func (f *Formatter) logbookByScope(tasks []task.Task) {
+	noScopeTasks := make([]task.Task, 0)
 	groups := make(map[string][]task.Task)
 
 	for _, t := range tasks {
-		if t.ProjectName == nil {
+		if t.ParentName == nil {
 			if t.AreaName == nil {
-				noProjectNoAreaTasks = append(noProjectNoAreaTasks, t)
+				noScopeTasks = append(noScopeTasks, t)
 			} else {
 				groups[*t.AreaName] = append(groups[*t.AreaName], t)
 			}
 			continue
 		}
 
-		header := *t.ProjectName
+		header := *t.ParentName
 		if t.AreaName != nil {
-			header = *t.AreaName + " > " + *t.ProjectName
+			header = *t.AreaName + " > " + *t.ParentName
 		}
 		groups[header] = append(groups[header], t)
 	}
 
-	if len(noProjectNoAreaTasks) > 0 {
-		fmt.Fprintln(f.w, f.theme.Header.Render("No Project"))
-		f.renderLogbookRows(noProjectNoAreaTasks)
+	if len(noScopeTasks) > 0 {
+		fmt.Fprintln(f.w, f.theme.Header.Render("No Scope"))
+		f.renderLogbookRows(noScopeTasks)
 	}
 
 	headers := make([]string, 0, len(groups))
@@ -545,35 +505,6 @@ func (f *Formatter) logbookByProject(tasks []task.Task) {
 	for _, header := range headers {
 		fmt.Fprintln(f.w, f.theme.Header.Render(header))
 		f.renderLogbookRows(groups[header])
-	}
-}
-
-func (f *Formatter) logbookByArea(tasks []task.Task) {
-	noAreaTasks := make([]task.Task, 0)
-	areaGroups := make(map[string][]task.Task)
-
-	for _, t := range tasks {
-		if t.AreaName == nil {
-			noAreaTasks = append(noAreaTasks, t)
-		} else {
-			areaGroups[*t.AreaName] = append(areaGroups[*t.AreaName], t)
-		}
-	}
-
-	if len(noAreaTasks) > 0 {
-		fmt.Fprintln(f.w, f.theme.Header.Render("No Area"))
-		f.renderLogbookRows(noAreaTasks)
-	}
-
-	areaNames := make([]string, 0, len(areaGroups))
-	for name := range areaGroups {
-		areaNames = append(areaNames, name)
-	}
-	sort.Strings(areaNames)
-
-	for _, aName := range areaNames {
-		fmt.Fprintln(f.w, f.theme.Header.Render(aName))
-		f.renderLogbookRows(areaGroups[aName])
 	}
 }
 
@@ -631,22 +562,22 @@ func (f *Formatter) AreaDeleted(a *area.Area) {
 	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted area: %s", a.Name)))
 }
 
-func (f *Formatter) ProjectCreated(p *project.Project) {
-	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Created project: %s", p.Name)))
+func (f *Formatter) ProjectCreated(p *task.Task) {
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Created project: %s", p.Title)))
 }
 
-func (f *Formatter) ProjectList(projects []project.Project) {
+func (f *Formatter) ProjectList(projects []task.Task) {
 	if len(projects) == 0 {
 		fmt.Fprintln(f.w, "No projects")
 		return
 	}
 
 	for _, p := range projects {
-		fmt.Fprintln(f.w, p.Name)
+		fmt.Fprintln(f.w, p.Title)
 	}
 }
 
-func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, groupBy string) {
+func (f *Formatter) ProjectListGrouped(projects []task.Task, groupBy string) {
 	if groupBy != "area" || groupBy == "" {
 		// Fall back to simple list
 		if len(projects) == 0 {
@@ -654,7 +585,7 @@ func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, group
 			return
 		}
 		for _, p := range projects {
-			fmt.Fprintln(f.w, p.Name)
+			fmt.Fprintln(f.w, p.Title)
 		}
 		return
 	}
@@ -665,8 +596,8 @@ func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, group
 	}
 
 	// Group projects by area
-	noAreaProjects := make([]project.ProjectWithArea, 0)
-	areaGroups := make(map[string][]project.ProjectWithArea)
+	noAreaProjects := make([]task.Task, 0)
+	areaGroups := make(map[string][]task.Task)
 
 	for _, p := range projects {
 		if p.AreaName == nil {
@@ -680,7 +611,7 @@ func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, group
 	if len(noAreaProjects) > 0 {
 		fmt.Fprintln(f.w, f.theme.Header.Render("No Area"))
 		for _, p := range noAreaProjects {
-			fmt.Fprintf(f.w, "  %s\n", p.Name)
+			fmt.Fprintf(f.w, "  %s\n", p.Title)
 		}
 	}
 
@@ -694,13 +625,13 @@ func (f *Formatter) ProjectListGrouped(projects []project.ProjectWithArea, group
 	for _, aName := range areaNames {
 		fmt.Fprintln(f.w, f.theme.Header.Render(aName))
 		for _, p := range areaGroups[aName] {
-			fmt.Fprintf(f.w, "  %s\n", p.Name)
+			fmt.Fprintf(f.w, "  %s\n", p.Title)
 		}
 	}
 }
 
-func (f *Formatter) ProjectDeleted(p *project.Project) {
-	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted project: %s", p.Name)))
+func (f *Formatter) ProjectDeleted(p *task.Task) {
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted project: %s", p.Title)))
 }
 
 func (f *Formatter) AreaRenamed(oldName, newName string) {
@@ -711,12 +642,12 @@ func (f *Formatter) ProjectRenamed(oldName, newName string) {
 	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Renamed project: %s -> %s", oldName, newName)))
 }
 
-func (f *Formatter) ProjectMoved(p *project.Project, areaName string) {
-	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Moved project '%s' to area: %s", p.Name, areaName)))
+func (f *Formatter) ProjectMoved(p *task.Task, areaName string) {
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Moved project '%s' to area: %s", p.Title, areaName)))
 }
 
-func (f *Formatter) ProjectAreaCleared(p *project.Project) {
-	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Cleared area from project: %s", p.Name)))
+func (f *Formatter) ProjectAreaCleared(p *task.Task) {
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Cleared area from project: %s", p.Title)))
 }
 
 func (f *Formatter) TaskPlannedDateSet(t *task.Task) {

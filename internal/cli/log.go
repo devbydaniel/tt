@@ -26,7 +26,7 @@ func NewLogCmd(deps *Dependencies) *cobra.Command {
 				since = &parsed
 			}
 
-			tasks, err := deps.TaskService.ListCompleted(since)
+			tasks, err := deps.App.ListCompletedTasks.Execute(since)
 			if err != nil {
 				return err
 			}
@@ -47,7 +47,7 @@ func NewLogCmd(deps *Dependencies) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&sinceStr, "since", "", "Show tasks completed since date (YYYY-MM-DD)")
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: scope, date, none")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 
 	return cmd

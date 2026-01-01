@@ -22,7 +22,7 @@ func NewInboxCmd(deps *Dependencies) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: scope, date, none")
 	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
@@ -41,7 +41,7 @@ func NewTodayCmd(deps *Dependencies) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: scope, date, none")
 	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
@@ -60,7 +60,7 @@ func NewUpcomingCmd(deps *Dependencies) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: scope, date, none")
 	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
@@ -79,7 +79,7 @@ func NewAnytimeCmd(deps *Dependencies) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: scope, date, none")
 	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
@@ -98,7 +98,7 @@ func NewSomedayCmd(deps *Dependencies) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: project, area, date, none")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group tasks by: scope, date, none")
 	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
@@ -115,7 +115,7 @@ func NewRenameCmd(deps *Dependencies) *cobra.Command {
 				return errors.New("invalid task ID: " + args[0])
 			}
 
-			if _, err := deps.TaskService.SetTitle(id, args[1]); err != nil {
+			if _, err := deps.App.SetTaskTitle.Execute(id, args[1]); err != nil {
 				return err
 			}
 

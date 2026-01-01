@@ -34,7 +34,7 @@ Examples:
 			}
 
 			if clear {
-				t, err := deps.TaskService.SetDueDate(id, nil)
+				t, err := deps.App.SetDueDate.Execute(id, nil)
 				if err != nil {
 					return err
 				}
@@ -52,7 +52,7 @@ Examples:
 				return err
 			}
 
-			t, err := deps.TaskService.SetDueDate(id, &date)
+			t, err := deps.App.SetDueDate.Execute(id, &date)
 			if err != nil {
 				return err
 			}

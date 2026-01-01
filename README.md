@@ -93,8 +93,7 @@ tt list --tag urgent
 
 # Group output
 tt list --group=schedule  # Group by schedule (Today, Upcoming, Anytime, Someday)
-tt list --group=project   # Group by Area > Project
-tt list --group=area      # Group by area
+tt list --group=scope     # Group by scope (Area, Area > Project, or Project)
 tt list --group=date      # Group by date (Overdue, Today, Tomorrow, etc.)
 tt list --group=none      # Flat list (default)
 
@@ -303,12 +302,12 @@ data_dir = "/path/to/data"
 
 # Global defaults for all list views
 sort = "created"       # created, title, planned, due, id, project, area
-group = "project"      # project, area, date, none
+group = "scope"        # scope, date, none
 
 # Per-list overrides
 [today]
 sort = "planned"
-group = "project"
+group = "scope"
 
 [upcoming]
 sort = "planned:asc"

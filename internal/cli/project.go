@@ -2,7 +2,9 @@ package cli
 
 import (
 	"os"
+	"time"
 
+	"github.com/devbydaniel/tt/internal/domain/task/usecases"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -37,20 +39,7 @@ func newProjectListCmd(deps *Dependencies) *cobra.Command {
 				groupBy = deps.Config.GetGroup("project-list")
 			}
 
-			if groupBy == "area" {
-				projects, err := deps.ProjectService.ListWithArea()
-				if err != nil {
-					return err
-				}
-				if jsonOutput {
-					return output.WriteJSON(os.Stdout, projects)
-				}
-				formatter := output.NewFormatter(os.Stdout, deps.Theme)
-				formatter.ProjectListGrouped(projects, groupBy)
-				return nil
-			}
-
-			projects, err := deps.ProjectService.List()
+			projects, err := deps.App.ListProjectsWithArea.Execute()
 			if err != nil {
 				return err
 			}
@@ -58,7 +47,11 @@ func newProjectListCmd(deps *Dependencies) *cobra.Command {
 				return output.WriteJSON(os.Stdout, projects)
 			}
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			formatter.ProjectList(projects)
+			if groupBy == "area" {
+				formatter.ProjectListGrouped(projects, groupBy)
+			} else {
+				formatter.ProjectList(projects)
+			}
 			return nil
 		},
 	}
@@ -71,13 +64,38 @@ func newProjectListCmd(deps *Dependencies) *cobra.Command {
 
 func newProjectAddCmd(deps *Dependencies) *cobra.Command {
 	var areaName string
+	var plannedStr string
+	var dueStr string
+	var someday bool
+	var description string
 
 	cmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Create a new project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			project, err := deps.ProjectService.Create(args[0], areaName)
+			opts := &usecases.CreateProjectOptions{
+				AreaName:    areaName,
+				Description: description,
+				Someday:     someday,
+			}
+
+			if plannedStr != "" {
+				t, err := parseDate(plannedStr)
+				if err != nil {
+					return err
+				}
+				opts.PlannedDate = &t
+			}
+			if dueStr != "" {
+				t, err := parseDate(dueStr)
+				if err != nil {
+					return err
+				}
+				opts.DueDate = &t
+			}
+
+			project, err := deps.App.CreateProject.Execute(args[0], opts)
 			if err != nil {
 				return err
 			}
@@ -89,6 +107,10 @@ func newProjectAddCmd(deps *Dependencies) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&areaName, "area", "", "Assign to area")
+	cmd.Flags().StringVarP(&plannedStr, "planned", "p", "", "Set planned date (YYYY-MM-DD or 'today', 'tomorrow', etc.)")
+	cmd.Flags().StringVarP(&dueStr, "due", "d", "", "Set due date (YYYY-MM-DD or 'today', 'tomorrow', etc.)")
+	cmd.Flags().BoolVarP(&someday, "someday", "s", false, "Create in someday state")
+	cmd.Flags().StringVar(&description, "desc", "", "Set project description")
 
 	// Register area completion
 	registry := NewCompletionRegistry(deps)
@@ -103,7 +125,14 @@ func newProjectDeleteCmd(deps *Dependencies) *cobra.Command {
 		Short: "Delete a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			project, err := deps.ProjectService.Delete(args[0])
+			// Look up project by name
+			project, err := deps.App.GetProjectByName.Execute(args[0])
+			if err != nil {
+				return err
+			}
+
+			// Delete the project (and its children via cascade)
+			_, err = deps.App.DeleteTasks.Execute([]int64{project.ID})
 			if err != nil {
 				return err
 			}
@@ -130,7 +159,14 @@ func newProjectRenameCmd(deps *Dependencies) *cobra.Command {
 			oldName := args[0]
 			newName := args[1]
 
-			_, err := deps.ProjectService.Rename(oldName, newName)
+			// Look up project by name
+			project, err := deps.App.GetProjectByName.Execute(oldName)
+			if err != nil {
+				return err
+			}
+
+			// Rename using SetTaskTitle
+			_, err = deps.App.SetTaskTitle.Execute(project.ID, newName)
 			if err != nil {
 				return err
 			}
@@ -160,8 +196,15 @@ func newProjectMoveCmd(deps *Dependencies) *cobra.Command {
 			projectName := args[0]
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 
+			// Look up project by name
+			project, err := deps.App.GetProjectByName.Execute(projectName)
+			if err != nil {
+				return err
+			}
+
 			if clearArea {
-				project, err := deps.ProjectService.ClearArea(projectName)
+				// Clear area using SetTaskArea with empty string
+				project, err = deps.App.SetTaskArea.Execute(project.ID, "")
 				if err != nil {
 					return err
 				}
@@ -173,7 +216,8 @@ func newProjectMoveCmd(deps *Dependencies) *cobra.Command {
 				return cmd.Help()
 			}
 
-			project, err := deps.ProjectService.SetArea(projectName, areaName)
+			// Set area using SetTaskArea
+			project, err = deps.App.SetTaskArea.Execute(project.ID, areaName)
 			if err != nil {
 				return err
 			}
@@ -194,3 +238,17 @@ func newProjectMoveCmd(deps *Dependencies) *cobra.Command {
 	return cmd
 }
 
+// parseDate parses a date string in various formats
+func parseDate(s string) (time.Time, error) {
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+
+	switch s {
+	case "today":
+		return today, nil
+	case "tomorrow":
+		return today.AddDate(0, 0, 1), nil
+	default:
+		return time.Parse("2006-01-02", s)
+	}
+}

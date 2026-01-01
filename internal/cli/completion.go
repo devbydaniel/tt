@@ -22,15 +22,15 @@ func NewCompletionRegistry(deps *Dependencies) *CompletionRegistry {
 // ProjectCompletion returns a completion function for project names
 func (r *CompletionRegistry) ProjectCompletion() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		projects, err := r.deps.ProjectService.List()
+		projects, err := r.deps.App.ListProjects.Execute()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
 
 		var completions []string
 		for _, p := range projects {
-			if strings.HasPrefix(strings.ToLower(p.Name), strings.ToLower(toComplete)) {
-				completions = append(completions, p.Name)
+			if strings.HasPrefix(strings.ToLower(p.Title), strings.ToLower(toComplete)) {
+				completions = append(completions, p.Title)
 			}
 		}
 
@@ -41,7 +41,7 @@ func (r *CompletionRegistry) ProjectCompletion() func(*cobra.Command, []string, 
 // AreaCompletion returns a completion function for area names
 func (r *CompletionRegistry) AreaCompletion() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		areas, err := r.deps.AreaService.List()
+		areas, err := r.deps.App.ListAreas.Execute()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}

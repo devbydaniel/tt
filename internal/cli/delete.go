@@ -24,7 +24,7 @@ func NewDeleteCmd(deps *Dependencies) *cobra.Command {
 				ids = append(ids, id)
 			}
 
-			deleted, err := deps.TaskService.Delete(ids)
+			deleted, err := deps.App.DeleteTasks.Execute(ids)
 			if err != nil {
 				return err
 			}
