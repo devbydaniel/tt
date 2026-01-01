@@ -46,7 +46,7 @@ tt
 tt add "Buy groceries"
 tt add "Submit report" --due friday
 tt today                  # See today's tasks
-tt done 1                 # Mark a task done
+tt do 1                   # Mark a task done
 tt --help                 # See all commands
 ```
 
@@ -74,6 +74,7 @@ tt add "Someday task" --someday
 - `--area, -a` - Assign to area
 - `--tag, -t` - Add tag (can be used multiple times)
 - `--recur, -r` - Recurrence pattern
+- `--recur-end` - Recurrence end date
 - `--someday` - Mark as someday/maybe
 
 ### Listing Tasks
@@ -140,11 +141,18 @@ tt list -S "meeting" --upcoming
 ### Completing Tasks
 
 ```bash
-tt done 1                 # Complete task #1
-tt done 1 2 3             # Complete multiple tasks
+tt do 1                   # Complete task #1
+tt do 1 2 3               # Complete multiple tasks
 ```
 
 Recurring tasks automatically create their next occurrence when completed.
+
+### Uncompleting Tasks
+
+```bash
+tt undo 1                 # Mark task #1 as not complete
+tt undo 1 2 3             # Uncomplete multiple tasks
+```
 
 ### Editing Tasks (`edit` / `e`)
 
@@ -165,6 +173,9 @@ tt edit 1 --clear-description
 tt edit 1 2 3 --project Work
 tt edit 1 2 3 --tag urgent
 tt edit 1 2 3 -T                   # Plan all for today
+
+# Rename shortcut
+tt rename 1 "New title"            # Shortcut for edit --title
 ```
 
 ### Managing Dates (`plan` / `p`, `due` / `d`)
@@ -319,6 +330,15 @@ hide_scope = true      # Hide project/area columns when filtering by project
 [area]
 hide_scope = true      # Hide project/area columns when filtering by area
 
+[tag]
+hide_scope = true      # Hide project/area columns when filtering by tag
+
+[inbox]
+group = "none"
+
+[list]
+group = "scope"        # Settings for the default "tt list" view
+
 [log]
 group = "date"
 
@@ -356,7 +376,10 @@ name = "dracula"  # Use a preset theme
 muted = "#6272a4"    # Dates, tags, secondary info
 accent = "#f1fa8c"   # Planned-today indicator (★)
 warning = "#ff5555"  # Due/overdue indicator (⚑)
+success = "#50fa7b"  # Success messages
+error = "#ff5555"    # Error messages
 header = "#bd93f9"   # Section headers
+id = "#6272a4"       # Task IDs (defaults to muted if empty)
 scope = "#8be9fd"    # Project/area column
 ```
 
@@ -367,6 +390,7 @@ scope = "#8be9fd"    # Project/area column
 planned = "★"   # Tasks planned for today
 due = "⚑"       # Due/overdue indicator
 date = "›"      # Planned date prefix
+done = "✓"      # Completed tasks indicator
 ```
 
 You can combine a preset with custom overrides - preset colors are applied first, then your custom values override them.
