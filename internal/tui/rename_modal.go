@@ -103,6 +103,8 @@ func (m RenameModal) Update(msg tea.Msg) (RenameModal, *RenameResult) {
 			m = m.Close()
 			return m, &RenameResult{
 				TaskID:   m.taskID,
+				ItemType: m.itemType,
+				ItemKey:  m.itemKey,
 				NewTitle: title,
 			}
 		}

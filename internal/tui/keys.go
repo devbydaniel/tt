@@ -214,11 +214,11 @@ func (k createProjectKeyMap) FullHelp() [][]key.Binding {
 type sidebarAreaKeyMap struct{}
 
 func (k sidebarAreaKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarAreaKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
 }
 
 // sidebarScopesKeyMap provides help bindings when scopes section is focused (no item selected)

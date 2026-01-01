@@ -214,7 +214,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var result *RenameResult
 			m.renameModal, result = m.renameModal.Update(msg)
 			if result != nil && !result.Canceled {
-				// Rename was confirmed, update the task
+				// Rename was confirmed
+				if result.ItemType == "area" {
+					return m, m.renameArea(result.ItemKey, result.NewTitle)
+				}
 				return m, m.renameTask(result.TaskID, result.NewTitle)
 			}
 			return m, nil
@@ -352,9 +355,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			if m.focusArea == FocusSidebar {
-				if proj := m.getSelectedProject(); proj != nil {
+				item := m.sidebar.SelectedItem()
+				if item.Type == "project" {
+					if proj := m.getSelectedProject(); proj != nil {
+						m.renameModal = m.renameModal.SetSize(m.width, m.height-1)
+						m.renameModal = m.renameModal.Open(proj.ID, proj.Title)
+						return m, nil
+					}
+				}
+				if item.Type == "area" {
 					m.renameModal = m.renameModal.SetSize(m.width, m.height-1)
-					m.renameModal = m.renameModal.Open(proj.ID, proj.Title)
+					m.renameModal = m.renameModal.OpenForArea(item.Key)
 					return m, nil
 				}
 			}
@@ -671,6 +682,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reload tasks to show the updated title
 		return m, m.loadTasksForSelection
 
+	case areaRenamedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload sidebar to show the renamed area
+		return m, m.loadData
+
 	case taskMovedMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -837,6 +856,12 @@ type scheduleTasksLoadedMsg struct {
 // taskRenamedMsg carries the result of a task rename
 type taskRenamedMsg struct {
 	task *task.Task
+	err  error
+}
+
+// areaRenamedMsg carries the result of an area rename
+type areaRenamedMsg struct {
+	area *area.Area
 	err  error
 }
 
@@ -1017,6 +1042,14 @@ func (m Model) renameTask(taskID int64, newTitle string) tea.Cmd {
 	return func() tea.Msg {
 		updated, err := m.app.SetTaskTitle.Execute(taskID, newTitle)
 		return taskRenamedMsg{task: updated, err: err}
+	}
+}
+
+// renameArea creates a command to rename an area
+func (m Model) renameArea(oldName, newName string) tea.Cmd {
+	return func() tea.Msg {
+		updated, err := m.app.RenameArea.Execute(oldName, newName)
+		return areaRenamedMsg{area: updated, err: err}
 	}
 }
 
