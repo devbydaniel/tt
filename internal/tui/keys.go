@@ -17,6 +17,8 @@ type keyMap struct {
 	Due          key.Binding
 	Tags         key.Binding
 	Add          key.Binding
+	AddProject   key.Binding
+	AddArea      key.Binding
 	Toggle       key.Binding
 	Someday      key.Binding
 	Delete       key.Binding
@@ -38,11 +40,11 @@ func (k sidebarKeyMap) FullHelp() [][]key.Binding {
 type sidebarProjectKeyMap struct{}
 
 func (k sidebarProjectKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarProjectKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.FocusContent, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
 }
 
 // contentKeyMap provides help bindings when content is focused
@@ -181,21 +183,60 @@ func (k confirmKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{keys.Enter, keys.Escape}}
 }
 
+// createAreaKeyMap provides help bindings for create area modal
+type createAreaKeyMap struct{}
+
+func (k createAreaKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Enter, keys.Escape}
+}
+
+func (k createAreaKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{keys.Enter, keys.Escape}}
+}
+
+// createProjectKeyMap provides help bindings for create project modal
+type createProjectKeyMap struct{}
+
+func (k createProjectKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field")),
+		key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("s-tab", "prev field")),
+		keys.Enter,
+		keys.Escape,
+	}
+}
+
+func (k createProjectKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
 // sidebarAreaKeyMap provides help bindings when an area is selected in sidebar
 type sidebarAreaKeyMap struct{}
 
 func (k sidebarAreaKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Delete, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarAreaKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Delete, keys.FocusContent, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
+}
+
+// sidebarScopesKeyMap provides help bindings when scopes section is focused (no item selected)
+type sidebarScopesKeyMap struct{}
+
+func (k sidebarScopesKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Up, keys.Down, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
+}
+
+func (k sidebarScopesKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{keys.Up, keys.Down, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
 }
 
 var (
 	sidebarKeys        = sidebarKeyMap{}
 	sidebarProjectKeys = sidebarProjectKeyMap{}
 	sidebarAreaKeys    = sidebarAreaKeyMap{}
+	sidebarScopesKeys  = sidebarScopesKeyMap{}
 	contentKeys        = contentKeyMap{}
 	renameKeys         = renameKeyMap{}
 	moveKeys           = moveKeyMap{}
@@ -206,6 +247,8 @@ var (
 	detailKeys         = detailKeyMap{}
 	descriptionKeys    = descriptionKeyMap{}
 	confirmKeys        = confirmKeyMap{}
+	createAreaKeys     = createAreaKeyMap{}
+	createProjectKeys  = createProjectKeyMap{}
 )
 
 var keys = keyMap{
@@ -264,6 +307,14 @@ var keys = keyMap{
 	Add: key.NewBinding(
 		key.WithKeys("a"),
 		key.WithHelp("a", "add"),
+	),
+	AddProject: key.NewBinding(
+		key.WithKeys("a"),
+		key.WithHelp("a", "project"),
+	),
+	AddArea: key.NewBinding(
+		key.WithKeys("A"),
+		key.WithHelp("A", "area"),
 	),
 	Toggle: key.NewBinding(
 		key.WithKeys(" "),

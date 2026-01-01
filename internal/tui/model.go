@@ -12,6 +12,7 @@ import (
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/task"
+	taskusecases "github.com/devbydaniel/tt/internal/domain/task/usecases"
 	"github.com/devbydaniel/tt/internal/output"
 )
 
@@ -41,19 +42,21 @@ type Model struct {
 	gap    int // Gap between sidebar and content (can be 0 for tight layouts)
 
 	// Components
-	sidebar          Sidebar
-	content          Content
-	detailPane       DetailPane
-	renameModal      RenameModal
-	moveModal        MoveModal
-	dateModal        DateModal
-	addModal         AddModal
-	tagModal         TagModal
-	descriptionModal DescriptionModal
-	confirmModal     ConfirmModal
-	help             help.Model
-	focusArea        FocusArea
-	detailVisible    bool // whether the detail pane is shown
+	sidebar            Sidebar
+	content            Content
+	detailPane         DetailPane
+	renameModal        RenameModal
+	moveModal          MoveModal
+	dateModal          DateModal
+	addModal           AddModal
+	tagModal           TagModal
+	descriptionModal   DescriptionModal
+	confirmModal       ConfirmModal
+	createProjectModal CreateProjectModal
+	createAreaModal    CreateAreaModal
+	help               help.Model
+	focusArea          FocusArea
+	detailVisible      bool // whether the detail pane is shown
 
 	// Cached data
 	areas    []area.Area
@@ -75,21 +78,23 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 	helpModel.Styles.ShortSeparator = theme.Muted
 
 	return Model{
-		app:              application,
-		config:           cfg,
-		styles:           styles,
-		gap:              1, // Default gap, adjusted on resize
-		sidebar:          NewSidebar(styles),
-		content:          NewContent(styles),
-		detailPane:       NewDetailPane(styles),
-		renameModal:      NewRenameModal(styles),
-		moveModal:        NewMoveModal(styles),
-		dateModal:        NewDateModal(styles),
-		addModal:         NewAddModal(styles),
-		tagModal:         NewTagModal(styles),
-		descriptionModal: NewDescriptionModal(styles),
-		confirmModal:     NewConfirmModal(styles),
-		help:             helpModel,
+		app:                application,
+		config:             cfg,
+		styles:             styles,
+		gap:                1, // Default gap, adjusted on resize
+		sidebar:            NewSidebar(styles),
+		content:            NewContent(styles),
+		detailPane:         NewDetailPane(styles),
+		renameModal:        NewRenameModal(styles),
+		moveModal:          NewMoveModal(styles),
+		dateModal:          NewDateModal(styles),
+		addModal:           NewAddModal(styles),
+		tagModal:           NewTagModal(styles),
+		descriptionModal:   NewDescriptionModal(styles),
+		confirmModal:       NewConfirmModal(styles),
+		createProjectModal: NewCreateProjectModal(styles),
+		createAreaModal:    NewCreateAreaModal(styles),
+		help:               helpModel,
 	}
 }
 
@@ -265,6 +270,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Route keys to create project modal when active
+		if m.createProjectModal.Active() {
+			var result *CreateProjectResult
+			m.createProjectModal, result = m.createProjectModal.Update(msg)
+			if result != nil && !result.Canceled {
+				return m, m.createProject(result)
+			}
+			return m, nil
+		}
+
+		// Route keys to create area modal when active
+		if m.createAreaModal.Active() {
+			var result *CreateAreaResult
+			m.createAreaModal, result = m.createAreaModal.Update(msg)
+			if result != nil && !result.Canceled {
+				return m, m.createArea(result)
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -399,7 +424,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.Add):
-			// Open add modal, pre-fill scope if viewing a project or area
+			// If sidebar is focused and scopes section is active, open create project modal
+			if m.focusArea == FocusSidebar && m.sidebar.IsScopesSectionActive() {
+				m.createProjectModal = m.createProjectModal.SetSize(m.width, m.height-1)
+				m.createProjectModal = m.createProjectModal.Open(m.areas)
+				return m, nil
+			}
+			// Otherwise, open add task modal (pre-fill scope if viewing a project or area)
 			sidebarItem := m.sidebar.SelectedItem()
 			var prefill *SidebarItem
 			if sidebarItem.Type == "project" || sidebarItem.Type == "area" {
@@ -408,6 +439,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addModal = m.addModal.SetSize(m.width, m.height-1)
 			m.addModal = m.addModal.Open(m.projects, m.areas, prefill)
 			return m, nil
+
+		case key.Matches(msg, keys.AddArea):
+			// Only works when sidebar is focused and scopes section is active
+			if m.focusArea == FocusSidebar && m.sidebar.IsScopesSectionActive() {
+				m.createAreaModal = m.createAreaModal.SetSize(m.width, m.height-1)
+				m.createAreaModal = m.createAreaModal.Open()
+				return m, nil
+			}
 
 		case key.Matches(msg, keys.Toggle):
 			if m.focusArea == FocusContent {
@@ -672,6 +711,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reload tasks to show the new task
 		return m, m.loadTasksForSelection
 
+	case projectCreatedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload sidebar to show the new project
+		return m, m.loadData
+
+	case areaCreatedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload sidebar to show the new area
+		return m, m.loadData
+
 	case taskToggledMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -834,6 +889,18 @@ type itemDeletedMsg struct {
 	targetID   int64
 	targetName string
 	err        error
+}
+
+// projectCreatedMsg carries the result of creating a project
+type projectCreatedMsg struct {
+	project *task.Task
+	err     error
+}
+
+// areaCreatedMsg carries the result of creating an area
+type areaCreatedMsg struct {
+	area *area.Area
+	err  error
 }
 
 // formatProjectTitle builds a project title with metadata for the content header.
@@ -1001,6 +1068,25 @@ func (m Model) createTask(result *AddResult) tea.Cmd {
 
 		created, err := m.app.CreateTask.Execute(result.Title, opts)
 		return taskCreatedMsg{task: created, err: err}
+	}
+}
+
+// createProject creates a command to create a new project
+func (m Model) createProject(result *CreateProjectResult) tea.Cmd {
+	return func() tea.Msg {
+		opts := &taskusecases.CreateProjectOptions{
+			AreaName: result.AreaName,
+		}
+		created, err := m.app.CreateProject.Execute(result.Name, opts)
+		return projectCreatedMsg{project: created, err: err}
+	}
+}
+
+// createArea creates a command to create a new area
+func (m Model) createArea(result *CreateAreaResult) tea.Cmd {
+	return func() tea.Msg {
+		created, err := m.app.CreateArea.Execute(result.Name)
+		return areaCreatedMsg{area: created, err: err}
 	}
 }
 
@@ -1279,11 +1365,17 @@ func (m Model) View() string {
 		helpView = m.help.View(descriptionKeys)
 	case m.confirmModal.Active():
 		helpView = m.help.View(confirmKeys)
+	case m.createProjectModal.Active():
+		helpView = m.help.View(createProjectKeys)
+	case m.createAreaModal.Active():
+		helpView = m.help.View(createAreaKeys)
 	case m.focusArea == FocusSidebar:
 		if m.getSelectedProject() != nil {
 			helpView = m.help.View(sidebarProjectKeys)
 		} else if m.sidebar.SelectedItem().Type == "area" {
 			helpView = m.help.View(sidebarAreaKeys)
+		} else if m.sidebar.IsScopesSectionActive() {
+			helpView = m.help.View(sidebarScopesKeys)
 		} else {
 			helpView = m.help.View(sidebarKeys)
 		}
@@ -1315,6 +1407,12 @@ func (m Model) View() string {
 	}
 	if m.confirmModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.confirmModal.View(), helpView)
+	}
+	if m.createProjectModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.createProjectModal.View(), helpView)
+	}
+	if m.createAreaModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.createAreaModal.View(), helpView)
 	}
 
 	// Render sidebar and content side by side (gap can be 0 for tight layouts)

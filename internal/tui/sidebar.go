@@ -136,6 +136,11 @@ func (s Sidebar) SelectedItem() SidebarItem {
 	return s.sections[s.activeSection].SelectedItem()
 }
 
+// IsScopesSectionActive returns true if the Scopes section is currently active
+func (s Sidebar) IsScopesSectionActive() bool {
+	return s.activeSection == 1 // Scopes section is index 1
+}
+
 // View renders the sidebar as three stacked bordered boxes
 func (s Sidebar) View() string {
 	headers := []string{"Lists", "Scopes", "Tags"}
