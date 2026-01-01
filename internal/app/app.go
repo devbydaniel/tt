@@ -19,6 +19,7 @@ type App struct {
 	// Project use cases (projects are now tasks with task_type='project')
 	CreateProject        *taskusecases.CreateProject
 	ListProjects         *taskusecases.ListProjects
+	ListAllProjects      *taskusecases.ListAllProjects
 	ListProjectsWithArea *taskusecases.ListProjectsWithArea
 	GetProjectByName     *taskusecases.GetProjectByName
 
@@ -67,6 +68,7 @@ func New(db *database.DB) *App {
 		AreaLookup: getAreaByName,
 	}
 	listProjects := &taskusecases.ListProjects{Repo: taskRepo}
+	listAllProjects := &taskusecases.ListAllProjects{Repo: taskRepo}
 	listProjectsWithArea := &taskusecases.ListProjectsWithArea{Repo: taskRepo}
 
 	// Create task use cases
@@ -119,6 +121,7 @@ func New(db *database.DB) *App {
 		// Project (tasks with task_type='project')
 		CreateProject:        createProject,
 		ListProjects:         listProjects,
+		ListAllProjects:      listAllProjects,
 		ListProjectsWithArea: listProjectsWithArea,
 		GetProjectByName:     getProjectByName,
 

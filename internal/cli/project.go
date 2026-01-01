@@ -509,9 +509,9 @@ Examples:
 	cmd.Flags().BoolVar(&clearArea, "clear-area", false, "Remove from area")
 	cmd.Flags().BoolVar(&clearDescription, "clear-description", false, "Clear description")
 
-	// Register completions
+	// Register completions (use AllProjectCompletion to include someday projects)
 	registry := NewCompletionRegistry(deps)
-	cmd.ValidArgsFunction = registry.ProjectCompletion()
+	cmd.ValidArgsFunction = registry.AllProjectCompletion()
 	registry.RegisterAreaFlag(cmd)
 
 	return cmd

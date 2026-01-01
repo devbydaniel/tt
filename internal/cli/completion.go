@@ -19,10 +19,29 @@ func NewCompletionRegistry(deps *Dependencies) *CompletionRegistry {
 	return &CompletionRegistry{deps: deps}
 }
 
-// ProjectCompletion returns a completion function for project names
+// ProjectCompletion returns a completion function for project names (active projects only)
 func (r *CompletionRegistry) ProjectCompletion() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		projects, err := r.deps.App.ListProjects.Execute()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		var completions []string
+		for _, p := range projects {
+			if strings.HasPrefix(strings.ToLower(p.Title), strings.ToLower(toComplete)) {
+				completions = append(completions, p.Title)
+			}
+		}
+
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// AllProjectCompletion returns a completion function for all project names (active and someday)
+func (r *CompletionRegistry) AllProjectCompletion() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		projects, err := r.deps.App.ListAllProjects.Execute()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
