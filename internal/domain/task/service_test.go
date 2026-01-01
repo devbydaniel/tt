@@ -276,10 +276,10 @@ func TestTaskFilterByProject(t *testing.T) {
 		t.Errorf("got %d work tasks, want 2", len(workTasks))
 	}
 
-	// All tasks
+	// All items (tasks + projects)
 	allTasks, _ := application.ListTasks.Execute(nil)
-	if len(allTasks) != 4 {
-		t.Errorf("got %d total tasks, want 4", len(allTasks))
+	if len(allTasks) != 6 {
+		t.Errorf("got %d total items, want 6 (4 tasks + 2 projects)", len(allTasks))
 	}
 }
 
@@ -327,10 +327,10 @@ func TestCascadeDeleteProject(t *testing.T) {
 	application.CreateTask.Execute("Task 2", &task.CreateOptions{ProjectName: "Work"})
 	application.CreateTask.Execute("Standalone", nil)
 
-	// Verify tasks exist
+	// Verify items exist (1 project + 3 tasks)
 	tasks, _ := application.ListTasks.Execute(nil)
-	if len(tasks) != 3 {
-		t.Fatalf("got %d tasks before delete, want 3", len(tasks))
+	if len(tasks) != 4 {
+		t.Fatalf("got %d items before delete, want 4 (1 project + 3 tasks)", len(tasks))
 	}
 
 	// Delete project - should cascade delete its tasks (projects are now tasks)
@@ -358,10 +358,10 @@ func TestCascadeDeleteArea(t *testing.T) {
 	application.CreateTask.Execute("Task in area directly", &task.CreateOptions{AreaName: "Work"})
 	application.CreateTask.Execute("Standalone", nil)
 
-	// Verify initial state
+	// Verify initial state (1 project + 3 tasks)
 	tasks, _ := application.ListTasks.Execute(nil)
-	if len(tasks) != 3 {
-		t.Fatalf("got %d tasks before delete, want 3", len(tasks))
+	if len(tasks) != 4 {
+		t.Fatalf("got %d items before delete, want 4 (1 project + 3 tasks)", len(tasks))
 	}
 	projects, _ := application.ListProjects.Execute()
 	if len(projects) != 1 {
@@ -930,13 +930,22 @@ func TestListSortMultipleFields(t *testing.T) {
 
 	// Sort by project then title
 	sortOpts, _ := task.ParseSort("project:asc,title:asc")
-	tasks, err := application.ListTasks.Execute(&task.ListOptions{Sort: sortOpts})
+	items, err := application.ListTasks.Execute(&task.ListOptions{Sort: sortOpts})
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
 
-	if len(tasks) != 3 {
-		t.Fatalf("got %d tasks, want 3", len(tasks))
+	if len(items) != 5 {
+		t.Fatalf("got %d items, want 5 (2 projects + 3 tasks)", len(items))
+	}
+
+	// Projects have no parent so come first (NULL sorts before values), then tasks sorted by project then title
+	// Filter to just tasks to check order
+	var tasks []task.Task
+	for _, item := range items {
+		if !item.IsProject() {
+			tasks = append(tasks, item)
+		}
 	}
 
 	// Alpha Project tasks first (sorted by title), then Beta Project

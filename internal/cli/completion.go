@@ -97,11 +97,36 @@ func (r *CompletionRegistry) RegisterSortFlag(cmd *cobra.Command) {
 	_ = cmd.RegisterFlagCompletionFunc("sort", r.SortCompletion())
 }
 
-// RegisterAll registers project, area, and sort completion on a command
+// TagCompletion returns a completion function for tag names
+func (r *CompletionRegistry) TagCompletion() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		tags, err := r.deps.App.ListTags.Execute()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		var completions []string
+		for _, t := range tags {
+			if strings.HasPrefix(strings.ToLower(t), strings.ToLower(toComplete)) {
+				completions = append(completions, t)
+			}
+		}
+
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// RegisterTagFlag registers tag completion on a command's --tag flag
+func (r *CompletionRegistry) RegisterTagFlag(cmd *cobra.Command) {
+	_ = cmd.RegisterFlagCompletionFunc("tag", r.TagCompletion())
+}
+
+// RegisterAll registers project, area, sort, and tag completion on a command
 func (r *CompletionRegistry) RegisterAll(cmd *cobra.Command) {
 	r.RegisterProjectFlag(cmd)
 	r.RegisterAreaFlag(cmd)
 	r.RegisterSortFlag(cmd)
+	r.RegisterTagFlag(cmd)
 }
 
 // NewCompletionCmd creates the completion command for generating shell scripts

@@ -436,10 +436,14 @@ func (c Content) renderTaskRow(t *task.Task, index int) string {
 	// Build scope and title differently for projects vs tasks
 	var scope, title string
 	if t.IsProject() {
-		// For projects: scope IS the project name (Area > ProjectName), no separate title
-		scope = c.formatProjectScope(t.AreaName, t.Title)
-		scope = theme.Scope.Render(scope)
-		title = "" // No title for projects
+		// For projects in scope-hidden view (e.g., area view), show project name as title with scope styling
+		// Otherwise, show full scope (Area > ProjectName)
+		if c.hideScope {
+			title = theme.Scope.Render(c.sanitizeTitle(t.Title))
+		} else {
+			scope = c.formatProjectScope(t.AreaName, t.Title)
+			scope = theme.Scope.Render(scope)
+		}
 	} else {
 		// For regular tasks: scope and title
 		scope = c.formatScope(t.AreaName, t.ParentName)

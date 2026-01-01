@@ -22,12 +22,10 @@ type ListTasks struct {
 }
 
 func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
-	filter := &task.ListFilter{
-		TaskType: task.TaskTypeTask, // Default to listing only tasks, not projects
-	}
+	filter := &task.ListFilter{}
 
 	if opts != nil {
-		// Override task type filter if specified
+		// Allow explicit task type filter if specified
 		if opts.TaskType != "" {
 			filter.TaskType = opts.TaskType
 		}
@@ -59,19 +57,14 @@ func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
 		switch opts.Schedule {
 		case "today":
 			filter.Today = true
-			filter.TaskType = "" // Include both tasks and projects
 		case "upcoming":
 			filter.Upcoming = true
-			filter.TaskType = "" // Include both tasks and projects
 		case "anytime":
 			filter.Anytime = true
-			filter.TaskType = "" // Include both tasks and projects
 		case "inbox":
 			filter.Inbox = true
-			filter.TaskType = "" // Include both tasks and projects
 		case "someday":
 			filter.State = task.StateSomeday
-			filter.TaskType = "" // Include both tasks and projects
 		}
 	}
 

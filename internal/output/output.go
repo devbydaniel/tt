@@ -129,7 +129,7 @@ func (f *Formatter) groupedByScope(tasks []task.Task) {
 	// Render: No Scope first
 	if len(noScopeTasks) > 0 {
 		fmt.Fprintln(f.w, f.theme.Header.Render("No Scope"))
-		f.renderTaskRows(noScopeTasks, 0, false, idWidth)
+		f.renderTaskRows(noScopeTasks, 0, !f.hideScope, idWidth)
 	}
 
 	// Combine all headers (group headers + project scopes) and sort
@@ -149,7 +149,7 @@ func (f *Formatter) groupedByScope(tasks []task.Task) {
 			f.renderProjectHeaderLine(proj)
 		} else if tasks, isGroup := groups[header]; isGroup {
 			fmt.Fprintln(f.w, f.theme.Header.Render(header))
-			f.renderTaskRows(tasks, 0, false, idWidth)
+			f.renderTaskRows(tasks, 0, !f.hideScope, idWidth)
 		}
 	}
 }
@@ -265,8 +265,12 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool
 		// Build display differently for projects vs tasks
 		var display string
 		if t.IsProject() {
-			// For projects: scope IS the project name (Area > ProjectName), no separate title
-			display = f.theme.Scope.Render(formatProjectScope(t.AreaName, t.Title))
+			// For projects: when hiding scope, show only project name (no area)
+			if showScope {
+				display = f.theme.Scope.Render(formatProjectScope(t.AreaName, t.Title))
+			} else {
+				display = f.theme.Scope.Render(sanitizeTitle(t.Title))
+			}
 		} else {
 			// For regular tasks: optional scope prefix + title
 			if showScope {
