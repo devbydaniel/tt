@@ -50,6 +50,7 @@ type Model struct {
 	addModal         AddModal
 	tagModal         TagModal
 	descriptionModal DescriptionModal
+	confirmModal     ConfirmModal
 	help             help.Model
 	focusArea        FocusArea
 	detailVisible    bool // whether the detail pane is shown
@@ -87,6 +88,7 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 		addModal:         NewAddModal(styles),
 		tagModal:         NewTagModal(styles),
 		descriptionModal: NewDescriptionModal(styles),
+		confirmModal:     NewConfirmModal(styles),
 		help:             helpModel,
 	}
 }
@@ -253,6 +255,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Route keys to confirm modal when active
+		if m.confirmModal.Active() {
+			var result *ConfirmResult
+			m.confirmModal, result = m.confirmModal.Update(msg)
+			if result != nil && result.Confirmed {
+				return m, m.deleteItem(result)
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -413,6 +425,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusArea == FocusSidebar {
 				if proj := m.getSelectedProject(); proj != nil {
 					return m, m.toggleTaskState(proj.ID, proj.State)
+				}
+			}
+
+		case key.Matches(msg, keys.Delete):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					m.confirmModal = m.confirmModal.SetSize(m.width, m.height-1)
+					m.confirmModal = m.confirmModal.OpenForTask(selectedTask.ID, selectedTask.Title)
+					return m, nil
+				}
+			}
+			if m.focusArea == FocusSidebar {
+				item := m.sidebar.SelectedItem()
+				if item.Type == "project" {
+					if proj := m.getSelectedProject(); proj != nil {
+						m.confirmModal = m.confirmModal.SetSize(m.width, m.height-1)
+						m.confirmModal = m.confirmModal.OpenForProject(proj.ID, proj.Title)
+						return m, nil
+					}
+				}
+				if item.Type == "area" {
+					m.confirmModal = m.confirmModal.SetSize(m.width, m.height-1)
+					m.confirmModal = m.confirmModal.OpenForArea(item.Key)
+					return m, nil
 				}
 			}
 
@@ -689,6 +725,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reload tasks to reflect the description change
 		return m, m.loadTasksForSelection
 
+	case itemDeletedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Close detail pane if it was showing the deleted task
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.targetID {
+			m.detailVisible = false
+			m.focusArea = FocusContent
+			m.detailPane = m.detailPane.SetFocused(false)
+			m.content = m.content.SetFocused(true)
+			m = m.recalculateLayout()
+		}
+		// Reload data - for areas/projects reload everything, for tasks just reload task list
+		if msg.target == DeleteTargetArea || msg.target == DeleteTargetProject {
+			return m, m.loadData
+		}
+		return m, m.loadTasksForSelection
+
 	case tagsAndTasksUpdatedMsg:
 		m.tags = msg.tags
 		m.sidebar = m.sidebar.SetData(m.areas, m.projects, msg.tags)
@@ -771,6 +826,14 @@ type taskTagsUpdatedMsg struct {
 type taskDescriptionUpdatedMsg struct {
 	task *task.Task
 	err  error
+}
+
+// itemDeletedMsg carries the result of a delete operation
+type itemDeletedMsg struct {
+	target     DeleteTarget
+	targetID   int64
+	targetName string
+	err        error
 }
 
 // formatProjectTitle builds a project title with metadata for the content header.
@@ -986,6 +1049,26 @@ func (m Model) setTaskDescription(taskID int64, description *string) tea.Cmd {
 	}
 }
 
+// deleteItem creates a command to delete an item (task, project, or area)
+func (m Model) deleteItem(result *ConfirmResult) tea.Cmd {
+	return func() tea.Msg {
+		var err error
+		switch result.Target {
+		case DeleteTargetTask, DeleteTargetProject:
+			// Both tasks and projects use DeleteTasks
+			_, err = m.app.DeleteTasks.Execute([]int64{result.TargetID})
+		case DeleteTargetArea:
+			_, err = m.app.DeleteArea.Execute(result.TargetName)
+		}
+		return itemDeletedMsg{
+			target:     result.Target,
+			targetID:   result.TargetID,
+			targetName: result.TargetName,
+			err:        err,
+		}
+	}
+}
+
 // openDetailPane opens the detail pane with the selected task
 func (m Model) openDetailPane() (tea.Model, tea.Cmd) {
 	selectedTask := m.content.SelectedTask()
@@ -1194,9 +1277,13 @@ func (m Model) View() string {
 		helpView = m.help.View(tagKeys)
 	case m.descriptionModal.Active():
 		helpView = m.help.View(descriptionKeys)
+	case m.confirmModal.Active():
+		helpView = m.help.View(confirmKeys)
 	case m.focusArea == FocusSidebar:
 		if m.getSelectedProject() != nil {
 			helpView = m.help.View(sidebarProjectKeys)
+		} else if m.sidebar.SelectedItem().Type == "area" {
+			helpView = m.help.View(sidebarAreaKeys)
 		} else {
 			helpView = m.help.View(sidebarKeys)
 		}
@@ -1225,6 +1312,9 @@ func (m Model) View() string {
 	}
 	if m.descriptionModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.descriptionModal.View(), helpView)
+	}
+	if m.confirmModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.confirmModal.View(), helpView)
 	}
 
 	// Render sidebar and content side by side (gap can be 0 for tight layouts)

@@ -19,6 +19,7 @@ type keyMap struct {
 	Add          key.Binding
 	Toggle       key.Binding
 	Someday      key.Binding
+	Delete       key.Binding
 	Quit         key.Binding
 }
 
@@ -37,22 +38,22 @@ func (k sidebarKeyMap) FullHelp() [][]key.Binding {
 type sidebarProjectKeyMap struct{}
 
 func (k sidebarProjectKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarProjectKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.FocusContent, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.FocusContent, keys.Quit}}
 }
 
 // contentKeyMap provides help bindings when content is focused
 type contentKeyMap struct{}
 
 func (k contentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Someday, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Someday, keys.Delete, keys.Quit}
 }
 
 func (k contentKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Toggle, keys.Someday, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Toggle, keys.Someday, keys.Delete, keys.Quit}}
 }
 
 // renameKeyMap provides help bindings for rename modal
@@ -169,18 +170,42 @@ func (k descriptionKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
+// confirmKeyMap provides help bindings for confirm modal
+type confirmKeyMap struct{}
+
+func (k confirmKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Enter, keys.Escape}
+}
+
+func (k confirmKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{keys.Enter, keys.Escape}}
+}
+
+// sidebarAreaKeyMap provides help bindings when an area is selected in sidebar
+type sidebarAreaKeyMap struct{}
+
+func (k sidebarAreaKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Up, keys.Down, keys.Delete, keys.FocusContent, keys.Quit}
+}
+
+func (k sidebarAreaKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Delete, keys.FocusContent, keys.Quit}}
+}
+
 var (
 	sidebarKeys        = sidebarKeyMap{}
 	sidebarProjectKeys = sidebarProjectKeyMap{}
+	sidebarAreaKeys    = sidebarAreaKeyMap{}
 	contentKeys        = contentKeyMap{}
-	renameKeys      = renameKeyMap{}
-	moveKeys        = moveKeyMap{}
-	tagKeys         = tagKeyMap{}
-	dateInputKeys   = dateInputKeyMap{}
-	datePickerKeys  = datePickerKeyMap{}
-	addKeys         = addKeyMap{}
-	detailKeys      = detailKeyMap{}
-	descriptionKeys = descriptionKeyMap{}
+	renameKeys         = renameKeyMap{}
+	moveKeys           = moveKeyMap{}
+	tagKeys            = tagKeyMap{}
+	dateInputKeys      = dateInputKeyMap{}
+	datePickerKeys     = datePickerKeyMap{}
+	addKeys            = addKeyMap{}
+	detailKeys         = detailKeyMap{}
+	descriptionKeys    = descriptionKeyMap{}
+	confirmKeys        = confirmKeyMap{}
 )
 
 var keys = keyMap{
@@ -247,6 +272,10 @@ var keys = keyMap{
 	Someday: key.NewBinding(
 		key.WithKeys("s"),
 		key.WithHelp("s", "someday"),
+	),
+	Delete: key.NewBinding(
+		key.WithKeys("backspace"),
+		key.WithHelp("bksp", "delete"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
