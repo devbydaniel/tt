@@ -333,6 +333,8 @@ func newProjectEditCmd(deps *Dependencies) *cobra.Command {
 	var clearDue bool
 	var clearArea bool
 	var clearDescription bool
+	var someday bool
+	var active bool
 
 	cmd := &cobra.Command{
 		Use:   "edit <name>",
@@ -346,7 +348,9 @@ Examples:
   tt project edit "My Project" --planned +3d
   tt project edit "My Project" --tag urgent --tag priority
   tt project edit "My Project" --untag old-tag
-  tt project edit "My Project" --clear-area`,
+  tt project edit "My Project" --clear-area
+  tt project edit "My Project" --someday
+  tt project edit "My Project" --active`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			projectName := args[0]
@@ -385,7 +389,8 @@ Examples:
 			// If no changes specified, show details
 			hasChanges := title != "" || description != "" || areaName != "" ||
 				plannedStr != "" || dueStr != "" || today || clearPlanned || clearDue ||
-				clearArea || clearDescription || len(addTags) > 0 || len(removeTags) > 0
+				clearArea || clearDescription || len(addTags) > 0 || len(removeTags) > 0 ||
+				someday || active
 
 			if !hasChanges {
 				formatter.ProjectDetails(project)
@@ -422,6 +427,12 @@ Examples:
 			}
 			if len(removeTags) > 0 {
 				changes = append(changes, "tags removed")
+			}
+			if someday {
+				changes = append(changes, "moved to someday")
+			}
+			if active {
+				changes = append(changes, "moved to active")
 			}
 
 			// Apply changes
@@ -491,6 +502,18 @@ Examples:
 				}
 			}
 
+			if someday {
+				if _, err := deps.App.DeferTask.Execute(project.ID); err != nil {
+					return err
+				}
+			}
+
+			if active {
+				if _, err := deps.App.ActivateTask.Execute(project.ID); err != nil {
+					return err
+				}
+			}
+
 			formatter.ProjectEdited(projectName, changes)
 			return nil
 		},
@@ -508,6 +531,9 @@ Examples:
 	cmd.Flags().BoolVar(&clearDue, "clear-due", false, "Clear due date")
 	cmd.Flags().BoolVar(&clearArea, "clear-area", false, "Remove from area")
 	cmd.Flags().BoolVar(&clearDescription, "clear-description", false, "Clear description")
+	cmd.Flags().BoolVarP(&someday, "someday", "s", false, "Move to someday")
+	cmd.Flags().BoolVarP(&active, "active", "A", false, "Move to active")
+	cmd.MarkFlagsMutuallyExclusive("someday", "active")
 
 	// Register completions (use AllProjectCompletion to include someday projects)
 	registry := NewCompletionRegistry(deps)

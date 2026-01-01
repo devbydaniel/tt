@@ -8,19 +8,23 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// RenameModal handles task renaming with a text input
+// RenameModal handles task/project/area renaming with a text input
 type RenameModal struct {
-	input  textinput.Model
-	taskID int64
-	active bool
-	styles *Styles
-	width  int
-	height int
+	input    textinput.Model
+	taskID   int64
+	itemType string // "task" or "area"
+	itemKey  string // For areas, stores the original name
+	active   bool
+	styles   *Styles
+	width    int
+	height   int
 }
 
 // RenameResult represents the outcome of the rename modal
 type RenameResult struct {
 	TaskID   int64
+	ItemType string // "task" or "area"
+	ItemKey  string // For areas, the original name
 	NewTitle string
 	Canceled bool
 }
@@ -41,7 +45,21 @@ func NewRenameModal(styles *Styles) RenameModal {
 func (m RenameModal) Open(taskID int64, currentTitle string) RenameModal {
 	m.active = true
 	m.taskID = taskID
+	m.itemType = "task"
+	m.itemKey = ""
 	m.input.SetValue(currentTitle)
+	m.input.Focus()
+	m.input.CursorEnd()
+	return m
+}
+
+// OpenForArea shows the modal for renaming an area
+func (m RenameModal) OpenForArea(areaName string) RenameModal {
+	m.active = true
+	m.taskID = 0
+	m.itemType = "area"
+	m.itemKey = areaName
+	m.input.SetValue(areaName)
 	m.input.Focus()
 	m.input.CursorEnd()
 	return m

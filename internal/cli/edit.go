@@ -25,6 +25,8 @@ func NewEditCmd(deps *Dependencies) *cobra.Command {
 	var clearProject bool
 	var clearArea bool
 	var clearDescription bool
+	var someday bool
+	var active bool
 
 	cmd := &cobra.Command{
 		Use:     "edit <task-id>...",
@@ -42,7 +44,9 @@ Examples:
   t edit 1 --tag urgent --tag priority
   t edit 1 --untag old-tag
   t edit 1 --clear-project
-  t edit 1 --clear-due`,
+  t edit 1 --clear-due
+  t edit 1 --someday
+  t edit 1 --active`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse all task IDs first
@@ -89,7 +93,8 @@ Examples:
 			// If no changes specified and single task, show details
 			hasChanges := title != "" || description != "" || projectName != "" || areaName != "" ||
 				plannedStr != "" || dueStr != "" || today || clearPlanned || clearDue ||
-				clearProject || clearArea || clearDescription || len(addTags) > 0 || len(removeTags) > 0
+				clearProject || clearArea || clearDescription || len(addTags) > 0 || len(removeTags) > 0 ||
+				someday || active
 
 			if !hasChanges {
 				if len(ids) == 1 {
@@ -139,6 +144,12 @@ Examples:
 			}
 			if len(removeTags) > 0 {
 				changes = append(changes, "tags removed")
+			}
+			if someday {
+				changes = append(changes, "moved to someday")
+			}
+			if active {
+				changes = append(changes, "moved to active")
 			}
 
 			// Apply changes to all tasks
@@ -219,6 +230,18 @@ Examples:
 					}
 				}
 
+				if someday {
+					if _, err := deps.App.DeferTask.Execute(id); err != nil {
+						return err
+					}
+				}
+
+				if active {
+					if _, err := deps.App.ActivateTask.Execute(id); err != nil {
+						return err
+					}
+				}
+
 				formatter.TaskEdited(id, changes)
 			}
 
@@ -240,6 +263,9 @@ Examples:
 	cmd.Flags().BoolVar(&clearProject, "clear-project", false, "Remove from project")
 	cmd.Flags().BoolVar(&clearArea, "clear-area", false, "Remove from area")
 	cmd.Flags().BoolVar(&clearDescription, "clear-description", false, "Clear description")
+	cmd.Flags().BoolVarP(&someday, "someday", "s", false, "Move to someday")
+	cmd.Flags().BoolVarP(&active, "active", "A", false, "Move to active")
+	cmd.MarkFlagsMutuallyExclusive("someday", "active")
 
 	// Register completions
 	registry := NewCompletionRegistry(deps)

@@ -168,6 +168,8 @@ tt edit 1 --untag old-tag
 tt edit 1 --clear-due
 tt edit 1 --clear-project
 tt edit 1 --clear-description
+tt edit 1 --someday                # Move to someday
+tt edit 1 --active                 # Move back to active
 
 # Edit multiple tasks at once
 tt edit 1 2 3 --project Work
@@ -245,6 +247,8 @@ tt project add "Home Renovation" --area Home
 tt project rename "Q1 Goals" "Q1 Objectives"
 tt project move "Home Renovation" --area Personal
 tt project move "Home Renovation" --clear      # Remove from area
+tt project edit "Q1 Goals" --someday           # Move project to someday
+tt project edit "Q1 Goals" --active            # Move project back to active
 tt project delete "Q1 Goals"
 ```
 
