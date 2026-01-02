@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/devbydaniel/tt/internal/dateparse"
+	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/domain/task/usecases"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
@@ -30,7 +31,9 @@ func NewProjectCmd(deps *Dependencies) *cobra.Command {
 }
 
 func newProjectListCmd(deps *Dependencies) *cobra.Command {
+	var sortStr string
 	var group string
+	var hideScope bool
 	var jsonOutput bool
 
 	cmd := &cobra.Command{
@@ -38,30 +41,55 @@ func newProjectListCmd(deps *Dependencies) *cobra.Command {
 		Short: "List all projects",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Use flag if provided, otherwise use config
+			// Resolve sorting: flag > config > code default
+			sortToUse := sortStr
+			if sortToUse == "" {
+				sortToUse = deps.Config.GetSort("project-list")
+			}
+			sortOpts, err := task.ParseSort(sortToUse)
+			if err != nil {
+				return err
+			}
+
+			// Resolve grouping: flag > config > "none"
 			groupBy := group
 			if groupBy == "" {
 				groupBy = deps.Config.GetGroup("project-list")
 			}
 
-			projects, err := deps.App.ListProjectsWithArea.Execute()
+			// Resolve hideScope: flag > config
+			hideScopeToUse := hideScope
+			if !hideScope {
+				hideScopeToUse = deps.Config.GetHideScope("project-list")
+			}
+
+			// List only active projects
+			projects, err := deps.App.ListTasks.Execute(&task.ListOptions{
+				TaskType: task.TaskTypeProject,
+				State:    task.StateActive,
+				Sort:     sortOpts,
+			})
 			if err != nil {
 				return err
 			}
+
 			if jsonOutput {
 				return output.WriteJSON(os.Stdout, projects)
 			}
+
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-			if groupBy == "area" {
-				formatter.ProjectListGrouped(projects, groupBy)
-			} else {
-				formatter.ProjectList(projects)
+			if hideScopeToUse {
+				formatter.SetHideScope(true)
 			}
+
+			formatter.GroupedTaskList(projects, groupBy)
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVarP(&group, "group", "g", "", "Group projects by: area")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, area (e.g. due,title:desc)")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "Group projects by: scope, date, none")
+	cmd.Flags().BoolVar(&hideScope, "hide-scope", false, "Hide area column")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 
 	return cmd

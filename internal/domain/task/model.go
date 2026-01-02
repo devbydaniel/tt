@@ -228,6 +228,7 @@ type ListOptions struct {
 	AreaName    string
 	TagName     string       // filter by tag
 	Schedule    string       // "today", "upcoming", "anytime", "inbox", "someday"
+	State       State        // explicit state filter ("active", "someday", or empty for schedule-based)
 	Search      string       // case-insensitive title search
 	Sort        []SortOption // sort options (default: created desc)
 }

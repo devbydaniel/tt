@@ -54,6 +54,11 @@ func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
 			filter.Sort = opts.Sort
 		}
 
+		// Explicit state filter (takes precedence over schedule-based state)
+		if opts.State != "" {
+			filter.State = opts.State
+		}
+
 		switch opts.Schedule {
 		case "today":
 			filter.Today = true
@@ -65,7 +70,10 @@ func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
 		case "inbox":
 			filter.Inbox = true
 		case "someday":
-			filter.State = task.StateSomeday
+			// Only set state if not explicitly overridden
+			if opts.State == "" {
+				filter.State = task.StateSomeday
+			}
 		}
 	}
 
