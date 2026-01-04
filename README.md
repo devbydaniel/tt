@@ -318,6 +318,7 @@ The sidebar has three sections you can cycle through with `Tab`:
 **When a project is selected:**
 | Key | Action |
 |-----|--------|
+| `Space` | Complete project (and all tasks) |
 | `r` | Rename project |
 | `m` | Move to different area |
 | `s` | Toggle someday/active |

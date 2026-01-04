@@ -793,6 +793,17 @@ func (f *Formatter) TaskEdited(id int64, changes []string) {
 	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Updated #%d: %s", id, joinChanges(changes))))
 }
 
+func (f *Formatter) BulkEditPreview(tasks []task.Task) {
+	fmt.Fprintf(f.w, "Would edit %d task(s):\n", len(tasks))
+	for _, t := range tasks {
+		fmt.Fprintf(f.w, "  #%d: %s\n", t.ID, sanitizeTitle(t.Title))
+	}
+}
+
+func (f *Formatter) BulkEditSummary(count int) {
+	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Edited %d tasks", count)))
+}
+
 func joinChanges(changes []string) string {
 	if len(changes) == 0 {
 		return "no changes"

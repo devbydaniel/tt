@@ -1,6 +1,8 @@
 package usecases
 
 import (
+	"errors"
+
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
@@ -47,6 +49,9 @@ func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
 		if opts.TagName != "" {
 			filter.TagName = opts.TagName
 		}
+		if len(opts.TagNames) > 0 {
+			filter.TagNames = opts.TagNames
+		}
 		if opts.Search != "" {
 			filter.Search = opts.Search
 		}
@@ -74,6 +79,34 @@ func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
 			if opts.State == "" {
 				filter.State = task.StateSomeday
 			}
+		}
+
+		// NOT filters for bulk edit
+		if opts.NotProjectName != "" {
+			p, err := l.ProjectLookup.Execute(opts.NotProjectName)
+			if err != nil {
+				// If project not found, the NOT condition is vacuously satisfied
+				// (no tasks belong to a non-existent project) - just skip the filter
+				if !errors.Is(err, task.ErrTaskNotFound) {
+					return nil, err
+				}
+			} else {
+				filter.NotParentID = &p.ID
+			}
+		}
+		if opts.NotAreaName != "" {
+			a, err := l.AreaLookup.Execute(opts.NotAreaName)
+			if err != nil {
+				// If area not found, skip the filter
+				if !errors.Is(err, area.ErrAreaNotFound) {
+					return nil, err
+				}
+			} else {
+				filter.NotAreaID = &a.ID
+			}
+		}
+		if len(opts.NotTagNames) > 0 {
+			filter.NotTagNames = opts.NotTagNames
 		}
 	}
 

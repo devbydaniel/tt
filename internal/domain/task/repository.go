@@ -3,6 +3,7 @@ package task
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/devbydaniel/tt/internal/database"
@@ -69,9 +70,15 @@ type ListFilter struct {
 	Upcoming bool         // future planned/due dates
 	Anytime  bool         // no planned_date and no due_date (active only)
 	Inbox    bool         // no project, no area, no dates
-	TagName  string       // filter by tag
+	TagName  string       // filter by tag (single, for backwards compat)
+	TagNames []string     // filter by multiple tags (AND logic - task must have ALL)
 	Search   string       // case-insensitive title search
 	Sort     []SortOption // sort options (default: created desc)
+
+	// NOT filters for bulk edit
+	NotParentID *int64   // exclude tasks with this parent (project)
+	NotAreaID   *int64   // exclude tasks with this area
+	NotTagNames []string // exclude tasks with any of these tags
 }
 
 // buildOrderByClause builds the ORDER BY clause from sort options
@@ -140,9 +147,17 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 	query += ` LEFT JOIN areas parent_area ON parent.area_id = parent_area.id`
 	args := []any{}
 
-	// Join with task_tags if filtering by tag
+	// Join with task_tags if filtering by single tag (backwards compat)
 	if filter != nil && filter.TagName != "" {
 		query += ` INNER JOIN task_tags tt ON t.id = tt.task_id`
+	}
+
+	// Join with task_tags for each tag in TagNames (AND logic)
+	if filter != nil && len(filter.TagNames) > 0 {
+		for i := range filter.TagNames {
+			alias := fmt.Sprintf("tt%d", i)
+			query += fmt.Sprintf(` INNER JOIN task_tags %s ON t.id = %s.task_id`, alias, alias)
+		}
 	}
 
 	query += ` WHERE t.status = ?`
@@ -156,6 +171,12 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 		if filter.TagName != "" {
 			query += ` AND tt.tag_name = ?`
 			args = append(args, filter.TagName)
+		}
+		// Multiple tags with AND logic
+		for i, tag := range filter.TagNames {
+			alias := fmt.Sprintf("tt%d", i)
+			query += fmt.Sprintf(` AND %s.tag_name = ?`, alias)
+			args = append(args, tag)
 		}
 		if filter.ParentID != nil {
 			query += ` AND t.parent_id = ?`
@@ -197,6 +218,20 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 		if filter.Search != "" {
 			query += ` AND t.title LIKE ? COLLATE NOCASE`
 			args = append(args, "%"+filter.Search+"%")
+		}
+
+		// NOT conditions for bulk edit
+		if filter.NotParentID != nil {
+			query += ` AND (t.parent_id IS NULL OR t.parent_id != ?)`
+			args = append(args, *filter.NotParentID)
+		}
+		if filter.NotAreaID != nil {
+			query += ` AND (t.area_id IS NULL OR t.area_id != ?)`
+			args = append(args, *filter.NotAreaID)
+		}
+		for _, tag := range filter.NotTagNames {
+			query += ` AND NOT EXISTS (SELECT 1 FROM task_tags nt WHERE nt.task_id = t.id AND nt.tag_name = ?)`
+			args = append(args, tag)
 		}
 	}
 

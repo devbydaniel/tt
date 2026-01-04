@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/devbydaniel/tt/internal/dateparse"
+	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -28,11 +29,21 @@ func NewEditCmd(deps *Dependencies) *cobra.Command {
 	var someday bool
 	var active bool
 
+	// Bulk edit filter flags
+	var whereProject string
+	var whereNotProject string
+	var whereArea string
+	var whereNotArea string
+	var whereTags []string
+	var whereNotTags []string
+	var whereState string
+	var dryRun bool
+
 	cmd := &cobra.Command{
-		Use:     "edit <task-id>...",
+		Use:     "edit [<task-id>...]",
 		Aliases: []string{"e"},
 		Short:   "Edit one or more tasks",
-		Long: `Edit task properties. Supports multiple task IDs.
+		Long: `Edit task properties. Specify task IDs or use --where-* filters for bulk editing.
 
 Examples:
   t edit 1 --title "New title"
@@ -46,17 +57,70 @@ Examples:
   t edit 1 --clear-project
   t edit 1 --clear-due
   t edit 1 --someday
-  t edit 1 --active`,
-		Args: cobra.MinimumNArgs(1),
+  t edit 1 --active
+
+Bulk editing with filters (all --where-* flags are ANDed together):
+  t edit --where-project OldProject --project NewProject
+  t edit --where-tag urgent --where-tag work --clear-planned
+  t edit --where-state someday --active
+  t edit --where-area Health --where-not-tag done --today
+  t edit --where-project Work --dry-run`,
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse all task IDs first
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
+
+			// Determine mode: ID-based vs filter-based
+			hasWhereFlags := whereProject != "" || whereNotProject != "" ||
+				whereArea != "" || whereNotArea != "" ||
+				len(whereTags) > 0 || len(whereNotTags) > 0 ||
+				whereState != ""
+			hasIDArgs := len(args) > 0
+
+			// Validation: cannot mix ID args with where-* flags
+			if hasIDArgs && hasWhereFlags {
+				return errors.New("cannot specify both task IDs and --where-* flags")
+			}
+
 			var ids []int64
-			for _, arg := range args {
-				id, err := strconv.ParseInt(arg, 10, 64)
+
+			if hasWhereFlags {
+				// Bulk edit mode: query matching tasks
+				tasks, err := deps.App.ListTasks.Execute(&task.ListOptions{
+					TaskType:       task.TaskTypeTask, // only edit tasks, not projects
+					ProjectName:    whereProject,
+					NotProjectName: whereNotProject,
+					AreaName:       whereArea,
+					NotAreaName:    whereNotArea,
+					TagNames:       whereTags,
+					NotTagNames:    whereNotTags,
+					State:          task.State(whereState),
+				})
 				if err != nil {
-					return errors.New("invalid task ID: " + arg)
+					return err
 				}
-				ids = append(ids, id)
+
+				if len(tasks) == 0 {
+					return errors.New("no tasks match the specified filters")
+				}
+
+				// Dry run: show what would be edited
+				if dryRun {
+					formatter.BulkEditPreview(tasks)
+					return nil
+				}
+
+				for _, t := range tasks {
+					ids = append(ids, t.ID)
+				}
+			} else if hasIDArgs {
+				// ID mode: parse task IDs from args
+				for _, arg := range args {
+					id, err := strconv.ParseInt(arg, 10, 64)
+					if err != nil {
+						return errors.New("invalid task ID: " + arg)
+					}
+					ids = append(ids, id)
+				}
 			}
 
 			// Validate mutual exclusivity
@@ -88,8 +152,6 @@ Examples:
 				return errors.New("cannot specify both --description and --clear-description")
 			}
 
-			formatter := output.NewFormatter(os.Stdout, deps.Theme)
-
 			// If no changes specified and single task, show details
 			hasChanges := title != "" || description != "" || projectName != "" || areaName != "" ||
 				plannedStr != "" || dueStr != "" || today || clearPlanned || clearDue ||
@@ -103,10 +165,12 @@ Examples:
 						return err
 					}
 					formatter.TaskDetails(t)
+					return nil
+				} else if len(ids) == 0 && !hasWhereFlags {
+					return errors.New("specify task IDs or --where-* filters")
 				} else {
 					return errors.New("no changes specified")
 				}
-				return nil
 			}
 
 			// Build changes list once (same for all tasks)
@@ -245,6 +309,11 @@ Examples:
 				formatter.TaskEdited(id, changes)
 			}
 
+			// Show summary for bulk edits
+			if hasWhereFlags && len(ids) > 1 {
+				formatter.BulkEditSummary(len(ids))
+			}
+
 			return nil
 		},
 	}
@@ -267,9 +336,30 @@ Examples:
 	cmd.Flags().BoolVarP(&active, "active", "A", false, "Move to active")
 	cmd.MarkFlagsMutuallyExclusive("someday", "active")
 
+	// Bulk edit filter flags
+	cmd.Flags().StringVar(&whereProject, "where-project", "", "Filter by project")
+	cmd.Flags().StringVar(&whereNotProject, "where-not-project", "", "Exclude project")
+	cmd.Flags().StringVar(&whereArea, "where-area", "", "Filter by area")
+	cmd.Flags().StringVar(&whereNotArea, "where-not-area", "", "Exclude area")
+	cmd.Flags().StringArrayVar(&whereTags, "where-tag", nil, "Filter by tag (AND, repeatable)")
+	cmd.Flags().StringArrayVar(&whereNotTags, "where-not-tag", nil, "Exclude tag (repeatable)")
+	cmd.Flags().StringVar(&whereState, "where-state", "", "Filter by state (active, someday)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview matching tasks without editing")
+
 	// Register completions
 	registry := NewCompletionRegistry(deps)
 	registry.RegisterAll(cmd)
+
+	// Register where-* flag completions
+	_ = cmd.RegisterFlagCompletionFunc("where-project", registry.AllProjectCompletion())
+	_ = cmd.RegisterFlagCompletionFunc("where-not-project", registry.AllProjectCompletion())
+	_ = cmd.RegisterFlagCompletionFunc("where-area", registry.AreaCompletion())
+	_ = cmd.RegisterFlagCompletionFunc("where-not-area", registry.AreaCompletion())
+	_ = cmd.RegisterFlagCompletionFunc("where-tag", registry.TagCompletion())
+	_ = cmd.RegisterFlagCompletionFunc("where-not-tag", registry.TagCompletion())
+	_ = cmd.RegisterFlagCompletionFunc("where-state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"active", "someday"}, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	return cmd
 }

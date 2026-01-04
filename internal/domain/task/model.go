@@ -226,11 +226,17 @@ type ListOptions struct {
 	TaskType    TaskType     // filter by task type ("task", "project", or empty for all)
 	ProjectName string       // user-facing: filter by project name (internally uses ParentID)
 	AreaName    string
-	TagName     string       // filter by tag
+	TagName     string       // filter by tag (single, for backwards compat)
+	TagNames    []string     // filter by multiple tags (AND logic - task must have ALL)
 	Schedule    string       // "today", "upcoming", "anytime", "inbox", "someday"
 	State       State        // explicit state filter ("active", "someday", or empty for schedule-based)
 	Search      string       // case-insensitive title search
 	Sort        []SortOption // sort options (default: created desc)
+
+	// NOT filters for bulk edit
+	NotProjectName string   // exclude tasks in this project
+	NotAreaName    string   // exclude tasks in this area
+	NotTagNames    []string // exclude tasks with any of these tags
 }
 
 // CompleteResult represents the result of completing a task

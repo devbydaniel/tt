@@ -52,6 +52,7 @@ type Model struct {
 	tagModal           TagModal
 	descriptionModal   DescriptionModal
 	confirmModal       ConfirmModal
+	completeModal      CompleteModal
 	createProjectModal CreateProjectModal
 	createAreaModal    CreateAreaModal
 	help               help.Model
@@ -92,6 +93,7 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 		tagModal:           NewTagModal(styles),
 		descriptionModal:   NewDescriptionModal(styles),
 		confirmModal:       NewConfirmModal(styles),
+		completeModal:      NewCompleteModal(styles),
 		createProjectModal: NewCreateProjectModal(styles),
 		createAreaModal:    NewCreateAreaModal(styles),
 		help:               helpModel,
@@ -269,6 +271,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirmModal, result = m.confirmModal.Update(msg)
 			if result != nil && result.Confirmed {
 				return m, m.deleteItem(result)
+			}
+			return m, nil
+		}
+
+		// Route keys to complete modal when active
+		if m.completeModal.Active() {
+			var result *CompleteResult
+			m.completeModal, result = m.completeModal.Update(msg)
+			if result != nil && result.Confirmed {
+				return m, m.completeProject(result)
 			}
 			return m, nil
 		}
@@ -463,6 +475,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
 					return m, m.toggleTask(selectedTask.ID, selectedTask.Status)
+				}
+			}
+			if m.focusArea == FocusSidebar {
+				if proj := m.getSelectedProject(); proj != nil {
+					m.completeModal = m.completeModal.SetSize(m.width, m.height-1)
+					m.completeModal = m.completeModal.Open(proj.ID, proj.Title)
+					return m, nil
 				}
 			}
 
@@ -755,6 +774,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.content = m.content.UpdateTaskStatus(msg.taskID, msg.done)
 		return m, nil
 
+	case projectCompletedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload everything since project and its tasks are now completed
+		return m, m.loadData
+
 	case taskStateUpdatedMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -888,6 +915,12 @@ type taskToggledMsg struct {
 	taskID int64
 	done   bool // true if task was marked done, false if undone
 	err    error
+}
+
+// projectCompletedMsg carries the result of completing a project
+type projectCompletedMsg struct {
+	projectID int64
+	err       error
 }
 
 // taskStateUpdatedMsg carries the result of toggling a task's someday/active state
@@ -1135,6 +1168,14 @@ func (m Model) toggleTask(taskID int64, currentStatus task.Status) tea.Cmd {
 		// Complete the task
 		_, err = m.app.CompleteTasks.Execute([]int64{taskID})
 		return taskToggledMsg{taskID: taskID, done: true, err: err}
+	}
+}
+
+// completeProject creates a command to complete a project and all its tasks
+func (m Model) completeProject(result *CompleteResult) tea.Cmd {
+	return func() tea.Msg {
+		_, err := m.app.CompleteTasks.Execute([]int64{result.ProjectID})
+		return projectCompletedMsg{projectID: result.ProjectID, err: err}
 	}
 }
 
@@ -1440,6 +1481,9 @@ func (m Model) View() string {
 	}
 	if m.confirmModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.confirmModal.View(), helpView)
+	}
+	if m.completeModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.completeModal.View(), helpView)
 	}
 	if m.createProjectModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.createProjectModal.View(), helpView)
