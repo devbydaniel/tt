@@ -76,9 +76,9 @@ type ListFilter struct {
 	Sort     []SortOption // sort options (default: created desc)
 
 	// NOT filters for bulk edit
-	NotParentID *int64   // exclude tasks with this parent (project)
-	NotAreaID   *int64   // exclude tasks with this area
-	NotTagNames []string // exclude tasks with any of these tags
+	NotParentIDs []int64  // exclude tasks with these parents (projects) - AND logic
+	NotAreaIDs   []int64  // exclude tasks with these areas - AND logic
+	NotTagNames  []string // exclude tasks with any of these tags
 }
 
 // buildOrderByClause builds the ORDER BY clause from sort options
@@ -220,14 +220,14 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 			args = append(args, "%"+filter.Search+"%")
 		}
 
-		// NOT conditions for bulk edit
-		if filter.NotParentID != nil {
+		// NOT conditions for bulk edit (AND logic - exclude tasks matching ANY of these)
+		for _, parentID := range filter.NotParentIDs {
 			query += ` AND (t.parent_id IS NULL OR t.parent_id != ?)`
-			args = append(args, *filter.NotParentID)
+			args = append(args, parentID)
 		}
-		if filter.NotAreaID != nil {
+		for _, areaID := range filter.NotAreaIDs {
 			query += ` AND (t.area_id IS NULL OR t.area_id != ?)`
-			args = append(args, *filter.NotAreaID)
+			args = append(args, areaID)
 		}
 		for _, tag := range filter.NotTagNames {
 			query += ` AND NOT EXISTS (SELECT 1 FROM task_tags nt WHERE nt.task_id = t.id AND nt.tag_name = ?)`

@@ -234,9 +234,9 @@ type ListOptions struct {
 	Sort        []SortOption // sort options (default: created desc)
 
 	// NOT filters for bulk edit
-	NotProjectName string   // exclude tasks in this project
-	NotAreaName    string   // exclude tasks in this area
-	NotTagNames    []string // exclude tasks with any of these tags
+	NotProjectNames []string // exclude tasks in these projects (AND logic)
+	NotAreaNames    []string // exclude tasks in these areas (AND logic)
+	NotTagNames     []string // exclude tasks with any of these tags
 }
 
 // CompleteResult represents the result of completing a task

@@ -81,28 +81,28 @@ func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
 			}
 		}
 
-		// NOT filters for bulk edit
-		if opts.NotProjectName != "" {
-			p, err := l.ProjectLookup.Execute(opts.NotProjectName)
+		// NOT filters for bulk edit (AND logic - all must be satisfied)
+		for _, projectName := range opts.NotProjectNames {
+			p, err := l.ProjectLookup.Execute(projectName)
 			if err != nil {
 				// If project not found, the NOT condition is vacuously satisfied
-				// (no tasks belong to a non-existent project) - just skip the filter
+				// (no tasks belong to a non-existent project) - just skip this filter
 				if !errors.Is(err, task.ErrTaskNotFound) {
 					return nil, err
 				}
 			} else {
-				filter.NotParentID = &p.ID
+				filter.NotParentIDs = append(filter.NotParentIDs, p.ID)
 			}
 		}
-		if opts.NotAreaName != "" {
-			a, err := l.AreaLookup.Execute(opts.NotAreaName)
+		for _, areaName := range opts.NotAreaNames {
+			a, err := l.AreaLookup.Execute(areaName)
 			if err != nil {
-				// If area not found, skip the filter
+				// If area not found, skip this filter
 				if !errors.Is(err, area.ErrAreaNotFound) {
 					return nil, err
 				}
 			} else {
-				filter.NotAreaID = &a.ID
+				filter.NotAreaIDs = append(filter.NotAreaIDs, a.ID)
 			}
 		}
 		if len(opts.NotTagNames) > 0 {

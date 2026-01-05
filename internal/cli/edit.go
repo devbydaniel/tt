@@ -31,9 +31,9 @@ func NewEditCmd(deps *Dependencies) *cobra.Command {
 
 	// Bulk edit filter flags
 	var whereProject string
-	var whereNotProject string
+	var whereNotProjects []string
 	var whereArea string
-	var whereNotArea string
+	var whereNotAreas []string
 	var whereTags []string
 	var whereNotTags []string
 	var whereState string
@@ -64,14 +64,15 @@ Bulk editing with filters (all --where-* flags are ANDed together):
   t edit --where-tag urgent --where-tag work --clear-planned
   t edit --where-state someday --active
   t edit --where-area Health --where-not-tag done --today
+  t edit --where-not-project Work --where-not-project Personal --today
   t edit --where-project Work --dry-run`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			formatter := output.NewFormatter(os.Stdout, deps.Theme)
 
 			// Determine mode: ID-based vs filter-based
-			hasWhereFlags := whereProject != "" || whereNotProject != "" ||
-				whereArea != "" || whereNotArea != "" ||
+			hasWhereFlags := whereProject != "" || len(whereNotProjects) > 0 ||
+				whereArea != "" || len(whereNotAreas) > 0 ||
 				len(whereTags) > 0 || len(whereNotTags) > 0 ||
 				whereState != ""
 			hasIDArgs := len(args) > 0
@@ -86,14 +87,14 @@ Bulk editing with filters (all --where-* flags are ANDed together):
 			if hasWhereFlags {
 				// Bulk edit mode: query matching tasks
 				tasks, err := deps.App.ListTasks.Execute(&task.ListOptions{
-					TaskType:       task.TaskTypeTask, // only edit tasks, not projects
-					ProjectName:    whereProject,
-					NotProjectName: whereNotProject,
-					AreaName:       whereArea,
-					NotAreaName:    whereNotArea,
-					TagNames:       whereTags,
-					NotTagNames:    whereNotTags,
-					State:          task.State(whereState),
+					TaskType:        task.TaskTypeTask, // only edit tasks, not projects
+					ProjectName:     whereProject,
+					NotProjectNames: whereNotProjects,
+					AreaName:        whereArea,
+					NotAreaNames:    whereNotAreas,
+					TagNames:        whereTags,
+					NotTagNames:     whereNotTags,
+					State:           task.State(whereState),
 				})
 				if err != nil {
 					return err
@@ -338,9 +339,9 @@ Bulk editing with filters (all --where-* flags are ANDed together):
 
 	// Bulk edit filter flags
 	cmd.Flags().StringVar(&whereProject, "where-project", "", "Filter by project")
-	cmd.Flags().StringVar(&whereNotProject, "where-not-project", "", "Exclude project")
+	cmd.Flags().StringArrayVar(&whereNotProjects, "where-not-project", nil, "Exclude project (AND, repeatable)")
 	cmd.Flags().StringVar(&whereArea, "where-area", "", "Filter by area")
-	cmd.Flags().StringVar(&whereNotArea, "where-not-area", "", "Exclude area")
+	cmd.Flags().StringArrayVar(&whereNotAreas, "where-not-area", nil, "Exclude area (AND, repeatable)")
 	cmd.Flags().StringArrayVar(&whereTags, "where-tag", nil, "Filter by tag (AND, repeatable)")
 	cmd.Flags().StringArrayVar(&whereNotTags, "where-not-tag", nil, "Exclude tag (repeatable)")
 	cmd.Flags().StringVar(&whereState, "where-state", "", "Filter by state (active, someday)")
