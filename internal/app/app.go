@@ -22,6 +22,7 @@ type App struct {
 	// Sync event use cases
 	PersistSyncEvent *synceventusecases.PersistSyncEvent
 	PushEvents       *synceventusecases.PushEvents
+	ResetSync        *synceventusecases.ResetSync
 
 	// Project use cases (projects are now tasks with task_type='project')
 	CreateProject        *taskusecases.CreateProject
@@ -82,6 +83,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 	// Create sync event persister (nil if sync is disabled)
 	var syncPersister taskusecases.SyncEventPersister
 	var syncEventRepo *syncevent.Repository
+	var resetSync *synceventusecases.ResetSync
 	if clientID != "" {
 		syncEventRepo = syncevent.NewRepository(db)
 		syncPersister = &synceventusecases.PersistSyncEvent{
@@ -89,6 +91,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 			TaskLookup: getTask,
 			AreaLookup: getAreaByID,
 		}
+		resetSync = &synceventusecases.ResetSync{Repo: syncEventRepo}
 	}
 
 	// Create push events use case (nil if sync server not configured)
@@ -240,6 +243,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		// Sync event
 		PersistSyncEvent: persistSyncEvent,
 		PushEvents:       pushEvents,
+		ResetSync:        resetSync,
 
 		// Project (tasks with task_type='project')
 		CreateProject:        createProject,

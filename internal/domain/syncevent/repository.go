@@ -203,3 +203,13 @@ func (r *Repository) scanEventRow(row *sql.Row) (*SyncEvent, error) {
 
 	return &event, nil
 }
+
+// DeleteAll removes all sync events from the database.
+// Returns the number of deleted events.
+func (r *Repository) DeleteAll() (int64, error) {
+	result, err := r.db.Conn.Exec("DELETE FROM sync_events")
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
