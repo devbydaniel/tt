@@ -3,13 +3,17 @@ package usecases
 import (
 	"time"
 
+	"github.com/devbydaniel/tt/internal/domain/syncevent"
+	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/recurparse"
 	"github.com/google/uuid"
 )
 
 type CompleteTasks struct {
-	Repo *task.Repository
+	Repo          *task.Repository
+	SyncPersister SyncEventPersister
+	ClientID      string
 }
 
 func (c *CompleteTasks) Execute(ids []int64) ([]task.CompleteResult, error) {
@@ -42,11 +46,29 @@ func (c *CompleteTasks) Execute(ids []int64) ([]task.CompleteResult, error) {
 
 		result := task.CompleteResult{Completed: *t}
 
+		// Emit sync event for completed task
+		if c.SyncPersister != nil {
+			c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+				ClientID:  c.ClientID,
+				EventType: syncevent.EventTypeCompleted,
+				Task:      t,
+			})
+		}
+
 		// Check if task should regenerate (not for projects)
 		if !t.IsProject() && t.RecurType != nil && t.RecurRule != nil && !t.RecurPaused {
 			nextTask := c.regenerateTask(t, completedAt)
 			if nextTask != nil {
 				result.NextTask = nextTask
+
+				// Emit sync event for regenerated task
+				if c.SyncPersister != nil {
+					c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+						ClientID:  c.ClientID,
+						EventType: syncevent.EventTypeCreated,
+						Task:      nextTask,
+					})
+				}
 			}
 		}
 

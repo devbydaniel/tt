@@ -14,7 +14,7 @@ func setupCLI(t *testing.T) *cli.Dependencies {
 	t.Helper()
 	db := testutil.NewTestDB(t)
 
-	application := app.New(db)
+	application := app.New(db, "", nil)
 
 	return &cli.Dependencies{
 		App:    application,

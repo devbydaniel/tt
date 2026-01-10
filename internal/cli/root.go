@@ -56,6 +56,9 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	// Interactive TUI
 	rootCmd.AddCommand(NewTUICmd(deps))
 
+	// Sync
+	rootCmd.AddCommand(NewSyncCmd(deps))
+
 	return rootCmd
 }
 

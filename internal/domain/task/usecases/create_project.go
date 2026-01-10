@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/devbydaniel/tt/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/syncevent"
+	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/google/uuid"
 )
@@ -23,8 +25,10 @@ type CreateProjectOptions struct {
 }
 
 type CreateProject struct {
-	Repo       *task.Repository
-	AreaLookup AreaLookupForCreateProject
+	Repo          *task.Repository
+	AreaLookup    AreaLookupForCreateProject
+	SyncPersister SyncEventPersister
+	ClientID      string
 }
 
 func (c *CreateProject) Execute(name string, opts *CreateProjectOptions) (*task.Task, error) {
@@ -60,6 +64,15 @@ func (c *CreateProject) Execute(name string, opts *CreateProjectOptions) (*task.
 
 	if err := c.Repo.Create(p); err != nil {
 		return nil, err
+	}
+
+	// Emit sync event if sync is enabled
+	if c.SyncPersister != nil {
+		c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+			ClientID:  c.ClientID,
+			EventType: syncevent.EventTypeCreated,
+			Task:      p,
+		})
 	}
 
 	return p, nil

@@ -35,7 +35,14 @@ func run() error {
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
-	application := app.New(db)
+	var syncCfg *app.SyncConfig
+	if cfg.Sync.URL != "" {
+		syncCfg = &app.SyncConfig{
+			URL:    cfg.Sync.URL,
+			APIKey: cfg.Sync.APIKey,
+		}
+	}
+	application := app.New(db, cfg.ClientID, syncCfg)
 	theme := output.NewTheme(&cfg.Theme)
 
 	deps := &cli.Dependencies{

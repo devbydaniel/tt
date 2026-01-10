@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/devbydaniel/tt/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/syncevent"
+	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
@@ -14,8 +16,10 @@ type AreaLookupForSetArea interface {
 }
 
 type SetTaskArea struct {
-	Repo       *task.Repository
-	AreaLookup AreaLookupForSetArea
+	Repo          *task.Repository
+	AreaLookup    AreaLookupForSetArea
+	SyncPersister SyncEventPersister
+	ClientID      string
 }
 
 func (s *SetTaskArea) Execute(id int64, areaName string) (*task.Task, error) {
@@ -41,6 +45,15 @@ func (s *SetTaskArea) Execute(id int64, areaName string) (*task.Task, error) {
 
 	if err := s.Repo.Update(t); err != nil {
 		return nil, err
+	}
+
+	// Emit sync event if sync is enabled
+	if s.SyncPersister != nil {
+		s.SyncPersister.Execute(&synceventusecases.PersistOptions{
+			ClientID:  s.ClientID,
+			EventType: syncevent.EventTypeUpdated,
+			Task:      t,
+		})
 	}
 
 	return t, nil

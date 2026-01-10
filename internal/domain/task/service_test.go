@@ -13,7 +13,7 @@ import (
 func setupApp(t *testing.T) *app.App {
 	t.Helper()
 	db := testutil.NewTestDB(t)
-	return app.New(db)
+	return app.New(db, "", nil)
 }
 
 func TestTaskCreate(t *testing.T) {

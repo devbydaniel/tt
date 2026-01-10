@@ -4,6 +4,8 @@ import (
 	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	areausecases "github.com/devbydaniel/tt/internal/domain/area/usecases"
+	"github.com/devbydaniel/tt/internal/domain/syncevent"
+	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	taskusecases "github.com/devbydaniel/tt/internal/domain/task/usecases"
 )
@@ -13,8 +15,13 @@ type App struct {
 	CreateArea    *areausecases.CreateArea
 	ListAreas     *areausecases.ListAreas
 	GetAreaByName *areausecases.GetAreaByName
+	GetAreaByID   *areausecases.GetAreaByID
 	DeleteArea    *areausecases.DeleteArea
 	RenameArea    *areausecases.RenameArea
+
+	// Sync event use cases
+	PersistSyncEvent *synceventusecases.PersistSyncEvent
+	PushEvents       *synceventusecases.PushEvents
 
 	// Project use cases (projects are now tasks with task_type='project')
 	CreateProject        *taskusecases.CreateProject
@@ -49,7 +56,13 @@ type App struct {
 	SetTags            *taskusecases.SetTags
 }
 
-func New(db *database.DB) *App {
+// SyncConfig holds sync configuration.
+type SyncConfig struct {
+	URL    string
+	APIKey string
+}
+
+func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 	// Create repositories
 	areaRepo := area.NewRepository(db)
 	taskRepo := task.NewRepository(db)
@@ -58,14 +71,44 @@ func New(db *database.DB) *App {
 	createArea := &areausecases.CreateArea{Repo: areaRepo}
 	listAreas := &areausecases.ListAreas{Repo: areaRepo}
 	getAreaByName := &areausecases.GetAreaByName{Repo: areaRepo}
+	getAreaByID := &areausecases.GetAreaByID{Repo: areaRepo}
 	deleteArea := &areausecases.DeleteArea{Repo: areaRepo}
 	renameArea := &areausecases.RenameArea{Repo: areaRepo}
 
 	// Create project use cases (projects are now tasks with task_type='project')
 	getProjectByName := &taskusecases.GetProjectByName{Repo: taskRepo}
+	getTask := &taskusecases.GetTask{Repo: taskRepo}
+
+	// Create sync event persister (nil if sync is disabled)
+	var syncPersister taskusecases.SyncEventPersister
+	var syncEventRepo *syncevent.Repository
+	if clientID != "" {
+		syncEventRepo = syncevent.NewRepository(db)
+		syncPersister = &synceventusecases.PersistSyncEvent{
+			Repo:       syncEventRepo,
+			TaskLookup: getTask,
+			AreaLookup: getAreaByID,
+		}
+	}
+
+	// Create push events use case (nil if sync server not configured)
+	var pushEvents *synceventusecases.PushEvents
+	if syncCfg != nil && syncCfg.URL != "" && syncCfg.APIKey != "" && clientID != "" {
+		if syncEventRepo == nil {
+			syncEventRepo = syncevent.NewRepository(db)
+		}
+		pushEvents = &synceventusecases.PushEvents{
+			Repo:     syncEventRepo,
+			Client:   syncevent.NewClient(syncCfg.URL, syncCfg.APIKey),
+			ClientID: clientID,
+		}
+	}
+
 	createProject := &taskusecases.CreateProject{
-		Repo:       taskRepo,
-		AreaLookup: getAreaByName,
+		Repo:          taskRepo,
+		AreaLookup:    getAreaByName,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
 	}
 	listProjects := &taskusecases.ListProjects{Repo: taskRepo}
 	listAllProjects := &taskusecases.ListAllProjects{Repo: taskRepo}
@@ -76,47 +119,127 @@ func New(db *database.DB) *App {
 		Repo:          taskRepo,
 		ProjectLookup: getProjectByName,
 		AreaLookup:    getAreaByName,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
 	}
 	listTasks := &taskusecases.ListTasks{
 		Repo:          taskRepo,
 		ProjectLookup: getProjectByName,
 		AreaLookup:    getAreaByName,
 	}
-	getTask := &taskusecases.GetTask{Repo: taskRepo}
-	completeTasks := &taskusecases.CompleteTasks{Repo: taskRepo}
-	uncompleteTasks := &taskusecases.UncompleteTasks{Repo: taskRepo}
-	deleteTasks := &taskusecases.DeleteTasks{Repo: taskRepo}
+	completeTasks := &taskusecases.CompleteTasks{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	uncompleteTasks := &taskusecases.UncompleteTasks{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	deleteTasks := &taskusecases.DeleteTasks{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
 	listCompletedTasks := &taskusecases.ListCompletedTasks{Repo: taskRepo}
-	deferTask := &taskusecases.DeferTask{Repo: taskRepo}
-	activateTask := &taskusecases.ActivateTask{Repo: taskRepo}
-	setPlannedDate := &taskusecases.SetPlannedDate{Repo: taskRepo}
-	setDueDate := &taskusecases.SetDueDate{Repo: taskRepo}
+	deferTask := &taskusecases.DeferTask{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	activateTask := &taskusecases.ActivateTask{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	setPlannedDate := &taskusecases.SetPlannedDate{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	setDueDate := &taskusecases.SetDueDate{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
 	setTaskProject := &taskusecases.SetTaskProject{
 		Repo:          taskRepo,
 		ProjectLookup: getProjectByName,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
 	}
 	setTaskArea := &taskusecases.SetTaskArea{
-		Repo:       taskRepo,
-		AreaLookup: getAreaByName,
+		Repo:          taskRepo,
+		AreaLookup:    getAreaByName,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
 	}
-	setTaskTitle := &taskusecases.SetTaskTitle{Repo: taskRepo}
-	setTaskDescription := &taskusecases.SetTaskDescription{Repo: taskRepo}
-	setRecurrence := &taskusecases.SetRecurrence{Repo: taskRepo}
-	pauseRecurrence := &taskusecases.PauseRecurrence{Repo: taskRepo}
-	resumeRecurrence := &taskusecases.ResumeRecurrence{Repo: taskRepo}
-	setRecurrenceEnd := &taskusecases.SetRecurrenceEnd{Repo: taskRepo}
-	addTag := &taskusecases.AddTag{Repo: taskRepo}
-	removeTag := &taskusecases.RemoveTag{Repo: taskRepo}
+	setTaskTitle := &taskusecases.SetTaskTitle{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	setTaskDescription := &taskusecases.SetTaskDescription{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	setRecurrence := &taskusecases.SetRecurrence{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	pauseRecurrence := &taskusecases.PauseRecurrence{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	resumeRecurrence := &taskusecases.ResumeRecurrence{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	setRecurrenceEnd := &taskusecases.SetRecurrenceEnd{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	addTag := &taskusecases.AddTag{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+	removeTag := &taskusecases.RemoveTag{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
 	listTagsUC := &taskusecases.ListTags{Repo: taskRepo}
-	setTags := &taskusecases.SetTags{Repo: taskRepo}
+	setTags := &taskusecases.SetTags{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+
+	// Expose sync persister for direct access (nil if sync disabled)
+	var persistSyncEvent *synceventusecases.PersistSyncEvent
+	if p, ok := syncPersister.(*synceventusecases.PersistSyncEvent); ok {
+		persistSyncEvent = p
+	}
 
 	return &App{
 		// Area
 		CreateArea:    createArea,
 		ListAreas:     listAreas,
 		GetAreaByName: getAreaByName,
+		GetAreaByID:   getAreaByID,
 		DeleteArea:    deleteArea,
 		RenameArea:    renameArea,
+
+		// Sync event
+		PersistSyncEvent: persistSyncEvent,
+		PushEvents:       pushEvents,
 
 		// Project (tasks with task_type='project')
 		CreateProject:        createProject,

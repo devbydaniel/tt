@@ -15,8 +15,15 @@ type ListSettings struct {
 	HideScope bool   `toml:"hide_scope"`
 }
 
+// SyncConfig holds configuration for sync server communication
+type SyncConfig struct {
+	URL    string `toml:"url"`     // sync server URL (e.g., "http://localhost:8080")
+	APIKey string `toml:"api_key"` // shared secret for authentication
+}
+
 type Config struct {
 	Database string
+	ClientID string // unique client identifier for sync (user-defined)
 	Sort     string // global default sort
 	Group    string // global default group
 	Today         ListSettings
@@ -31,6 +38,7 @@ type Config struct {
 	List        ListSettings // for "all" view
 	Inbox         ListSettings
 	Theme       ThemeConfig
+	Sync        SyncConfig
 }
 
 // ThemeConfig holds color and icon settings for output formatting
@@ -165,9 +173,10 @@ func (c *Config) GetHideScope(listName string) bool {
 
 // fileConfig represents the TOML config file structure
 type fileConfig struct {
-	DataDir string `toml:"data_dir"`
-	Sort    string `toml:"sort"`
-	Group   string `toml:"group"`
+	DataDir  string `toml:"data_dir"`
+	ClientID string `toml:"client_id"`
+	Sort     string `toml:"sort"`
+	Group    string `toml:"group"`
 	Today         ListSettings `toml:"today"`
 	Upcoming      ListSettings `toml:"upcoming"`
 	Anytime       ListSettings `toml:"anytime"`
@@ -180,6 +189,7 @@ type fileConfig struct {
 	List        ListSettings `toml:"list"`
 	Inbox         ListSettings `toml:"inbox"`
 	Theme       ThemeConfig  `toml:"theme"`
+	Sync        SyncConfig   `toml:"sync"`
 }
 
 func Load() (*Config, error) {
@@ -196,6 +206,7 @@ func Load() (*Config, error) {
 	if configPath := configFilePath(); configPath != "" {
 		var fc fileConfig
 		if _, err := toml.DecodeFile(configPath, &fc); err == nil {
+			cfg.ClientID = fc.ClientID
 			cfg.Sort = fc.Sort
 			cfg.Group = fc.Group
 			cfg.Today = fc.Today
@@ -210,6 +221,7 @@ func Load() (*Config, error) {
 			cfg.List = fc.List
 			cfg.Inbox = fc.Inbox
 			cfg.Theme = fc.Theme
+			cfg.Sync = fc.Sync
 		}
 	}
 

@@ -4,11 +4,15 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/devbydaniel/tt/internal/domain/syncevent"
+	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
 type SetTaskDescription struct {
-	Repo *task.Repository
+	Repo          *task.Repository
+	SyncPersister SyncEventPersister
+	ClientID      string
 }
 
 func (s *SetTaskDescription) Execute(id int64, description *string) (*task.Task, error) {
@@ -24,6 +28,15 @@ func (s *SetTaskDescription) Execute(id int64, description *string) (*task.Task,
 
 	if err := s.Repo.Update(t); err != nil {
 		return nil, err
+	}
+
+	// Emit sync event if sync is enabled
+	if s.SyncPersister != nil {
+		s.SyncPersister.Execute(&synceventusecases.PersistOptions{
+			ClientID:  s.ClientID,
+			EventType: syncevent.EventTypeUpdated,
+			Task:      t,
+		})
 	}
 
 	return t, nil

@@ -4,11 +4,15 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/devbydaniel/tt/internal/domain/syncevent"
+	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
 type DeleteTasks struct {
-	Repo *task.Repository
+	Repo          *task.Repository
+	SyncPersister SyncEventPersister
+	ClientID      string
 }
 
 func (d *DeleteTasks) Execute(ids []int64) ([]task.Task, error) {
@@ -25,6 +29,17 @@ func (d *DeleteTasks) Execute(ids []int64) ([]task.Task, error) {
 		if err := d.Repo.Delete(id); err != nil {
 			return deleted, err
 		}
+
+		// Emit sync event with task data captured before deletion
+		if d.SyncPersister != nil {
+			d.SyncPersister.Execute(&synceventusecases.PersistOptions{
+				ClientID:   d.ClientID,
+				EventType:  syncevent.EventTypeDeleted,
+				Task:       t,
+				EntityUUID: t.UUID,
+			})
+		}
+
 		deleted = append(deleted, *t)
 	}
 
