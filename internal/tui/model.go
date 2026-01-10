@@ -666,7 +666,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Get groupBy and hideScope for initial "today" view
 		groupBy := m.config.GetGroup("today")
 		hideScope := m.config.GetHideScope("today")
-		m.content = m.content.SetTasks(msg.tasks, "Today", groupBy, hideScope)
+		// Initial load - reset to top (0, 0)
+		m.content = m.content.SetTasks(msg.tasks, "Today", groupBy, hideScope, 0, 0)
 		return m, nil
 
 	case tasksLoadedMsg:
@@ -674,7 +675,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope)
+		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		return m, nil
 
 	case scheduleTasksLoadedMsg:
@@ -682,7 +683,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.content = m.content.SetScheduleGroups(msg.groups, msg.title, msg.hideScope)
+		m.content = m.content.SetScheduleGroups(msg.groups, msg.title, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		return m, nil
 
 	case taskRenamedMsg:
@@ -698,8 +699,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isProjectID(msg.task.ID) {
 			return m, m.loadData
 		}
-		// Reload tasks to show the updated title
-		return m, m.loadTasksForSelection
+		// Reload tasks to show the updated title, preserving selection
+		return m, m.loadTasksPreserveSelection
 
 	case areaRenamedMsg:
 		if msg.err != nil {
@@ -722,8 +723,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isProjectID(msg.task.ID) {
 			return m, m.loadData
 		}
-		// Reload tasks to reflect the move
-		return m, m.loadTasksForSelection
+		// Reload tasks to reflect the move, preserving selection
+		return m, m.loadTasksPreserveSelection
 
 	case taskDateUpdatedMsg:
 		if msg.err != nil {
@@ -738,8 +739,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isProjectID(msg.task.ID) {
 			m.updateProjectCache(msg.task)
 		}
-		// Reload tasks to reflect the date change
-		return m, m.loadTasksForSelection
+		// Reload tasks to reflect the date change, preserving selection
+		return m, m.loadTasksPreserveSelection
 
 	case taskCreatedMsg:
 		if msg.err != nil {
@@ -795,8 +796,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isProjectID(msg.task.ID) {
 			return m, m.loadData
 		}
-		// Reload tasks to reflect the state change
-		return m, m.loadTasksForSelection
+		// Reload tasks to reflect the state change, preserving selection
+		return m, m.loadTasksPreserveSelection
 
 	case taskTagsUpdatedMsg:
 		if msg.err != nil {
@@ -811,8 +812,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isProjectID(msg.task.ID) {
 			m.updateProjectCache(msg.task)
 		}
-		// Reload tasks and tags (tags cache may have new tags)
-		return m, m.loadDataAfterTagUpdate
+		// Reload tasks and tags (tags cache may have new tags), preserving selection
+		return m, m.loadDataAfterTagUpdatePreserveSelection
 
 	case taskDescriptionUpdatedMsg:
 		if msg.err != nil {
@@ -823,8 +824,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
 		}
-		// Reload tasks to reflect the description change
-		return m, m.loadTasksForSelection
+		// Reload tasks to reflect the description change, preserving selection
+		return m, m.loadTasksPreserveSelection
 
 	case itemDeletedMsg:
 		if msg.err != nil {
@@ -843,12 +844,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.target == DeleteTargetArea || msg.target == DeleteTargetProject {
 			return m, m.loadData
 		}
-		return m, m.loadTasksForSelection
+		// Preserve index (not task ID) so cursor moves to next task
+		return m, m.loadTasksPreserveIndex
 
 	case tagsAndTasksUpdatedMsg:
 		m.tags = msg.tags
 		m.sidebar = m.sidebar.SetData(m.areas, m.projects, msg.tags)
-		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope)
+		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		return m, nil
 	}
 
@@ -857,11 +859,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // tasksLoadedMsg carries loaded tasks for a selection
 type tasksLoadedMsg struct {
-	tasks     []task.Task
-	title     string
-	groupBy   string
-	hideScope bool
-	err       error
+	tasks          []task.Task
+	title          string
+	groupBy        string
+	hideScope      bool
+	preserveTaskID int64 // task ID to try to restore selection to
+	preserveIndex  int   // fallback index if task not found
+	err            error
 }
 
 // ScheduleGroups holds tasks grouped by schedule
@@ -874,10 +878,12 @@ type ScheduleGroups struct {
 
 // scheduleTasksLoadedMsg carries schedule-grouped tasks
 type scheduleTasksLoadedMsg struct {
-	groups    ScheduleGroups
-	title     string
-	hideScope bool
-	err       error
+	groups         ScheduleGroups
+	title          string
+	hideScope      bool
+	preserveTaskID int64 // task ID to try to restore selection to
+	preserveIndex  int   // fallback index if task not found
+	err            error
 }
 
 // taskRenamedMsg carries the result of a task rename
@@ -1068,6 +1074,45 @@ func (m Model) loadScheduleGroups(item SidebarItem, title string, sortOpts []tas
 	}
 
 	return scheduleTasksLoadedMsg{groups: groups, title: title, hideScope: hideScope}
+}
+
+// loadTasksPreserveSelection loads tasks while preserving current selection
+func (m Model) loadTasksPreserveSelection() tea.Msg {
+	preserveTaskID := m.content.SelectedTaskID()
+	preserveIndex := m.content.SelectedIndex()
+
+	msg := m.loadTasksForSelection()
+
+	switch typedMsg := msg.(type) {
+	case tasksLoadedMsg:
+		typedMsg.preserveTaskID = preserveTaskID
+		typedMsg.preserveIndex = preserveIndex
+		return typedMsg
+	case scheduleTasksLoadedMsg:
+		typedMsg.preserveTaskID = preserveTaskID
+		typedMsg.preserveIndex = preserveIndex
+		return typedMsg
+	}
+	return msg
+}
+
+// loadTasksPreserveIndex loads tasks while preserving only the index (for delete)
+func (m Model) loadTasksPreserveIndex() tea.Msg {
+	preserveIndex := m.content.SelectedIndex()
+
+	msg := m.loadTasksForSelection()
+
+	switch typedMsg := msg.(type) {
+	case tasksLoadedMsg:
+		typedMsg.preserveTaskID = 0 // Don't try to find deleted task
+		typedMsg.preserveIndex = preserveIndex
+		return typedMsg
+	case scheduleTasksLoadedMsg:
+		typedMsg.preserveTaskID = 0
+		typedMsg.preserveIndex = preserveIndex
+		return typedMsg
+	}
+	return msg
 }
 
 // renameTask creates a command to rename a task
@@ -1399,13 +1444,30 @@ func (m Model) loadDataAfterTagUpdate() tea.Msg {
 	}
 }
 
+// loadDataAfterTagUpdatePreserveSelection reloads tags and tasks while preserving selection
+func (m Model) loadDataAfterTagUpdatePreserveSelection() tea.Msg {
+	preserveTaskID := m.content.SelectedTaskID()
+	preserveIndex := m.content.SelectedIndex()
+
+	msg := m.loadDataAfterTagUpdate()
+
+	if typedMsg, ok := msg.(tagsAndTasksUpdatedMsg); ok {
+		typedMsg.preserveTaskID = preserveTaskID
+		typedMsg.preserveIndex = preserveIndex
+		return typedMsg
+	}
+	return msg
+}
+
 // tagsAndTasksUpdatedMsg carries updated tags and tasks
 type tagsAndTasksUpdatedMsg struct {
-	tags      []string
-	tasks     []task.Task
-	title     string
-	groupBy   string
-	hideScope bool
+	tags           []string
+	tasks          []task.Task
+	title          string
+	groupBy        string
+	hideScope      bool
+	preserveTaskID int64 // task ID to try to restore selection to
+	preserveIndex  int   // fallback index if task not found
 }
 
 // View implements tea.Model

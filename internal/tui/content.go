@@ -68,26 +68,26 @@ func (c Content) SetSize(width, height int) Content {
 }
 
 // SetTasks updates the displayed tasks with optional grouping
-func (c Content) SetTasks(tasks []task.Task, title string, groupBy string, hideScope bool) Content {
+// preserveTaskID and fallbackIndex are used to restore selection after reload:
+// - First tries to find task by preserveTaskID
+// - Falls back to fallbackIndex if task not found
+// - Pass 0, 0 to reset to top
+func (c Content) SetTasks(tasks []task.Task, title string, groupBy string, hideScope bool, preserveTaskID int64, fallbackIndex int) Content {
 	c.title = title
 	c.groupBy = groupBy
 	c.hideScope = hideScope
 	c.displayTasks = c.computeDisplayOrder(tasks, groupBy)
-	// Reset selection when tasks change
-	if c.focused && len(c.displayTasks) > 0 {
-		c.selectedIndex = 0
-	} else {
-		c.selectedIndex = -1
-	}
+	c = c.restoreSelection(preserveTaskID, fallbackIndex)
 	if c.ready {
 		c.viewport.SetContent(c.buildTaskList())
-		c.viewport.GotoTop()
+		c = c.ensureSelectionVisible()
 	}
 	return c
 }
 
 // SetScheduleGroups updates the content with pre-grouped schedule data
-func (c Content) SetScheduleGroups(groups ScheduleGroups, title string, hideScope bool) Content {
+// preserveTaskID and fallbackIndex work the same as in SetTasks
+func (c Content) SetScheduleGroups(groups ScheduleGroups, title string, hideScope bool, preserveTaskID int64, fallbackIndex int) Content {
 	c.groupBy = "schedule"
 	c.hideScope = hideScope
 	c.title = title
@@ -111,15 +111,39 @@ func (c Content) SetScheduleGroups(groups ScheduleGroups, title string, hideScop
 		all = append(all, t)
 	}
 	c.displayTasks = all
-	// Reset selection when tasks change
-	if c.focused && len(c.displayTasks) > 0 {
-		c.selectedIndex = 0
-	} else {
-		c.selectedIndex = -1
-	}
+	c = c.restoreSelection(preserveTaskID, fallbackIndex)
 	if c.ready {
 		c.viewport.SetContent(c.buildTaskList())
-		c.viewport.GotoTop()
+		c = c.ensureSelectionVisible()
+	}
+	return c
+}
+
+// restoreSelection restores the selection after a task list reload
+func (c Content) restoreSelection(preserveTaskID int64, fallbackIndex int) Content {
+	if c.focused && len(c.displayTasks) > 0 {
+		newIndex := -1
+
+		// First try to find the task by ID
+		if preserveTaskID > 0 {
+			newIndex = c.findTaskIndex(preserveTaskID)
+		}
+
+		// Fall back to index if task not found
+		if newIndex < 0 && fallbackIndex >= 0 {
+			newIndex = fallbackIndex
+		}
+
+		// Clamp to valid range
+		if newIndex < 0 {
+			newIndex = 0
+		} else if newIndex >= len(c.displayTasks) {
+			newIndex = len(c.displayTasks) - 1
+		}
+
+		c.selectedIndex = newIndex
+	} else {
+		c.selectedIndex = -1
 	}
 	return c
 }
@@ -776,6 +800,29 @@ func (c Content) SelectedTask() *task.Task {
 		return nil
 	}
 	return &c.displayTasks[c.selectedIndex]
+}
+
+// SelectedTaskID returns the ID of the currently selected task, or 0 if none
+func (c Content) SelectedTaskID() int64 {
+	if c.selectedIndex < 0 || c.selectedIndex >= len(c.displayTasks) {
+		return 0
+	}
+	return c.displayTasks[c.selectedIndex].ID
+}
+
+// SelectedIndex returns the current selection index
+func (c Content) SelectedIndex() int {
+	return c.selectedIndex
+}
+
+// findTaskIndex finds the index of a task by ID, returns -1 if not found
+func (c Content) findTaskIndex(taskID int64) int {
+	for i := range c.displayTasks {
+		if c.displayTasks[i].ID == taskID {
+			return i
+		}
+	}
+	return -1
 }
 
 // UpdateTaskStatus updates a task's status in-place and refreshes the viewport
