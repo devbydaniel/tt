@@ -213,3 +213,108 @@ func (r *Repository) DeleteAll() (int64, error) {
 	}
 	return result.RowsAffected()
 }
+
+// GetMaxID returns the current maximum event ID (for cursor tracking).
+// Returns 0 if no events exist.
+func (r *Repository) GetMaxID() (int64, error) {
+	var maxID sql.NullInt64
+	err := r.db.Conn.QueryRow("SELECT MAX(id) FROM sync_events").Scan(&maxID)
+	if err != nil {
+		return 0, err
+	}
+	if !maxID.Valid {
+		return 0, nil
+	}
+	return maxID.Int64, nil
+}
+
+// EntityState represents the latest state for a single entity.
+type EntityState struct {
+	EntityType string  `json:"entityType"`
+	EntityUUID string  `json:"entityUuid"`
+	EventType  string  `json:"eventType"` // "created", "updated", "deleted", "completed"
+	Snapshot   *string `json:"snapshot"`  // JSON, nil for deletes
+}
+
+// GetLatestStatesSince returns the latest snapshot per entity since cursor,
+// excluding entities in excludeEntityUUIDs (the ones client just pushed).
+// Returns the entity states and the new cursor (max ID seen).
+func (r *Repository) GetLatestStatesSince(cursor int64, excludeEntityUUIDs []string) ([]EntityState, int64, error) {
+	// Build the exclusion clause
+	var excludeClause string
+	var args []any
+	args = append(args, cursor)
+
+	if len(excludeEntityUUIDs) > 0 {
+		placeholders := make([]string, len(excludeEntityUUIDs))
+		for i, uuid := range excludeEntityUUIDs {
+			placeholders[i] = "?"
+			args = append(args, uuid)
+		}
+		excludeClause = fmt.Sprintf(" AND entity_uuid NOT IN (%s)", strings.Join(placeholders, ", "))
+	}
+
+	// Query to get the latest event per entity since cursor
+	// Using a subquery to find max ID per entity, then joining to get full data
+	query := fmt.Sprintf(`
+		SELECT e.entity_type, e.entity_uuid, e.event_type, e.snapshot
+		FROM sync_events e
+		INNER JOIN (
+			SELECT entity_uuid, MAX(id) as max_id
+			FROM sync_events
+			WHERE id > ?%s
+			GROUP BY entity_uuid
+		) latest ON e.entity_uuid = latest.entity_uuid AND e.id = latest.max_id
+		ORDER BY e.id ASC
+	`, excludeClause)
+
+	rows, err := r.db.Conn.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var states []EntityState
+	for rows.Next() {
+		var state EntityState
+		if err := rows.Scan(&state.EntityType, &state.EntityUUID, &state.EventType, &state.Snapshot); err != nil {
+			return nil, 0, err
+		}
+		states = append(states, state)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	// Get the new cursor (max ID)
+	newCursor, err := r.GetMaxID()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return states, newCursor, nil
+}
+
+// GetSyncState retrieves a sync state value by key.
+// Returns empty string if key doesn't exist.
+func (r *Repository) GetSyncState(key string) (string, error) {
+	var value string
+	err := r.db.Conn.QueryRow("SELECT value FROM sync_state WHERE key = ?", key).Scan(&value)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
+// SetSyncState stores a sync state value.
+func (r *Repository) SetSyncState(key, value string) error {
+	_, err := r.db.Conn.Exec(
+		"INSERT INTO sync_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+		key, value,
+	)
+	return err
+}

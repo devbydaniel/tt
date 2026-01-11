@@ -485,6 +485,50 @@ make test     # Run tests
 make clean    # Remove binary
 ```
 
+## Sync Server
+
+The `tt-sync` server enables syncing tasks between multiple devices.
+
+### Building
+
+```bash
+make build-sync    # Build the sync server binary
+```
+
+### Configuration
+
+The sync server loads configuration from environment variables and `.env` file.
+
+**Environment variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TT_SYNC_API_KEY` | Yes | Shared secret for authentication |
+| `TT_DATA_DIR` | No | Data directory (default: `~/.local/share/tt`) |
+| `PORT` | No | HTTP port (default: `8080`) |
+
+**Quick start:**
+
+```bash
+# Copy the example and configure
+cp .env.example .env
+# Edit .env and set TT_SYNC_API_KEY
+
+# Run the server
+make run-sync
+```
+
+**Docker:**
+
+```bash
+docker run -e TT_SYNC_API_KEY=your-secret -e TT_DATA_DIR=/data -v ./data:/data tt-sync
+```
+
+The server exposes:
+- `GET /health` - Health check
+- `POST /api/v1/events` - Push events (requires API key)
+- `POST /api/v1/sync` - Bidirectional sync (requires API key)
+
 ## Shell Completion
 
 Enable tab completion for commands, flags, and dynamic values like project and area names.

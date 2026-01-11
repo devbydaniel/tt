@@ -44,6 +44,21 @@ type PushResponse struct {
 	Rejected []RejectedEvent `json:"rejected"`
 }
 
+// SyncRequest is the request body for bidirectional sync.
+type SyncRequest struct {
+	ClientID string       `json:"clientId"`
+	Cursor   int64        `json:"cursor"` // 0 = first sync
+	Events   []*SyncEvent `json:"events"` // Events to push
+}
+
+// SyncResponse is the response from bidirectional sync.
+type SyncResponse struct {
+	Accepted  []string        `json:"accepted"`  // Pushed events that were accepted
+	Rejected  []RejectedEvent `json:"rejected"`  // Pushed events that were rejected
+	Entities  []EntityState   `json:"entities"`  // Latest state per entity (authoritative)
+	NewCursor int64           `json:"newCursor"` // New cursor to store
+}
+
 // PushEvents sends events to the sync server and returns the response.
 func (c *Client) PushEvents(clientID string, events []*SyncEvent) (*PushResponse, error) {
 	reqBody := PushRequest{
@@ -84,4 +99,48 @@ func (c *Client) PushEvents(clientID string, events []*SyncEvent) (*PushResponse
 	}
 
 	return &pushResp, nil
+}
+
+// Sync performs bidirectional sync with the server.
+// It sends local events and receives the latest state for entities that changed.
+func (c *Client) Sync(clientID string, cursor int64, events []*SyncEvent) (*SyncResponse, error) {
+	reqBody := SyncRequest{
+		ClientID: clientID,
+		Cursor:   cursor,
+		Events:   events,
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/api/v1/sync", bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("authentication failed: invalid API key")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	var syncResp SyncResponse
+	if err := json.NewDecoder(resp.Body).Decode(&syncResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &syncResp, nil
 }

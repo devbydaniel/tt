@@ -69,3 +69,73 @@ func (r *ReceiveEvents) Execute(req *ReceiveRequest) (*ReceiveResult, error) {
 
 	return result, nil
 }
+
+// SyncRequest contains the request for bidirectional sync.
+type SyncRequest struct {
+	ClientID string
+	Cursor   int64
+	Events   []*syncevent.SyncEvent
+}
+
+// SyncResult contains the result of bidirectional sync.
+type SyncResult struct {
+	Accepted  []string
+	Rejected  []RejectedEvent
+	Entities  []syncevent.EntityState
+	NewCursor int64
+}
+
+// ExecuteSync handles bidirectional sync: receives events and returns latest states.
+func (r *ReceiveEvents) ExecuteSync(req *SyncRequest) (*SyncResult, error) {
+	result := &SyncResult{
+		Accepted: make([]string, 0),
+		Rejected: make([]RejectedEvent, 0),
+	}
+
+	// Track which entity UUIDs we just received (to exclude from response)
+	acceptedEntityUUIDs := make([]string, 0)
+
+	// Process incoming events
+	for _, event := range req.Events {
+		// Validate client ID matches
+		if event.ClientID != req.ClientID {
+			result.Rejected = append(result.Rejected, RejectedEvent{
+				EventUUID: event.EventUUID,
+				Reason:    "client_id mismatch",
+			})
+			continue
+		}
+
+		// Check for duplicate
+		existing, err := r.Repo.GetByUUID(event.EventUUID)
+		if err != nil && !errors.Is(err, syncevent.ErrEventNotFound) {
+			return nil, err
+		}
+		if existing != nil {
+			result.Rejected = append(result.Rejected, RejectedEvent{
+				EventUUID: event.EventUUID,
+				Reason:    "duplicate",
+			})
+			continue
+		}
+
+		// Persist the event
+		if err := r.Repo.Create(event); err != nil {
+			return nil, err
+		}
+
+		result.Accepted = append(result.Accepted, event.EventUUID)
+		acceptedEntityUUIDs = append(acceptedEntityUUIDs, event.EntityUUID)
+	}
+
+	// Get latest states since cursor, excluding entities we just received
+	entities, newCursor, err := r.Repo.GetLatestStatesSince(req.Cursor, acceptedEntityUUIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Entities = entities
+	result.NewCursor = newCursor
+
+	return result, nil
+}

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/devbydaniel/tt/config"
+	"github.com/joho/godotenv"
 	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
@@ -20,6 +21,9 @@ func main() {
 }
 
 func run() error {
+	// Load .env file from working directory (optional, errors ignored)
+	_ = godotenv.Load()
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -27,7 +31,7 @@ func run() error {
 
 	// Validate required config
 	if cfg.Sync.APIKey == "" {
-		return fmt.Errorf("sync.api_key must be set in config file")
+		return fmt.Errorf("sync.api_key must be set (via TT_SYNC_API_KEY env var, .env file, or config.toml)")
 	}
 
 	db, err := database.Open(cfg.Database)
@@ -53,6 +57,7 @@ func run() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", handler.HandleHealth)
 	mux.HandleFunc("/api/v1/events", server.AuthMiddleware(cfg.Sync.APIKey, handler.HandlePushEvents))
+	mux.HandleFunc("/api/v1/sync", server.AuthMiddleware(cfg.Sync.APIKey, handler.HandleSync))
 
 	// Start server
 	addr := ":8080"

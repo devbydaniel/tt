@@ -15,7 +15,7 @@ type TaskLookup interface {
 	Execute(id int64) (*task.Task, error)
 }
 
-// AreaLookup resolves an area ID to an area (for getting area name)
+// AreaLookup resolves an area ID to an area (for getting area UUID)
 type AreaLookup interface {
 	Execute(id int64) (*area.Area, error)
 }
@@ -31,30 +31,22 @@ type PersistSyncEvent struct {
 type PersistOptions struct {
 	ClientID   string               // Required: originating client identifier
 	EventType  syncevent.EventType  // Required: type of event
-	Task       *task.Task           // Required for create/update/complete; nil for delete
-	EntityUUID string               // Required for delete (when task is already gone)
+	Task       *task.Task           // For task events
+	Area       *area.Area           // For area events
+	EntityUUID string               // Required for delete (when entity is already gone)
 }
 
-// Execute creates and persists a sync event for a task
+// Execute creates and persists a sync event for a task or area
 func (p *PersistSyncEvent) Execute(opts *PersistOptions) (*syncevent.SyncEvent, error) {
-	// Determine entity UUID
-	entityUUID := opts.EntityUUID
-	if opts.Task != nil {
-		entityUUID = opts.Task.UUID
-	}
-
-	// Get next event version for this entity
-	version, err := p.Repo.GetNextEventVersion(syncevent.EntityTypeTask, entityUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Build snapshot (nil for deletes) and extract metadata
+	var entityType syncevent.EntityType
+	var entityUUID string
 	var snapshotJSON *string
 	var entityTitle, entityStatus *string
 
-	if opts.Task != nil {
-		// Always capture title for reference
+	switch {
+	case opts.Task != nil:
+		entityType = syncevent.EntityTypeTask
+		entityUUID = opts.Task.UUID
 		entityTitle = &opts.Task.Title
 		status := string(opts.Task.Status)
 		entityStatus = &status
@@ -72,12 +64,43 @@ func (p *PersistSyncEvent) Execute(opts *PersistOptions) (*syncevent.SyncEvent, 
 			jsonStr := string(jsonBytes)
 			snapshotJSON = &jsonStr
 		}
+
+	case opts.Area != nil:
+		entityType = syncevent.EntityTypeArea
+		entityUUID = opts.Area.UUID
+		entityTitle = &opts.Area.Name
+		// entityStatus stays nil for areas
+
+		// Build full snapshot for non-delete events
+		if opts.EventType != syncevent.EventTypeDeleted {
+			snapshot := &syncevent.AreaSnapshotData{
+				UUID: opts.Area.UUID,
+				Name: opts.Area.Name,
+			}
+			jsonBytes, err := json.Marshal(snapshot)
+			if err != nil {
+				return nil, err
+			}
+			jsonStr := string(jsonBytes)
+			snapshotJSON = &jsonStr
+		}
+
+	default:
+		// Fallback for delete by UUID (legacy support)
+		entityType = syncevent.EntityTypeTask
+		entityUUID = opts.EntityUUID
+	}
+
+	// Get next event version for this entity
+	version, err := p.Repo.GetNextEventVersion(entityType, entityUUID)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create the event
 	event := &syncevent.SyncEvent{
 		EventUUID:    uuid.New().String(),
-		EntityType:   syncevent.EntityTypeTask,
+		EntityType:   entityType,
 		EntityUUID:   entityUUID,
 		ClientID:     opts.ClientID,
 		EventType:    opts.EventType,
@@ -120,11 +143,11 @@ func (p *PersistSyncEvent) buildTaskSnapshot(t *task.Task) (*syncevent.TaskSnaps
 		}
 	}
 
-	// Resolve AreaID to AreaName
+	// Resolve AreaID to AreaUUID
 	if t.AreaID != nil {
 		a, err := p.AreaLookup.Execute(*t.AreaID)
 		if err == nil && a != nil {
-			snapshot.AreaName = &a.Name
+			snapshot.AreaUUID = &a.UUID
 		}
 	}
 

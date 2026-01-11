@@ -666,3 +666,155 @@ func (r *Repository) CompleteWithChildren(id int64, completedAt time.Time) error
 func (r *Repository) ListChildren(parentID int64) ([]Task, error) {
 	return r.List(&ListFilter{ParentID: &parentID, TaskType: TaskTypeTask})
 }
+
+// GetByUUID finds a task by its UUID.
+func (r *Repository) GetByUUID(uuid string) (*Task, error) {
+	row := r.db.Conn.QueryRow(
+		`SELECT id, uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE uuid = ?`,
+		uuid,
+	)
+
+	var t Task
+	var plannedDate, dueDate *string
+	var createdAt string
+	var completedAt *string
+	var recurEnd *string
+	if err := row.Scan(&t.ID, &t.UUID, &t.Title, &t.Description, &t.TaskType, &t.ParentID, &t.AreaID, &plannedDate, &dueDate, &t.State, &t.Status, &createdAt, &completedAt, &t.RecurType, &t.RecurRule, &recurEnd, &t.RecurPaused, &t.RecurParentID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+	if plannedDate != nil {
+		parsed, _ := time.Parse(dateFormat, *plannedDate)
+		t.PlannedDate = &parsed
+	}
+	if dueDate != nil {
+		parsed, _ := time.Parse(dateFormat, *dueDate)
+		t.DueDate = &parsed
+	}
+	t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	if completedAt != nil {
+		parsed, _ := time.Parse(time.RFC3339, *completedAt)
+		t.CompletedAt = &parsed
+	}
+	if recurEnd != nil {
+		parsed, _ := time.Parse(dateFormat, *recurEnd)
+		t.RecurEnd = &parsed
+	}
+
+	// Load tags
+	tags, err := r.getTagsForTask(t.ID)
+	if err != nil {
+		return nil, err
+	}
+	t.Tags = tags
+
+	return &t, nil
+}
+
+// DeleteByUUID deletes a task by its UUID.
+func (r *Repository) DeleteByUUID(uuid string) error {
+	result, err := r.db.Conn.Exec(`DELETE FROM tasks WHERE uuid = ?`, uuid)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrTaskNotFound
+	}
+
+	return nil
+}
+
+// Upsert creates or updates a task by UUID.
+// If a task with the same UUID exists, it is updated. Otherwise, a new task is created.
+func (r *Repository) Upsert(t *Task) error {
+	// Check if task exists
+	existing, err := r.GetByUUID(t.UUID)
+	if err != nil && !errors.Is(err, ErrTaskNotFound) {
+		return err
+	}
+
+	// Format dates for SQL
+	var plannedDate, dueDate, recurEnd *string
+	if t.PlannedDate != nil {
+		s := t.PlannedDate.Format(dateFormat)
+		plannedDate = &s
+	}
+	if t.DueDate != nil {
+		s := t.DueDate.Format(dateFormat)
+		dueDate = &s
+	}
+	if t.RecurEnd != nil {
+		s := t.RecurEnd.Format(dateFormat)
+		recurEnd = &s
+	}
+
+	createdAtStr := t.CreatedAt.Format(time.RFC3339)
+
+	var completedAtStr *string
+	if t.CompletedAt != nil {
+		s := t.CompletedAt.Format(time.RFC3339)
+		completedAtStr = &s
+	}
+
+	if existing != nil {
+		// Update existing task
+		_, err = r.db.Conn.Exec(
+			`UPDATE tasks SET title = ?, description = ?, task_type = ?, parent_id = ?, area_id = ?,
+			 planned_date = ?, due_date = ?, state = ?, status = ?, completed_at = ?,
+			 recur_type = ?, recur_rule = ?, recur_end = ?, recur_paused = ?, recur_parent_id = ?
+			 WHERE uuid = ?`,
+			t.Title, t.Description, t.TaskType, t.ParentID, t.AreaID,
+			plannedDate, dueDate, t.State, t.Status, completedAtStr,
+			t.RecurType, t.RecurRule, recurEnd, t.RecurPaused, t.RecurParentID,
+			t.UUID,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Update tags
+		if err := r.SetTags(existing.ID, t.Tags); err != nil {
+			return err
+		}
+
+		t.ID = existing.ID
+		return nil
+	}
+
+	// Insert new task
+	taskType := t.TaskType
+	if taskType == "" {
+		taskType = TaskTypeTask
+	}
+
+	result, err := r.db.Conn.Exec(
+		`INSERT INTO tasks (uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.UUID, t.Title, t.Description, taskType, t.ParentID, t.AreaID, plannedDate, dueDate, t.State, t.Status, createdAtStr, completedAtStr,
+		t.RecurType, t.RecurRule, recurEnd, t.RecurPaused, t.RecurParentID,
+	)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	t.ID = id
+	t.TaskType = taskType
+
+	// Set tags for new task
+	if err := r.SetTags(id, t.Tags); err != nil {
+		return err
+	}
+
+	return nil
+}

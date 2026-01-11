@@ -1,0 +1,391 @@
+package syncevent_test
+
+import (
+	"testing"
+	"time"
+
+	"github.com/devbydaniel/tt/internal/domain/syncevent"
+	"github.com/devbydaniel/tt/internal/testutil"
+)
+
+func setupRepo(t *testing.T) *syncevent.Repository {
+	t.Helper()
+	db := testutil.NewTestDB(t)
+	return syncevent.NewRepository(db)
+}
+
+func createTestEvent(clientID, entityUUID, eventUUID string, eventType syncevent.EventType, version int64) *syncevent.SyncEvent {
+	snapshot := `{"uuid":"` + entityUUID + `","title":"Test Task","taskType":"task","state":"inbox","status":"todo","createdAt":"2024-01-01T00:00:00Z"}`
+	return &syncevent.SyncEvent{
+		EventUUID:    eventUUID,
+		EntityType:   syncevent.EntityTypeTask,
+		EntityUUID:   entityUUID,
+		ClientID:     clientID,
+		EventType:    eventType,
+		EventVersion: version,
+		Timestamp:    time.Now(),
+		Snapshot:     &snapshot,
+	}
+}
+
+func TestEventVersioning(t *testing.T) {
+	repo := setupRepo(t)
+	entityUUID := "entity-123"
+
+	// First event for an entity should get version 1
+	v1, err := repo.GetNextEventVersion(syncevent.EntityTypeTask, entityUUID)
+	if err != nil {
+		t.Fatalf("GetNextEventVersion() error = %v", err)
+	}
+	if v1 != 1 {
+		t.Errorf("first version = %d, want 1", v1)
+	}
+
+	// Create event with version 1
+	event1 := createTestEvent("client-1", entityUUID, "event-1", syncevent.EventTypeCreated, v1)
+	if err := repo.Create(event1); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	// Next version should be 2
+	v2, err := repo.GetNextEventVersion(syncevent.EntityTypeTask, entityUUID)
+	if err != nil {
+		t.Fatalf("GetNextEventVersion() error = %v", err)
+	}
+	if v2 != 2 {
+		t.Errorf("second version = %d, want 2", v2)
+	}
+
+	// Create event with version 2
+	event2 := createTestEvent("client-1", entityUUID, "event-2", syncevent.EventTypeUpdated, v2)
+	if err := repo.Create(event2); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	// Next version should be 3
+	v3, err := repo.GetNextEventVersion(syncevent.EntityTypeTask, entityUUID)
+	if err != nil {
+		t.Fatalf("GetNextEventVersion() error = %v", err)
+	}
+	if v3 != 3 {
+		t.Errorf("third version = %d, want 3", v3)
+	}
+}
+
+func TestEventVersioningPerEntity(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Different entities should have independent version counters
+	entity1 := "entity-1"
+	entity2 := "entity-2"
+
+	event1 := createTestEvent("client-1", entity1, "event-1", syncevent.EventTypeCreated, 1)
+	event2 := createTestEvent("client-1", entity1, "event-2", syncevent.EventTypeUpdated, 2)
+	event3 := createTestEvent("client-1", entity2, "event-3", syncevent.EventTypeCreated, 1)
+
+	repo.Create(event1)
+	repo.Create(event2)
+	repo.Create(event3)
+
+	// Entity 1 should be at version 3
+	v1, _ := repo.GetNextEventVersion(syncevent.EntityTypeTask, entity1)
+	if v1 != 3 {
+		t.Errorf("entity1 next version = %d, want 3", v1)
+	}
+
+	// Entity 2 should be at version 2
+	v2, _ := repo.GetNextEventVersion(syncevent.EntityTypeTask, entity2)
+	if v2 != 2 {
+		t.Errorf("entity2 next version = %d, want 2", v2)
+	}
+}
+
+func TestPushTracking(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Create 3 unpushed events
+	event1 := createTestEvent("client-1", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	event2 := createTestEvent("client-1", "entity-2", "event-2", syncevent.EventTypeCreated, 1)
+	event3 := createTestEvent("client-1", "entity-3", "event-3", syncevent.EventTypeCreated, 1)
+
+	repo.Create(event1)
+	repo.Create(event2)
+	repo.Create(event3)
+
+	// All 3 should be unpushed
+	unpushed, err := repo.GetUnpushed(10)
+	if err != nil {
+		t.Fatalf("GetUnpushed() error = %v", err)
+	}
+	if len(unpushed) != 3 {
+		t.Errorf("unpushed count = %d, want 3", len(unpushed))
+	}
+
+	// Mark first 2 as pushed
+	err = repo.MarkAsPushed([]string{"event-1", "event-2"}, time.Now())
+	if err != nil {
+		t.Fatalf("MarkAsPushed() error = %v", err)
+	}
+
+	// Only 1 should be unpushed now
+	unpushed, _ = repo.GetUnpushed(10)
+	if len(unpushed) != 1 {
+		t.Errorf("unpushed count after marking = %d, want 1", len(unpushed))
+	}
+	if unpushed[0].EventUUID != "event-3" {
+		t.Errorf("remaining unpushed = %s, want event-3", unpushed[0].EventUUID)
+	}
+}
+
+func TestPushTrackingBatching(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Create 5 events
+	for i := 1; i <= 5; i++ {
+		event := createTestEvent("client-1", "entity-"+string(rune('0'+i)), "event-"+string(rune('0'+i)), syncevent.EventTypeCreated, 1)
+		repo.Create(event)
+	}
+
+	// Request batch of 2
+	batch, _ := repo.GetUnpushed(2)
+	if len(batch) != 2 {
+		t.Errorf("batch size = %d, want 2", len(batch))
+	}
+
+	// Request all
+	all, _ := repo.GetUnpushed(100)
+	if len(all) != 5 {
+		t.Errorf("total unpushed = %d, want 5", len(all))
+	}
+}
+
+func TestGetByUUID(t *testing.T) {
+	repo := setupRepo(t)
+
+	event := createTestEvent("client-1", "entity-1", "event-uuid-123", syncevent.EventTypeCreated, 1)
+	repo.Create(event)
+
+	// Should find the event
+	found, err := repo.GetByUUID("event-uuid-123")
+	if err != nil {
+		t.Fatalf("GetByUUID() error = %v", err)
+	}
+	if found.EventUUID != "event-uuid-123" {
+		t.Errorf("found UUID = %s, want event-uuid-123", found.EventUUID)
+	}
+	if found.EntityUUID != "entity-1" {
+		t.Errorf("found EntityUUID = %s, want entity-1", found.EntityUUID)
+	}
+
+	// Should return error for non-existent
+	_, err = repo.GetByUUID("non-existent")
+	if err != syncevent.ErrEventNotFound {
+		t.Errorf("GetByUUID() error = %v, want ErrEventNotFound", err)
+	}
+}
+
+func TestCursorBasedPagination(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Create events from multiple clients/entities
+	event1 := createTestEvent("client-a", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	event2 := createTestEvent("client-b", "entity-2", "event-2", syncevent.EventTypeCreated, 1)
+	event3 := createTestEvent("client-a", "entity-1", "event-3", syncevent.EventTypeUpdated, 2) // Update entity-1
+
+	repo.Create(event1)
+	repo.Create(event2)
+	repo.Create(event3)
+
+	// Get initial cursor
+	maxID, _ := repo.GetMaxID()
+	if maxID != 3 {
+		t.Errorf("maxID = %d, want 3", maxID)
+	}
+
+	// Get states from cursor 0 (all entities, but only latest per entity)
+	states, newCursor, err := repo.GetLatestStatesSince(0, nil)
+	if err != nil {
+		t.Fatalf("GetLatestStatesSince() error = %v", err)
+	}
+	if newCursor != 3 {
+		t.Errorf("newCursor = %d, want 3", newCursor)
+	}
+	if len(states) != 2 {
+		t.Errorf("states count = %d, want 2 (latest per entity)", len(states))
+	}
+
+	// Entity-1 should have "updated" as latest event type
+	for _, state := range states {
+		if state.EntityUUID == "entity-1" {
+			if state.EventType != string(syncevent.EventTypeUpdated) {
+				t.Errorf("entity-1 event type = %s, want updated", state.EventType)
+			}
+		}
+	}
+}
+
+func TestCursorExcludesEntities(t *testing.T) {
+	repo := setupRepo(t)
+
+	event1 := createTestEvent("client-a", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	event2 := createTestEvent("client-b", "entity-2", "event-2", syncevent.EventTypeCreated, 1)
+	event3 := createTestEvent("client-c", "entity-3", "event-3", syncevent.EventTypeCreated, 1)
+
+	repo.Create(event1)
+	repo.Create(event2)
+	repo.Create(event3)
+
+	// Exclude entity-2 from results (simulates client just pushed entity-2)
+	states, _, err := repo.GetLatestStatesSince(0, []string{"entity-2"})
+	if err != nil {
+		t.Fatalf("GetLatestStatesSince() error = %v", err)
+	}
+
+	if len(states) != 2 {
+		t.Errorf("states count = %d, want 2 (entity-2 excluded)", len(states))
+	}
+
+	for _, state := range states {
+		if state.EntityUUID == "entity-2" {
+			t.Error("entity-2 should be excluded from results")
+		}
+	}
+}
+
+func TestCursorReturnsOnlyNewerEvents(t *testing.T) {
+	repo := setupRepo(t)
+
+	event1 := createTestEvent("client-a", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	repo.Create(event1)
+
+	// Get cursor after first event
+	cursor, _ := repo.GetMaxID()
+
+	// Create more events
+	event2 := createTestEvent("client-b", "entity-2", "event-2", syncevent.EventTypeCreated, 1)
+	event3 := createTestEvent("client-c", "entity-3", "event-3", syncevent.EventTypeCreated, 1)
+	repo.Create(event2)
+	repo.Create(event3)
+
+	// Get states since cursor - should only return entity-2 and entity-3
+	states, newCursor, _ := repo.GetLatestStatesSince(cursor, nil)
+
+	if len(states) != 2 {
+		t.Errorf("states count = %d, want 2", len(states))
+	}
+	if newCursor != 3 {
+		t.Errorf("newCursor = %d, want 3", newCursor)
+	}
+
+	for _, state := range states {
+		if state.EntityUUID == "entity-1" {
+			t.Error("entity-1 should not be in results (before cursor)")
+		}
+	}
+}
+
+func TestSyncState(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Non-existent key returns empty string
+	value, err := repo.GetSyncState("nonexistent")
+	if err != nil {
+		t.Fatalf("GetSyncState() error = %v", err)
+	}
+	if value != "" {
+		t.Errorf("nonexistent key value = %q, want empty", value)
+	}
+
+	// Set and get
+	if err := repo.SetSyncState("server_cursor", "42"); err != nil {
+		t.Fatalf("SetSyncState() error = %v", err)
+	}
+
+	value, _ = repo.GetSyncState("server_cursor")
+	if value != "42" {
+		t.Errorf("server_cursor = %s, want 42", value)
+	}
+
+	// Update existing key
+	if err := repo.SetSyncState("server_cursor", "100"); err != nil {
+		t.Fatalf("SetSyncState() error = %v", err)
+	}
+
+	value, _ = repo.GetSyncState("server_cursor")
+	if value != "100" {
+		t.Errorf("server_cursor after update = %s, want 100", value)
+	}
+}
+
+func TestDeleteAll(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Create some events
+	event1 := createTestEvent("client-1", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	event2 := createTestEvent("client-1", "entity-2", "event-2", syncevent.EventTypeCreated, 1)
+	repo.Create(event1)
+	repo.Create(event2)
+
+	// Verify they exist
+	unpushed, _ := repo.GetUnpushed(10)
+	if len(unpushed) != 2 {
+		t.Fatalf("should have 2 events before delete")
+	}
+
+	// Delete all
+	count, err := repo.DeleteAll()
+	if err != nil {
+		t.Fatalf("DeleteAll() error = %v", err)
+	}
+	if count != 2 {
+		t.Errorf("deleted count = %d, want 2", count)
+	}
+
+	// Verify they're gone
+	unpushed, _ = repo.GetUnpushed(10)
+	if len(unpushed) != 0 {
+		t.Errorf("should have 0 events after delete, got %d", len(unpushed))
+	}
+}
+
+func TestDeletedEventLatestState(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Create -> Update -> Delete sequence
+	event1 := createTestEvent("client-a", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	event2 := createTestEvent("client-a", "entity-1", "event-2", syncevent.EventTypeUpdated, 2)
+
+	// Delete event has no snapshot
+	deleteEvent := &syncevent.SyncEvent{
+		EventUUID:    "event-3",
+		EntityType:   syncevent.EntityTypeTask,
+		EntityUUID:   "entity-1",
+		ClientID:     "client-a",
+		EventType:    syncevent.EventTypeDeleted,
+		EventVersion: 3,
+		Timestamp:    time.Now(),
+		Snapshot:     nil, // Deletes have no snapshot
+	}
+
+	repo.Create(event1)
+	repo.Create(event2)
+	repo.Create(deleteEvent)
+
+	// Latest state for entity-1 should be "deleted" with nil snapshot
+	states, _, _ := repo.GetLatestStatesSince(0, nil)
+
+	if len(states) != 1 {
+		t.Fatalf("states count = %d, want 1", len(states))
+	}
+
+	state := states[0]
+	if state.EntityUUID != "entity-1" {
+		t.Errorf("entity UUID = %s, want entity-1", state.EntityUUID)
+	}
+	if state.EventType != string(syncevent.EventTypeDeleted) {
+		t.Errorf("event type = %s, want deleted", state.EventType)
+	}
+	if state.Snapshot != nil {
+		t.Error("deleted entity should have nil snapshot")
+	}
+}

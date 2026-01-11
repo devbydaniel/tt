@@ -225,6 +225,9 @@ func Load() (*Config, error) {
 		}
 	}
 
+	// Apply environment variable overrides
+	applyEnvOverrides(cfg)
+
 	return cfg, nil
 }
 
@@ -289,4 +292,18 @@ func defaultDataDir() string {
 	}
 
 	return filepath.Join(home, ".local", "share", "tt")
+}
+
+// applyEnvOverrides applies environment variable overrides to the config.
+// Environment variables take precedence over config file values.
+func applyEnvOverrides(cfg *Config) {
+	if url := os.Getenv("TT_SYNC_URL"); url != "" {
+		cfg.Sync.URL = url
+	}
+	if apiKey := os.Getenv("TT_SYNC_API_KEY"); apiKey != "" {
+		cfg.Sync.APIKey = apiKey
+	}
+	if clientID := os.Getenv("TT_CLIENT_ID"); clientID != "" {
+		cfg.ClientID = clientID
+	}
 }

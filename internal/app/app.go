@@ -22,6 +22,7 @@ type App struct {
 	// Sync event use cases
 	PersistSyncEvent *synceventusecases.PersistSyncEvent
 	PushEvents       *synceventusecases.PushEvents
+	SyncEvents       *synceventusecases.SyncEvents
 	ResetSync        *synceventusecases.ResetSync
 
 	// Project use cases (projects are now tasks with task_type='project')
@@ -68,13 +69,10 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 	areaRepo := area.NewRepository(db)
 	taskRepo := task.NewRepository(db)
 
-	// Create area use cases (no cross-domain dependencies)
-	createArea := &areausecases.CreateArea{Repo: areaRepo}
+	// Create read-only area use cases first (needed by sync persister)
 	listAreas := &areausecases.ListAreas{Repo: areaRepo}
 	getAreaByName := &areausecases.GetAreaByName{Repo: areaRepo}
 	getAreaByID := &areausecases.GetAreaByID{Repo: areaRepo}
-	deleteArea := &areausecases.DeleteArea{Repo: areaRepo}
-	renameArea := &areausecases.RenameArea{Repo: areaRepo}
 
 	// Create project use cases (projects are now tasks with task_type='project')
 	getProjectByName := &taskusecases.GetProjectByName{Repo: taskRepo}
@@ -82,28 +80,63 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 
 	// Create sync event persister (nil if sync is disabled)
 	var syncPersister taskusecases.SyncEventPersister
+	var areaSyncPersister areausecases.SyncEventPersister
 	var syncEventRepo *syncevent.Repository
 	var resetSync *synceventusecases.ResetSync
 	if clientID != "" {
 		syncEventRepo = syncevent.NewRepository(db)
-		syncPersister = &synceventusecases.PersistSyncEvent{
+		persistSyncEventUC := &synceventusecases.PersistSyncEvent{
 			Repo:       syncEventRepo,
 			TaskLookup: getTask,
 			AreaLookup: getAreaByID,
 		}
+		syncPersister = persistSyncEventUC
+		areaSyncPersister = persistSyncEventUC
 		resetSync = &synceventusecases.ResetSync{Repo: syncEventRepo}
+	}
+
+	// Create area use cases with sync support
+	createArea := &areausecases.CreateArea{
+		Repo:          areaRepo,
+		SyncPersister: areaSyncPersister,
+		ClientID:      clientID,
+	}
+	deleteArea := &areausecases.DeleteArea{
+		Repo:          areaRepo,
+		SyncPersister: areaSyncPersister,
+		ClientID:      clientID,
+	}
+	renameArea := &areausecases.RenameArea{
+		Repo:          areaRepo,
+		SyncPersister: areaSyncPersister,
+		ClientID:      clientID,
 	}
 
 	// Create push events use case (nil if sync server not configured)
 	var pushEvents *synceventusecases.PushEvents
+	var syncEvents *synceventusecases.SyncEvents
 	if syncCfg != nil && syncCfg.URL != "" && syncCfg.APIKey != "" && clientID != "" {
 		if syncEventRepo == nil {
 			syncEventRepo = syncevent.NewRepository(db)
 		}
+		syncClient := syncevent.NewClient(syncCfg.URL, syncCfg.APIKey)
 		pushEvents = &synceventusecases.PushEvents{
 			Repo:     syncEventRepo,
-			Client:   syncevent.NewClient(syncCfg.URL, syncCfg.APIKey),
+			Client:   syncClient,
 			ClientID: clientID,
+		}
+		// Create the applier for applying remote entity states
+		applier := &synceventusecases.ApplyEntityStates{
+			TaskUpserter:     taskRepo,
+			TaskByUUIDLookup: taskRepo,
+			AreaByUUIDLookup: areaRepo,
+			AreaUpserter:     areaRepo,
+		}
+		syncEvents = &synceventusecases.SyncEvents{
+			Repo:     syncEventRepo,
+			Client:   syncClient,
+			ClientID: clientID,
+			Applier:  applier,
 		}
 	}
 
@@ -226,9 +259,9 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 	}
 
 	// Expose sync persister for direct access (nil if sync disabled)
-	var persistSyncEvent *synceventusecases.PersistSyncEvent
+	var persistSyncEventExposed *synceventusecases.PersistSyncEvent
 	if p, ok := syncPersister.(*synceventusecases.PersistSyncEvent); ok {
-		persistSyncEvent = p
+		persistSyncEventExposed = p
 	}
 
 	return &App{
@@ -241,8 +274,9 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		RenameArea:    renameArea,
 
 		// Sync event
-		PersistSyncEvent: persistSyncEvent,
+		PersistSyncEvent: persistSyncEventExposed,
 		PushEvents:       pushEvents,
+		SyncEvents:       syncEvents,
 		ResetSync:        resetSync,
 
 		// Project (tasks with task_type='project')
