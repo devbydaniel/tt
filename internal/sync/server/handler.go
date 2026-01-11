@@ -11,12 +11,14 @@ import (
 // Handler handles sync API requests.
 type Handler struct {
 	ReceiveEvents *usecases.ReceiveEvents
+	ResetSync     *usecases.ResetSync
 }
 
 // NewHandler creates a new handler with the given use cases.
-func NewHandler(receiveEvents *usecases.ReceiveEvents) *Handler {
+func NewHandler(receiveEvents *usecases.ReceiveEvents, resetSync *usecases.ResetSync) *Handler {
 	return &Handler{
 		ReceiveEvents: receiveEvents,
+		ResetSync:     resetSync,
 	}
 }
 
@@ -126,4 +128,35 @@ func (h *Handler) HandleSync(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// HandleSyncReset handles POST /api/v1/sync/reset requests.
+// @Summary Reset sync state
+// @Description Clear all local sync events and reset the cursor
+// @Tags sync
+// @Produce json
+// @Success 200 {object} map[string]int64 "Number of events deleted"
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/sync/reset [post]
+func (h *Handler) HandleSyncReset(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if h.ResetSync == nil {
+		http.Error(w, "Sync reset not configured", http.StatusInternalServerError)
+		return
+	}
+
+	count, err := h.ResetSync.Execute()
+	if err != nil {
+		http.Error(w, "Failed to reset sync: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int64{"deleted": count})
 }

@@ -13,7 +13,7 @@ SERVER_PORT=18080
 SERVER_PID=""
 PASSED=0
 FAILED=0
-TOTAL=20  # 10 sync tests + 10 HTTP API tests
+TOTAL=28  # 10 sync tests + 10 HTTP API tests + 8 integration tests
 
 # Color output
 RED='\033[0;31m'
@@ -551,6 +551,190 @@ test_http_delete_task() {
 }
 
 # ============================================================================
+# Sync + HTTP Integration Tests
+# ============================================================================
+
+# ============================================================================
+# Test 21: CLI task visible via HTTP after sync
+# ============================================================================
+test_cli_task_visible_via_http() {
+    client1 add "CLI to HTTP task" > /dev/null
+    client1 sync > /dev/null
+
+    # Task should now be visible via HTTP API
+    local response
+    response=$(http_request "http://localhost:$SERVER_PORT/api/v1/tasks")
+
+    if echo "$response" | jq -e ".[] | select(.title == \"CLI to HTTP task\")" > /dev/null 2>&1; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Task 'CLI to HTTP task' not visible via HTTP after sync${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 22: HTTP task visible to CLI after sync
+# ============================================================================
+test_http_task_visible_to_cli() {
+    # Create task via HTTP
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/tasks" \
+        -d '{"title":"HTTP to CLI task"}')
+
+    local uuid=$(echo "$response" | jq -r '.uuid')
+    if [ -z "$uuid" ] || [ "$uuid" = "null" ]; then
+        echo -e "  ${RED}FAIL: Could not create task via HTTP${NC}"
+        return 1
+    fi
+
+    # Sync client1 to pull the HTTP-created task
+    client1 sync > /dev/null
+
+    # Task should be visible on client1
+    assert_task_exists client1 "HTTP to CLI task"
+}
+
+# ============================================================================
+# Test 23: CLI area visible via HTTP after sync
+# ============================================================================
+test_cli_area_visible_via_http() {
+    client1 area add "CLI Test Area" > /dev/null
+    client1 sync > /dev/null
+
+    # Area should now be visible via HTTP API
+    local response
+    response=$(http_request "http://localhost:$SERVER_PORT/api/v1/areas")
+
+    if echo "$response" | jq -e ".[] | select(.name == \"CLI Test Area\")" > /dev/null 2>&1; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Area 'CLI Test Area' not visible via HTTP after sync${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 24: HTTP area visible to CLI after sync
+# ============================================================================
+test_http_area_visible_to_cli() {
+    # Create area via HTTP
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/areas" \
+        -d '{"name":"HTTP Test Area"}')
+
+    local uuid=$(echo "$response" | jq -r '.uuid')
+    if [ -z "$uuid" ] || [ "$uuid" = "null" ]; then
+        echo -e "  ${RED}FAIL: Could not create area via HTTP${NC}"
+        return 1
+    fi
+
+    # Sync client2 to pull the HTTP-created area
+    client2 sync > /dev/null
+
+    # Area should be visible on client2
+    assert_area_exists client2 "HTTP Test Area"
+}
+
+# ============================================================================
+# Test 25: CLI project visible via HTTP after sync
+# ============================================================================
+test_cli_project_visible_via_http() {
+    client1 project add "CLI Test Project" > /dev/null
+    client1 sync > /dev/null
+
+    # Project should now be visible via HTTP API
+    local response
+    response=$(http_request "http://localhost:$SERVER_PORT/api/v1/projects")
+
+    if echo "$response" | jq -e ".[] | select(.title == \"CLI Test Project\")" > /dev/null 2>&1; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Project 'CLI Test Project' not visible via HTTP after sync${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 26: HTTP project visible to CLI after sync
+# ============================================================================
+test_http_project_visible_to_cli() {
+    # Create project via HTTP
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/projects" \
+        -d '{"title":"HTTP Test Project"}')
+
+    local uuid=$(echo "$response" | jq -r '.uuid')
+    if [ -z "$uuid" ] || [ "$uuid" = "null" ]; then
+        echo -e "  ${RED}FAIL: Could not create project via HTTP${NC}"
+        return 1
+    fi
+
+    # Sync client2 to pull the HTTP-created project
+    client2 sync > /dev/null
+
+    # Project should be visible on client2
+    assert_project_exists client2 "HTTP Test Project"
+}
+
+# ============================================================================
+# Test 27: CLI completed task visible via HTTP log after sync
+# ============================================================================
+test_cli_completed_visible_via_http() {
+    client1 add "CLI completed task" > /dev/null
+    local id=$(get_task_id client1 "CLI completed task")
+    client1 do "$id" > /dev/null
+    client1 sync > /dev/null
+
+    # Completed task should be visible via HTTP completed endpoint
+    local response
+    response=$(http_request "http://localhost:$SERVER_PORT/api/v1/tasks/completed")
+
+    if echo "$response" | jq -e ".[] | select(.title == \"CLI completed task\")" > /dev/null 2>&1; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Completed task 'CLI completed task' not visible via HTTP${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 28: Full round-trip: HTTP -> CLI -> modify -> sync -> HTTP
+# ============================================================================
+test_full_round_trip() {
+    # 1. Create task via HTTP
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/tasks" \
+        -d '{"title":"Round trip task"}')
+
+    local uuid=$(echo "$response" | jq -r '.uuid')
+
+    # 2. Sync to client1
+    client1 sync > /dev/null
+
+    # 3. Verify client1 has the task
+    assert_task_exists client1 "Round trip task" || return 1
+
+    # 4. Modify on client1
+    local id=$(get_task_id client1 "Round trip task")
+    client1 edit "$id" --title "Round trip modified" > /dev/null
+
+    # 5. Sync back to server
+    client1 sync > /dev/null
+
+    # 6. Verify modification visible via HTTP
+    response=$(http_request "http://localhost:$SERVER_PORT/api/v1/tasks/$uuid")
+    local title=$(echo "$response" | jq -r '.title')
+
+    if [ "$title" = "Round trip modified" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected title 'Round trip modified', got '$title'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 main() {
@@ -600,6 +784,17 @@ main() {
     run_test "HTTP Pause recurrence" test_http_pause_recurrence
     run_test "HTTP Resume recurrence" test_http_resume_recurrence
     run_test "HTTP Delete task" test_http_delete_task
+
+    # Run integration tests (sync + HTTP)
+    echo -e "\n${YELLOW}--- Sync + HTTP Integration Tests ---${NC}"
+    run_test "CLI task visible via HTTP" test_cli_task_visible_via_http
+    run_test "HTTP task visible to CLI" test_http_task_visible_to_cli
+    run_test "CLI area visible via HTTP" test_cli_area_visible_via_http
+    run_test "HTTP area visible to CLI" test_http_area_visible_to_cli
+    run_test "CLI project visible via HTTP" test_cli_project_visible_via_http
+    run_test "HTTP project visible to CLI" test_http_project_visible_to_cli
+    run_test "CLI completed task visible via HTTP" test_cli_completed_visible_via_http
+    run_test "Full round-trip" test_full_round_trip
 
     # Results
     echo -e "\n${BLUE}=== Results ===${NC}"

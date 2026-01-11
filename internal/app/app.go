@@ -12,12 +12,13 @@ import (
 
 type App struct {
 	// Area use cases
-	CreateArea    *areausecases.CreateArea
-	ListAreas     *areausecases.ListAreas
-	GetAreaByName *areausecases.GetAreaByName
-	GetAreaByID   *areausecases.GetAreaByID
-	DeleteArea    *areausecases.DeleteArea
-	RenameArea    *areausecases.RenameArea
+	CreateArea     *areausecases.CreateArea
+	ListAreas      *areausecases.ListAreas
+	GetAreaByName  *areausecases.GetAreaByName
+	GetAreaByID    *areausecases.GetAreaByID
+	GetAreaByUUID  *areausecases.GetAreaByUUID
+	DeleteArea     *areausecases.DeleteArea
+	RenameArea     *areausecases.RenameArea
 
 	// Sync event use cases
 	PersistSyncEvent *synceventusecases.PersistSyncEvent
@@ -74,6 +75,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 	listAreas := &areausecases.ListAreas{Repo: areaRepo}
 	getAreaByName := &areausecases.GetAreaByName{Repo: areaRepo}
 	getAreaByID := &areausecases.GetAreaByID{Repo: areaRepo}
+	getAreaByUUID := &areausecases.GetAreaByUUID{Repo: areaRepo}
 
 	// Create project use cases (projects are now tasks with task_type='project')
 	getProjectByName := &taskusecases.GetProjectByName{Repo: taskRepo}
@@ -272,6 +274,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		ListAreas:     listAreas,
 		GetAreaByName: getAreaByName,
 		GetAreaByID:   getAreaByID,
+		GetAreaByUUID: getAreaByUUID,
 		DeleteArea:    deleteArea,
 		RenameArea:    renameArea,
 

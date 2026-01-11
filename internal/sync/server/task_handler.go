@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -672,4 +673,69 @@ func (h *TaskHandler) handleResumeRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	writeJSON(w, http.StatusOK, t)
+}
+
+// HandleTagsList handles GET /api/v1/tags.
+// @Summary List all tags
+// @Description List all unique tags in use across tasks
+// @Tags tags
+// @Produce json
+// @Success 200 {array} string
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/tags [get]
+func (h *TaskHandler) HandleTagsList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	tags, err := h.App.ListTags.Execute()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to list tags: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tags)
+}
+
+// HandleCompletedTasks handles GET /api/v1/tasks/completed.
+// @Summary List completed tasks
+// @Description List tasks that have been completed (logbook)
+// @Tags tasks
+// @Produce json
+// @Param since query string false "Only show tasks completed after this date (RFC3339 format)"
+// @Success 200 {array} task.Task
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/tasks/completed [get]
+func (h *TaskHandler) HandleCompletedTasks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	query := r.URL.Query()
+	sinceStr := query.Get("since")
+
+	var since *time.Time
+	if sinceStr != "" {
+		t, err := time.Parse(time.RFC3339, sinceStr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Invalid since parameter: must be RFC3339 format")
+			return
+		}
+		since = &t
+	}
+
+	tasks, err := h.App.ListCompletedTasks.Execute(since)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to list completed tasks: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tasks)
 }

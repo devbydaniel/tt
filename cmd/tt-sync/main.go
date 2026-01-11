@@ -8,8 +8,10 @@ import (
 	"github.com/devbydaniel/tt/config"
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/database"
+	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
+	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/sync/server"
 	"github.com/joho/godotenv"
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -67,15 +69,34 @@ func run() error {
 	// Create app with server clientID (no syncCfg - server doesn't sync to itself)
 	application := app.New(db, serverClientID, nil)
 
+	// Create repositories for applying sync events
+	taskRepo := task.NewRepository(db)
+	areaRepo := area.NewRepository(db)
+
 	// Create sync use cases
 	syncEventRepo := syncevent.NewRepository(db)
+
+	// Create applier for materializing sync events into tasks/areas tables
+	applier := &usecases.ApplyEntityStates{
+		TaskUpserter:     taskRepo,
+		TaskByUUIDLookup: taskRepo,
+		AreaByUUIDLookup: areaRepo,
+		AreaUpserter:     areaRepo,
+	}
+
 	receiveEvents := &usecases.ReceiveEvents{
+		Repo:    syncEventRepo,
+		Applier: applier,
+	}
+	resetSync := &usecases.ResetSync{
 		Repo: syncEventRepo,
 	}
 
 	// Create handlers
-	syncHandler := server.NewHandler(receiveEvents)
+	syncHandler := server.NewHandler(receiveEvents, resetSync)
 	taskHandler := server.NewTaskHandler(application)
+	areaHandler := server.NewAreaHandler(application)
+	projectHandler := server.NewProjectHandler(application)
 
 	// Set up routes
 	mux := http.NewServeMux()
@@ -89,10 +110,24 @@ func run() error {
 	// Sync routes
 	mux.HandleFunc("/api/v1/events", server.AuthMiddleware(cfg.Sync.APIKey, syncHandler.HandlePushEvents))
 	mux.HandleFunc("/api/v1/sync", server.AuthMiddleware(cfg.Sync.APIKey, syncHandler.HandleSync))
+	mux.HandleFunc("/api/v1/sync/reset", server.AuthMiddleware(cfg.Sync.APIKey, syncHandler.HandleSyncReset))
 
 	// Task routes
+	// Note: /api/v1/tasks/completed must be registered before /api/v1/tasks/ to match first
+	mux.HandleFunc("/api/v1/tasks/completed", server.AuthMiddleware(cfg.Sync.APIKey, taskHandler.HandleCompletedTasks))
 	mux.HandleFunc("/api/v1/tasks", server.AuthMiddleware(cfg.Sync.APIKey, taskHandler.HandleTasks))
 	mux.HandleFunc("/api/v1/tasks/", server.AuthMiddleware(cfg.Sync.APIKey, taskHandler.HandleTaskByUUID))
+
+	// Tags route
+	mux.HandleFunc("/api/v1/tags", server.AuthMiddleware(cfg.Sync.APIKey, taskHandler.HandleTagsList))
+
+	// Area routes
+	mux.HandleFunc("/api/v1/areas", server.AuthMiddleware(cfg.Sync.APIKey, areaHandler.HandleAreas))
+	mux.HandleFunc("/api/v1/areas/", server.AuthMiddleware(cfg.Sync.APIKey, areaHandler.HandleAreaByUUID))
+
+	// Project routes
+	mux.HandleFunc("/api/v1/projects", server.AuthMiddleware(cfg.Sync.APIKey, projectHandler.HandleProjects))
+	mux.HandleFunc("/api/v1/projects/", server.AuthMiddleware(cfg.Sync.APIKey, projectHandler.HandleProjectByUUID))
 
 	// Start server
 	addr := ":8080"

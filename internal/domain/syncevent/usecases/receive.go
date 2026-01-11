@@ -8,7 +8,8 @@ import (
 
 // ReceiveEvents handles receiving and persisting events from clients.
 type ReceiveEvents struct {
-	Repo *syncevent.Repository
+	Repo    *syncevent.Repository
+	Applier EntityApplier // Optional: applies events to tasks/areas tables
 }
 
 // ReceiveRequest contains the events to receive from a client.
@@ -62,6 +63,18 @@ func (r *ReceiveEvents) Execute(req *ReceiveRequest) (*ReceiveResult, error) {
 		// Persist the event
 		if err := r.Repo.Create(event); err != nil {
 			return nil, err
+		}
+
+		// Apply to database if applier is configured
+		if r.Applier != nil {
+			entityState := syncevent.EntityState{
+				EntityType: string(event.EntityType),
+				EntityUUID: event.EntityUUID,
+				EventType:  string(event.EventType),
+				Snapshot:   event.Snapshot,
+			}
+			// Ignore apply errors - event is already stored
+			r.Applier.Apply([]syncevent.EntityState{entityState})
 		}
 
 		result.Accepted = append(result.Accepted, event.EventUUID)
@@ -122,6 +135,18 @@ func (r *ReceiveEvents) ExecuteSync(req *SyncRequest) (*SyncResult, error) {
 		// Persist the event
 		if err := r.Repo.Create(event); err != nil {
 			return nil, err
+		}
+
+		// Apply to database if applier is configured
+		if r.Applier != nil {
+			entityState := syncevent.EntityState{
+				EntityType: string(event.EntityType),
+				EntityUUID: event.EntityUUID,
+				EventType:  string(event.EventType),
+				Snapshot:   event.Snapshot,
+			}
+			// Ignore apply errors - event is already stored
+			r.Applier.Apply([]syncevent.EntityState{entityState})
 		}
 
 		result.Accepted = append(result.Accepted, event.EventUUID)
