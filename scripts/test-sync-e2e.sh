@@ -13,7 +13,7 @@ SERVER_PORT=18080
 SERVER_PID=""
 PASSED=0
 FAILED=0
-TOTAL=10
+TOTAL=20  # 10 sync tests + 10 HTTP API tests
 
 # Color output
 RED='\033[0;31m'
@@ -352,6 +352,205 @@ test_reset_sync() {
 }
 
 # ============================================================================
+# HTTP API Tests
+# ============================================================================
+
+# Helper: make HTTP request to server
+http_request() {
+    curl -s -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" "$@"
+}
+
+# Store UUID for HTTP tests
+HTTP_TEST_UUID=""
+
+# ============================================================================
+# Test 11: HTTP Create task
+# ============================================================================
+test_http_create_task() {
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/tasks" \
+        -d '{"title":"HTTP test task","tags":["http-test"]}')
+
+    HTTP_TEST_UUID=$(echo "$response" | jq -r '.uuid')
+    local title=$(echo "$response" | jq -r '.title')
+
+    if [ "$title" = "HTTP test task" ] && [ -n "$HTTP_TEST_UUID" ] && [ "$HTTP_TEST_UUID" != "null" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected title 'HTTP test task' and valid UUID, got title='$title' uuid='$HTTP_TEST_UUID'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 12: HTTP List tasks
+# ============================================================================
+test_http_list_tasks() {
+    local response
+    response=$(http_request "http://localhost:$SERVER_PORT/api/v1/tasks")
+
+    # Check that the response contains the task we created
+    if echo "$response" | jq -e ".[] | select(.title == \"HTTP test task\")" > /dev/null 2>&1; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Task 'HTTP test task' not found in list response${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 13: HTTP Get task by UUID
+# ============================================================================
+test_http_get_task() {
+    local response
+    response=$(http_request "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID")
+
+    local title=$(echo "$response" | jq -r '.title')
+    local uuid=$(echo "$response" | jq -r '.uuid')
+
+    if [ "$title" = "HTTP test task" ] && [ "$uuid" = "$HTTP_TEST_UUID" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected title 'HTTP test task' and uuid '$HTTP_TEST_UUID', got title='$title' uuid='$uuid'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 14: HTTP Update task
+# ============================================================================
+test_http_update_task() {
+    local response
+    response=$(http_request -X PATCH "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID" \
+        -d '{"title":"HTTP updated task","state":"someday"}')
+
+    local title=$(echo "$response" | jq -r '.title')
+    local state=$(echo "$response" | jq -r '.state')
+
+    if [ "$title" = "HTTP updated task" ] && [ "$state" = "someday" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected title 'HTTP updated task' and state 'someday', got title='$title' state='$state'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 15: HTTP Complete task
+# ============================================================================
+test_http_complete_task() {
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID/complete")
+
+    local status=$(echo "$response" | jq -r '.Completed.status')
+
+    if [ "$status" = "done" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected status 'done', got '$status'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 16: HTTP Uncomplete task
+# ============================================================================
+test_http_uncomplete_task() {
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID/uncomplete")
+
+    local status=$(echo "$response" | jq -r '.status')
+
+    if [ "$status" = "todo" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected status 'todo', got '$status'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 17: HTTP Set recurrence
+# ============================================================================
+test_http_set_recurrence() {
+    local response
+    response=$(http_request -X PATCH "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID/recurrence" \
+        -d '{"recurType":"fixed","recurRule":"{\"interval\":1,\"unit\":\"week\"}"}')
+
+    local recur_type=$(echo "$response" | jq -r '.recurType')
+
+    if [ "$recur_type" = "fixed" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected recurType 'fixed', got '$recur_type'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 18: HTTP Pause recurrence
+# ============================================================================
+test_http_pause_recurrence() {
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID/recurrence/pause")
+
+    local recur_paused=$(echo "$response" | jq -r '.recurPaused')
+
+    if [ "$recur_paused" = "true" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected recurPaused 'true', got '$recur_paused'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 19: HTTP Resume recurrence
+# ============================================================================
+test_http_resume_recurrence() {
+    local response
+    response=$(http_request -X POST "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID/recurrence/resume")
+
+    local recur_paused=$(echo "$response" | jq -r '.recurPaused')
+
+    # recurPaused is omitted (null) or false when not paused
+    if [ "$recur_paused" = "false" ] || [ "$recur_paused" = "null" ]; then
+        return 0
+    else
+        echo -e "  ${RED}FAIL: Expected recurPaused 'false' or 'null', got '$recur_paused'${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
+# Test 20: HTTP Delete task
+# ============================================================================
+test_http_delete_task() {
+    local status_code
+    status_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $API_KEY" \
+        -X DELETE "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID")
+
+    if [ "$status_code" = "204" ]; then
+        # Verify task is gone
+        local get_status
+        get_status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $API_KEY" \
+            "http://localhost:$SERVER_PORT/api/v1/tasks/$HTTP_TEST_UUID")
+
+        if [ "$get_status" = "404" ]; then
+            return 0
+        else
+            echo -e "  ${RED}FAIL: Task still exists after delete (status $get_status)${NC}"
+            return 1
+        fi
+    else
+        echo -e "  ${RED}FAIL: Expected status code 204, got $status_code${NC}"
+        return 1
+    fi
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 main() {
@@ -376,7 +575,8 @@ main() {
     wait_for_server
     echo -e "Server ready.\n"
 
-    # Run tests
+    # Run sync tests
+    echo -e "\n${YELLOW}--- Sync Tests ---${NC}"
     run_test "Basic sync" test_basic_sync
     run_test "Bidirectional sync" test_bidirectional_sync
     run_test "Task update sync" test_update_sync
@@ -387,6 +587,19 @@ main() {
     run_test "Project sync" test_project_sync
     run_test "Empty sync (no changes)" test_empty_sync
     run_test "Reset sync" test_reset_sync
+
+    # Run HTTP API tests
+    echo -e "\n${YELLOW}--- HTTP API Tests ---${NC}"
+    run_test "HTTP Create task" test_http_create_task
+    run_test "HTTP List tasks" test_http_list_tasks
+    run_test "HTTP Get task by UUID" test_http_get_task
+    run_test "HTTP Update task" test_http_update_task
+    run_test "HTTP Complete task" test_http_complete_task
+    run_test "HTTP Uncomplete task" test_http_uncomplete_task
+    run_test "HTTP Set recurrence" test_http_set_recurrence
+    run_test "HTTP Pause recurrence" test_http_pause_recurrence
+    run_test "HTTP Resume recurrence" test_http_resume_recurrence
+    run_test "HTTP Delete task" test_http_delete_task
 
     # Results
     echo -e "\n${BLUE}=== Results ===${NC}"

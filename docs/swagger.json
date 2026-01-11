@@ -1,0 +1,859 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Task management sync server with CRUD operations",
+        "title": "TT Sync Server API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/v1/tasks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List tasks with optional filters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "List tasks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by project name",
+                        "name": "project",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by area name",
+                        "name": "area",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by tag",
+                        "name": "tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search in task title",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by schedule: today, upcoming, anytime, inbox, someday",
+                        "name": "schedule",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort order: field:dir,field:dir (e.g. due:asc,title:desc)",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/task.Task"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new task with the given parameters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Create a new task",
+                "parameters": [
+                    {
+                        "description": "Task creation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.CreateTaskRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/task.Task"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{uuid}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a single task by its UUID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Get a task by UUID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/task.Task"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a task by its UUID",
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Delete a task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update a task's properties (partial update)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Update a task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.UpdateTaskRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/task.Task"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{uuid}/complete": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mark a task as completed",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Complete a task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/task.CompleteResult"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{uuid}/recurrence": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Configure recurrence settings for a task",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Set task recurrence",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Recurrence settings",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.SetRecurrenceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/task.Task"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{uuid}/recurrence/pause": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Pause the recurrence on a recurring task",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Pause task recurrence",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/task.Task"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{uuid}/recurrence/resume": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Resume a paused recurrence on a task",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Resume task recurrence",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/task.Task"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{uuid}/uncomplete": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mark a task as not completed",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Uncomplete a task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/task.Task"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "server.CreateTaskRequest": {
+            "description": "Request body for creating a new task",
+            "type": "object",
+            "properties": {
+                "areaName": {
+                    "description": "Area name to assign the task to",
+                    "type": "string",
+                    "example": "Personal"
+                },
+                "description": {
+                    "description": "Optional description",
+                    "type": "string",
+                    "example": "Get milk, eggs, and bread"
+                },
+                "dueDate": {
+                    "description": "Due date for the task (RFC3339 format)",
+                    "type": "string",
+                    "example": "2025-01-20T00:00:00Z"
+                },
+                "plannedDate": {
+                    "description": "Planned date for the task (RFC3339 format)",
+                    "type": "string",
+                    "example": "2025-01-15T00:00:00Z"
+                },
+                "projectName": {
+                    "description": "Project name to assign the task to",
+                    "type": "string",
+                    "example": "Shopping"
+                },
+                "recurEnd": {
+                    "description": "Recurrence end date (RFC3339 format)",
+                    "type": "string",
+                    "example": "2025-12-31T00:00:00Z"
+                },
+                "recurRule": {
+                    "description": "Recurrence rule as JSON",
+                    "type": "string",
+                    "example": "{\"interval\":1,\"unit\":\"week\"}"
+                },
+                "recurType": {
+                    "description": "Recurrence type: \"fixed\" or \"relative\"",
+                    "type": "string",
+                    "example": "fixed"
+                },
+                "someday": {
+                    "description": "Set to true to create task in someday state",
+                    "type": "boolean",
+                    "example": false
+                },
+                "tags": {
+                    "description": "Tags to assign to the task",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "urgent",
+                        "important"
+                    ]
+                },
+                "title": {
+                    "description": "Title of the task (required)",
+                    "type": "string",
+                    "example": "Buy groceries"
+                }
+            }
+        },
+        "server.ErrorResponse": {
+            "description": "Error response from the API",
+            "type": "object",
+            "properties": {
+                "error": {
+                    "description": "Error message",
+                    "type": "string",
+                    "example": "Task not found"
+                }
+            }
+        },
+        "server.SetRecurrenceRequest": {
+            "description": "Request body for setting recurrence on a task",
+            "type": "object",
+            "properties": {
+                "recurEnd": {
+                    "description": "Optional recurrence end date (RFC3339 format)",
+                    "type": "string",
+                    "example": "2025-12-31T00:00:00Z"
+                },
+                "recurRule": {
+                    "description": "Recurrence rule as JSON",
+                    "type": "string",
+                    "example": "{\"interval\":1,\"unit\":\"week\"}"
+                },
+                "recurType": {
+                    "description": "Recurrence type: \"fixed\" or \"relative\"",
+                    "type": "string",
+                    "example": "fixed"
+                }
+            }
+        },
+        "server.UpdateTaskRequest": {
+            "description": "Request body for updating an existing task (all fields optional)",
+            "type": "object",
+            "properties": {
+                "areaName": {
+                    "description": "Area name to assign the task to",
+                    "type": "string",
+                    "example": "Home"
+                },
+                "clearArea": {
+                    "description": "Set to true to unassign from area",
+                    "type": "boolean",
+                    "example": false
+                },
+                "clearDescription": {
+                    "description": "Set to true to clear the description",
+                    "type": "boolean",
+                    "example": false
+                },
+                "clearDueDate": {
+                    "description": "Set to true to clear the due date",
+                    "type": "boolean",
+                    "example": false
+                },
+                "clearPlannedDate": {
+                    "description": "Set to true to clear the planned date",
+                    "type": "boolean",
+                    "example": false
+                },
+                "clearProject": {
+                    "description": "Set to true to unassign from project",
+                    "type": "boolean",
+                    "example": false
+                },
+                "description": {
+                    "description": "New description for the task",
+                    "type": "string",
+                    "example": "Updated description"
+                },
+                "dueDate": {
+                    "description": "New due date (RFC3339 format)",
+                    "type": "string",
+                    "example": "2025-01-20T00:00:00Z"
+                },
+                "plannedDate": {
+                    "description": "New planned date (RFC3339 format)",
+                    "type": "string",
+                    "example": "2025-01-15T00:00:00Z"
+                },
+                "projectName": {
+                    "description": "Project name to assign the task to",
+                    "type": "string",
+                    "example": "Work"
+                },
+                "state": {
+                    "description": "Task state: \"active\" or \"someday\"",
+                    "type": "string",
+                    "example": "active"
+                },
+                "tags": {
+                    "description": "Replace all tags with these",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "work",
+                        "priority"
+                    ]
+                },
+                "title": {
+                    "description": "New title for the task",
+                    "type": "string",
+                    "example": "Updated task title"
+                }
+            }
+        },
+        "task.CompleteResult": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "$ref": "#/definitions/task.Task"
+                },
+                "nextTask": {
+                    "description": "non-nil if a recurring task was regenerated",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/task.Task"
+                        }
+                    ]
+                }
+            }
+        },
+        "task.State": {
+            "type": "string",
+            "enum": [
+                "active",
+                "someday"
+            ],
+            "x-enum-varnames": [
+                "StateActive",
+                "StateSomeday"
+            ]
+        },
+        "task.Status": {
+            "type": "string",
+            "enum": [
+                "todo",
+                "done"
+            ],
+            "x-enum-varnames": [
+                "StatusTodo",
+                "StatusDone"
+            ]
+        },
+        "task.Task": {
+            "type": "object",
+            "properties": {
+                "areaId": {
+                    "type": "integer"
+                },
+                "areaName": {
+                    "type": "string"
+                },
+                "completedAt": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dueDate": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "parentId": {
+                    "type": "integer"
+                },
+                "parentName": {
+                    "description": "Display fields (populated by queries with JOINs, not persisted)",
+                    "type": "string"
+                },
+                "plannedDate": {
+                    "type": "string"
+                },
+                "recurEnd": {
+                    "description": "optional end date",
+                    "type": "string"
+                },
+                "recurParentId": {
+                    "description": "links to original recurring task",
+                    "type": "integer"
+                },
+                "recurPaused": {
+                    "description": "true = paused",
+                    "type": "boolean"
+                },
+                "recurRule": {
+                    "description": "JSON rule: {\"interval\":1,\"unit\":\"week\",...}",
+                    "type": "string"
+                },
+                "recurType": {
+                    "description": "Recurrence fields",
+                    "type": "string"
+                },
+                "state": {
+                    "$ref": "#/definitions/task.State"
+                },
+                "status": {
+                    "$ref": "#/definitions/task.Status"
+                },
+                "tags": {
+                    "description": "Tags",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "taskType": {
+                    "$ref": "#/definitions/task.TaskType"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "task.TaskType": {
+            "type": "string",
+            "enum": [
+                "task",
+                "project"
+            ],
+            "x-enum-varnames": [
+                "TaskTypeTask",
+                "TaskTypeProject"
+            ]
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Enter \"Bearer {token}\" where {token} is your API key",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

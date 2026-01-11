@@ -6,12 +6,26 @@ import (
 	"os"
 
 	"github.com/devbydaniel/tt/config"
-	"github.com/joho/godotenv"
+	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/sync/server"
+	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
+
+	_ "github.com/devbydaniel/tt/docs" // swagger docs
 )
+
+// @title TT Sync Server API
+// @version 1.0
+// @description Task management sync server with CRUD operations
+// @host localhost:8080
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter "Bearer {token}" where {token} is your API key
 
 func main() {
 	if err := run(); err != nil {
@@ -44,20 +58,41 @@ func run() error {
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
-	// Create use cases
+	// Get server client ID from environment
+	serverClientID := os.Getenv("TT_SYNC_CLIENT_ID")
+	if serverClientID == "" {
+		serverClientID = "server"
+	}
+
+	// Create app with server clientID (no syncCfg - server doesn't sync to itself)
+	application := app.New(db, serverClientID, nil)
+
+	// Create sync use cases
 	syncEventRepo := syncevent.NewRepository(db)
 	receiveEvents := &usecases.ReceiveEvents{
 		Repo: syncEventRepo,
 	}
 
-	// Create handler
-	handler := server.NewHandler(receiveEvents)
+	// Create handlers
+	syncHandler := server.NewHandler(receiveEvents)
+	taskHandler := server.NewTaskHandler(application)
 
 	// Set up routes
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", handler.HandleHealth)
-	mux.HandleFunc("/api/v1/events", server.AuthMiddleware(cfg.Sync.APIKey, handler.HandlePushEvents))
-	mux.HandleFunc("/api/v1/sync", server.AuthMiddleware(cfg.Sync.APIKey, handler.HandleSync))
+
+	// Health check
+	mux.HandleFunc("/health", syncHandler.HandleHealth)
+
+	// Swagger UI
+	mux.HandleFunc("/swagger/", httpSwagger.WrapHandler)
+
+	// Sync routes
+	mux.HandleFunc("/api/v1/events", server.AuthMiddleware(cfg.Sync.APIKey, syncHandler.HandlePushEvents))
+	mux.HandleFunc("/api/v1/sync", server.AuthMiddleware(cfg.Sync.APIKey, syncHandler.HandleSync))
+
+	// Task routes
+	mux.HandleFunc("/api/v1/tasks", server.AuthMiddleware(cfg.Sync.APIKey, taskHandler.HandleTasks))
+	mux.HandleFunc("/api/v1/tasks/", server.AuthMiddleware(cfg.Sync.APIKey, taskHandler.HandleTaskByUUID))
 
 	// Start server
 	addr := ":8080"

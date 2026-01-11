@@ -36,6 +36,7 @@ type App struct {
 	CreateTask         *taskusecases.CreateTask
 	ListTasks          *taskusecases.ListTasks
 	GetTask            *taskusecases.GetTask
+	GetTaskByUUID      *taskusecases.GetTaskByUUID
 	CompleteTasks      *taskusecases.CompleteTasks
 	UncompleteTasks    *taskusecases.UncompleteTasks
 	DeleteTasks        *taskusecases.DeleteTasks
@@ -77,6 +78,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 	// Create project use cases (projects are now tasks with task_type='project')
 	getProjectByName := &taskusecases.GetProjectByName{Repo: taskRepo}
 	getTask := &taskusecases.GetTask{Repo: taskRepo}
+	getTaskByUUID := &taskusecases.GetTaskByUUID{Repo: taskRepo}
 
 	// Create sync event persister (nil if sync is disabled)
 	var syncPersister taskusecases.SyncEventPersister
@@ -290,6 +292,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		CreateTask:         createTask,
 		ListTasks:          listTasks,
 		GetTask:            getTask,
+		GetTaskByUUID:      getTaskByUUID,
 		CompleteTasks:      completeTasks,
 		UncompleteTasks:    uncompleteTasks,
 		DeleteTasks:        deleteTasks,
