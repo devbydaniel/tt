@@ -58,6 +58,7 @@ type App struct {
 	RemoveTag          *taskusecases.RemoveTag
 	ListTags           *taskusecases.ListTags
 	SetTags            *taskusecases.SetTags
+	DeleteTag          *taskusecases.DeleteTag
 }
 
 // SyncConfig holds sync configuration.
@@ -261,6 +262,11 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
 	}
+	deleteTag := &taskusecases.DeleteTag{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
 
 	// Expose sync persister for direct access (nil if sync disabled)
 	var persistSyncEventExposed *synceventusecases.PersistSyncEvent
@@ -316,5 +322,6 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		RemoveTag:          removeTag,
 		ListTags:           listTagsUC,
 		SetTags:            setTags,
+		DeleteTag:          deleteTag,
 	}
 }

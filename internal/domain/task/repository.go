@@ -10,6 +10,7 @@ import (
 )
 
 var ErrTaskNotFound = errors.New("task not found")
+var ErrTagNotFound = errors.New("tag not found")
 
 type Repository struct {
 	db *database.DB
@@ -583,6 +584,34 @@ func (r *Repository) SetTags(taskID int64, tags []string) error {
 		}
 	}
 	return nil
+}
+
+// DeleteTag removes a tag from all tasks and returns the number of affected tasks
+func (r *Repository) DeleteTag(tagName string) (int64, error) {
+	result, err := r.db.Conn.Exec(`DELETE FROM task_tags WHERE tag_name = ?`, tagName)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// GetTaskIDsByTag returns the IDs of all tasks that have a specific tag
+func (r *Repository) GetTaskIDsByTag(tagName string) ([]int64, error) {
+	rows, err := r.db.Conn.Query(`SELECT task_id FROM task_tags WHERE tag_name = ?`, tagName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // GetByName finds a task by title and type (for project lookup)

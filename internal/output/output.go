@@ -789,6 +789,14 @@ func (f *Formatter) TaskTagRemoved(t *task.Task, tagName string) {
 	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Removed tag '%s' from #%d: %s", tagName, t.ID, sanitizeTitle(t.Title))))
 }
 
+func (f *Formatter) TagDeleted(tagName string, count int64) {
+	if count == 1 {
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted tag '%s' from 1 task", tagName)))
+	} else {
+		fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Deleted tag '%s' from %d tasks", tagName, count)))
+	}
+}
+
 func (f *Formatter) TaskEdited(id int64, changes []string) {
 	fmt.Fprintln(f.w, f.theme.Success.Render(fmt.Sprintf("Updated #%d: %s", id, joinChanges(changes))))
 }

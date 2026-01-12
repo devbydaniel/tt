@@ -19,6 +19,7 @@ func NewTagCmd(deps *Dependencies) *cobra.Command {
 	cmd.AddCommand(newTagListCmd(deps))
 	cmd.AddCommand(newTagAddCmd(deps))
 	cmd.AddCommand(newTagRemoveCmd(deps))
+	cmd.AddCommand(newTagDeleteCmd(deps))
 
 	return cmd
 }
@@ -105,4 +106,33 @@ func newTagRemoveCmd(deps *Dependencies) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newTagDeleteCmd(deps *Dependencies) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete <tag>",
+		Short: "Delete a tag from all tasks",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			tagName := args[0]
+			if tagName == "" {
+				return errors.New("tag name cannot be empty")
+			}
+
+			count, err := deps.App.DeleteTag.Execute(tagName)
+			if err != nil {
+				return err
+			}
+
+			formatter := output.NewFormatter(os.Stdout, deps.Theme)
+			formatter.TagDeleted(tagName, count)
+			return nil
+		},
+	}
+
+	// Register tag name completion
+	registry := NewCompletionRegistry(deps)
+	cmd.ValidArgsFunction = registry.TagCompletion()
+
+	return cmd
 }
