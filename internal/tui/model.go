@@ -1010,6 +1010,10 @@ func (m Model) loadTasksForSelection() tea.Msg {
 	groupBy := m.config.GetGroup(configKey)
 	sortStr := m.config.GetSort(configKey)
 	hideScope := m.config.GetHideScope(configKey)
+	// Auto-hide scope when already viewing a specific area or project
+	if configKey == "area" || configKey == "project" {
+		hideScope = true
+	}
 	sortOpts, _ := task.ParseSort(sortStr)
 
 	// Schedule grouping requires 4 separate queries
@@ -1425,6 +1429,10 @@ func (m Model) loadDataAfterTagUpdate() tea.Msg {
 	sortOpts, _ := task.ParseSort(sortStr)
 	groupBy := m.config.GetGroup(configKey)
 	hideScope := m.config.GetHideScope(configKey)
+	// Auto-hide scope when already viewing a specific area or project
+	if configKey == "area" || configKey == "project" {
+		hideScope = true
+	}
 
 	opts := m.buildListOptions(item)
 	opts.Sort = sortOpts
