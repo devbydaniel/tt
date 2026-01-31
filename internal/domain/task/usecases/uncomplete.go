@@ -26,7 +26,7 @@ func (u *UncompleteTasks) Execute(ids []int64) ([]task.Task, error) {
 
 		// Emit sync event if sync is enabled
 		if u.SyncPersister != nil {
-			u.SyncPersister.Execute(&synceventusecases.PersistOptions{
+			_, _ = u.SyncPersister.Execute(&synceventusecases.PersistOptions{
 				ClientID:  u.ClientID,
 				EventType: syncevent.EventTypeUpdated,
 				Task:      t,

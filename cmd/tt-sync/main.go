@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
+
 	"github.com/devbydaniel/tt/config"
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/database"
@@ -13,8 +16,6 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/sync/server"
-	"github.com/joho/godotenv"
-	httpSwagger "github.com/swaggo/http-swagger"
 
 	_ "github.com/devbydaniel/tt/docs" // swagger docs
 )

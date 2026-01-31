@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"embed"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // register sqlite driver
 )
 
 //go:embed migrations/*.sql

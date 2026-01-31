@@ -2,6 +2,7 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/devbydaniel/tt/config"
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/output"

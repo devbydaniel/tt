@@ -24,7 +24,7 @@ func NewHandler(receiveEvents *usecases.ReceiveEvents, resetSync *usecases.Reset
 
 // PushRequest is the request body for pushing events.
 type PushRequest struct {
-	ClientID string               `json:"clientId"`
+	ClientID string                 `json:"clientId"`
 	Events   []*syncevent.SyncEvent `json:"events"`
 }
 
@@ -36,9 +36,9 @@ type PushResponse struct {
 
 // SyncRequest is the request body for bidirectional sync.
 type SyncRequest struct {
-	ClientID string                   `json:"clientId"`
-	Cursor   int64                    `json:"cursor"`
-	Events   []*syncevent.SyncEvent   `json:"events"`
+	ClientID string                 `json:"clientId"`
+	Cursor   int64                  `json:"cursor"`
+	Events   []*syncevent.SyncEvent `json:"events"`
 }
 
 // SyncResponse is the response body for bidirectional sync.
@@ -82,13 +82,13 @@ func (h *Handler) HandlePushEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // HandleHealth handles GET /health requests.
 func (h *Handler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // HandleSync handles POST /api/v1/sync requests for bidirectional sync.
@@ -127,7 +127,7 @@ func (h *Handler) HandleSync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // HandleSyncReset handles POST /api/v1/sync/reset requests.
@@ -158,5 +158,5 @@ func (h *Handler) HandleSyncReset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int64{"deleted": count})
+	_ = json.NewEncoder(w).Encode(map[string]int64{"deleted": count})
 }

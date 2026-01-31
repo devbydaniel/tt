@@ -36,7 +36,7 @@ func (r *RemoveTag) Execute(id int64, tagName string) (*task.Task, error) {
 
 	// Emit sync event if sync is enabled
 	if r.SyncPersister != nil {
-		r.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = r.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:  r.ClientID,
 			EventType: syncevent.EventTypeUpdated,
 			Task:      t,

@@ -1,4 +1,4 @@
-.PHONY: build run dev test clean build-sync run-sync dev-sync
+.PHONY: build run dev test lint clean build-sync run-sync dev-sync
 
 build:
 	go build -o tt ./cmd/tt
@@ -11,6 +11,9 @@ dev: build
 
 test:
 	go test ./...
+
+lint:
+	golangci-lint run ./...
 
 clean:
 	rm -f tt tt-sync

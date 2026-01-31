@@ -7,10 +7,11 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/sahilm/fuzzy"
+
 	"github.com/devbydaniel/tt/internal/dateparse"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/task"
-	"github.com/sahilm/fuzzy"
 )
 
 // AddModalField tracks which field is currently focused
@@ -520,9 +521,9 @@ func (m AddModal) renderScopeList() string {
 
 // Error messages
 var (
-	errTitleRequired     = &addModalError{"Title is required"}
+	errTitleRequired      = &addModalError{"Title is required"}
 	errInvalidPlannedDate = &addModalError{"Invalid planned date"}
-	errInvalidDueDate    = &addModalError{"Invalid due date"}
+	errInvalidDueDate     = &addModalError{"Invalid due date"}
 )
 
 type addModalError struct {

@@ -3,15 +3,15 @@ package dateutil
 import "time"
 
 // Boundaries returns rolling-window date boundaries for date categorization.
-func Boundaries() (today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear time.Time) {
+func Boundaries() (today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear time.Time) { //nolint:gocritic // named returns are clearer here
 	now := time.Now()
 	y, m, d := now.Date()
 	today = time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 	tomorrow = today.AddDate(0, 0, 1)
-	endOfWeek = today.AddDate(0, 0, 7)    // rolling 7 days
-	endOfMonth = today.AddDate(0, 0, 30)  // rolling 30 days
+	endOfWeek = today.AddDate(0, 0, 7)     // rolling 7 days
+	endOfMonth = today.AddDate(0, 0, 30)   // rolling 30 days
 	endOfQuarter = today.AddDate(0, 0, 90) // rolling 90 days
-	endOfYear = today.AddDate(0, 0, 365)  // rolling 365 days
+	endOfYear = today.AddDate(0, 0, 365)   // rolling 365 days
 	return
 }
 

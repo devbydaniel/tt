@@ -24,7 +24,7 @@ func (d *DeleteArea) Execute(name string) (*area.Area, error) {
 
 	// Emit sync event if sync is enabled
 	if d.SyncPersister != nil {
-		d.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = d.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:   d.ClientID,
 			EventType:  syncevent.EventTypeDeleted,
 			Area:       a,

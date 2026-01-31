@@ -74,7 +74,7 @@ func (r *ReceiveEvents) Execute(req *ReceiveRequest) (*ReceiveResult, error) {
 				Snapshot:   event.Snapshot,
 			}
 			// Ignore apply errors - event is already stored
-			r.Applier.Apply([]syncevent.EntityState{entityState})
+			_, _ = r.Applier.Apply([]syncevent.EntityState{entityState})
 		}
 
 		result.Accepted = append(result.Accepted, event.EventUUID)
@@ -146,7 +146,7 @@ func (r *ReceiveEvents) ExecuteSync(req *SyncRequest) (*SyncResult, error) {
 				Snapshot:   event.Snapshot,
 			}
 			// Ignore apply errors - event is already stored
-			r.Applier.Apply([]syncevent.EntityState{entityState})
+			_, _ = r.Applier.Apply([]syncevent.EntityState{entityState})
 		}
 
 		result.Accepted = append(result.Accepted, event.EventUUID)

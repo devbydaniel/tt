@@ -32,7 +32,7 @@ func (s *SetTaskDescription) Execute(id int64, description *string) (*task.Task,
 
 	// Emit sync event if sync is enabled
 	if s.SyncPersister != nil {
-		s.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = s.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:  s.ClientID,
 			EventType: syncevent.EventTypeUpdated,
 			Task:      t,

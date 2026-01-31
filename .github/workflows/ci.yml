@@ -7,6 +7,21 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -15,10 +30,23 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
-
-      - name: Build
-        run: go build -v ./...
+          go-version-file: go.mod
 
       - name: Test
-        run: go test -v ./...
+        run: go test -race -v ./...
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build tt
+        run: go build -v ./cmd/tt
+
+      - name: Build tt-sync
+        run: go build -v ./cmd/tt-sync

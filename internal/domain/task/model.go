@@ -226,8 +226,8 @@ type CreateOptions struct {
 
 // ListOptions contains options for listing tasks
 type ListOptions struct {
-	TaskType    TaskType     // filter by task type ("task", "project", or empty for all)
-	ProjectName string       // user-facing: filter by project name (internally uses ParentID)
+	TaskType    TaskType // filter by task type ("task", "project", or empty for all)
+	ProjectName string   // user-facing: filter by project name (internally uses ParentID)
 	AreaName    string
 	TagName     string       // filter by tag (single, for backwards compat)
 	TagNames    []string     // filter by multiple tags (AND logic - task must have ALL)

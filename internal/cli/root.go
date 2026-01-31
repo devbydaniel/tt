@@ -3,12 +3,13 @@ package cli
 import (
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/devbydaniel/tt/config"
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/devbydaniel/tt/internal/tui"
-	"github.com/spf13/cobra"
 )
 
 type Dependencies struct {

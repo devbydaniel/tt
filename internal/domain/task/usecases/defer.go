@@ -33,7 +33,7 @@ func (d *DeferTask) Execute(id int64) (*task.Task, error) {
 
 	// Emit sync event if sync is enabled
 	if d.SyncPersister != nil {
-		d.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = d.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:  d.ClientID,
 			EventType: syncevent.EventTypeUpdated,
 			Task:      t,

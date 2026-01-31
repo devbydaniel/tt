@@ -25,7 +25,7 @@ func (r *RenameArea) Execute(oldName, newName string) (*area.Area, error) {
 
 	// Emit sync event if sync is enabled
 	if r.SyncPersister != nil {
-		r.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = r.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:  r.ClientID,
 			EventType: syncevent.EventTypeUpdated,
 			Area:      a,

@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/devbydaniel/tt/internal/database"
 	"github.com/google/uuid"
+
+	"github.com/devbydaniel/tt/internal/database"
 )
 
 var ErrAreaNotFound = errors.New("area not found")
@@ -45,7 +46,7 @@ func (r *Repository) List() ([]Area, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanAreas(rows)
 }

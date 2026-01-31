@@ -11,8 +11,8 @@ import (
 
 // Rule represents a parsed recurrence rule.
 type Rule struct {
-	Interval int      `json:"interval"`          // e.g., 1, 2, 3
-	Unit     string   `json:"unit"`              // "day", "week", "month", "year"
+	Interval int      `json:"interval"`           // e.g., 1, 2, 3
+	Unit     string   `json:"unit"`               // "day", "week", "month", "year"
 	Weekdays []string `json:"weekdays,omitempty"` // e.g., ["mon", "wed", "fri"]
 	Day      int      `json:"day,omitempty"`      // day of month (1-31)
 }

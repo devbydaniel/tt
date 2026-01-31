@@ -3,8 +3,9 @@ package cli
 import (
 	"os"
 
-	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
+
+	"github.com/devbydaniel/tt/internal/output"
 )
 
 func NewTagsCmd(deps *Dependencies) *cobra.Command {

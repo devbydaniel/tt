@@ -453,4 +453,3 @@ func TestSyncFullCycle(t *testing.T) {
 		t.Errorf("applied entity UUID = %s, want remote-task", applier.appliedEntities[0].EntityUUID)
 	}
 }
-

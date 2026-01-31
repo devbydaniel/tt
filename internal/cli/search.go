@@ -3,9 +3,10 @@ package cli
 import (
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
-	"github.com/spf13/cobra"
 )
 
 func NewSearchCmd(deps *Dependencies) *cobra.Command {

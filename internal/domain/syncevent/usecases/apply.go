@@ -117,16 +117,13 @@ func (a *ApplyEntityStates) applyTask(entity syncevent.EntityState) error {
 	}
 
 	// Convert snapshot to task
-	t, err := a.snapshotToTask(&snapshot)
-	if err != nil {
-		return err
-	}
+	t := a.snapshotToTask(&snapshot)
 
 	return a.TaskUpserter.Upsert(t)
 }
 
 // snapshotToTask converts a TaskSnapshotData to a Task, resolving UUIDs/names to local IDs.
-func (a *ApplyEntityStates) snapshotToTask(snapshot *syncevent.TaskSnapshotData) (*task.Task, error) {
+func (a *ApplyEntityStates) snapshotToTask(snapshot *syncevent.TaskSnapshotData) *task.Task {
 	// Parse dates
 	var plannedDate, dueDate, recurEnd *time.Time
 	if snapshot.PlannedDate != nil {
@@ -203,7 +200,7 @@ func (a *ApplyEntityStates) snapshotToTask(snapshot *syncevent.TaskSnapshotData)
 		RecurPaused:   snapshot.RecurPaused,
 		RecurParentID: recurParentID,
 		Tags:          snapshot.Tags,
-	}, nil
+	}
 }
 
 // applyArea applies an area entity state.

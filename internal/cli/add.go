@@ -5,11 +5,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/devbydaniel/tt/internal/dateparse"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/devbydaniel/tt/internal/recurparse"
-	"github.com/spf13/cobra"
 )
 
 func NewAddCmd(deps *Dependencies) *cobra.Command {

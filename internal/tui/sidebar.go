@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
@@ -14,7 +15,7 @@ type Sidebar struct {
 	activeSection int
 	width         int
 	height        int
-	boxHeight     int // height of each individual box
+	boxHeight     int  // height of each individual box
 	focused       bool // whether sidebar has focus (vs content area)
 	styles        *Styles
 	card          *Card
@@ -283,8 +284,8 @@ type ScopesSection struct {
 // NewScopesSection creates an empty scopes section
 func NewScopesSection(styles *Styles) *ScopesSection {
 	return &ScopesSection{
-		items:   []SidebarItem{},
-		styles:  styles,
+		items:  []SidebarItem{},
+		styles: styles,
 	}
 }
 

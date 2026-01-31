@@ -2,6 +2,7 @@ package output
 
 import (
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/devbydaniel/tt/config"
 )
 

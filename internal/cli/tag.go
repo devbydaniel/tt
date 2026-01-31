@@ -5,8 +5,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/devbydaniel/tt/internal/output"
 	"github.com/spf13/cobra"
+
+	"github.com/devbydaniel/tt/internal/output"
 )
 
 func NewTagCmd(deps *Dependencies) *cobra.Command {

@@ -3,11 +3,12 @@ package usecases
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/recurparse"
-	"github.com/google/uuid"
 )
 
 type CompleteTasks struct {
@@ -48,7 +49,7 @@ func (c *CompleteTasks) Execute(ids []int64) ([]task.CompleteResult, error) {
 
 		// Emit sync event for completed task
 		if c.SyncPersister != nil {
-			c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+			_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
 				ClientID:  c.ClientID,
 				EventType: syncevent.EventTypeCompleted,
 				Task:      t,
@@ -63,7 +64,7 @@ func (c *CompleteTasks) Execute(ids []int64) ([]task.CompleteResult, error) {
 
 				// Emit sync event for regenerated task
 				if c.SyncPersister != nil {
-					c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+					_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
 						ClientID:  c.ClientID,
 						EventType: syncevent.EventTypeCreated,
 						Task:      nextTask,

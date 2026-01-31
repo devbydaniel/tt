@@ -5,13 +5,14 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/spf13/cobra"
+
 	"github.com/devbydaniel/tt/internal/dateparse"
 	"github.com/devbydaniel/tt/internal/output"
-	"github.com/spf13/cobra"
 )
 
 func NewDueCmd(deps *Dependencies) *cobra.Command {
-	var clear bool
+	var clearDate bool
 
 	cmd := &cobra.Command{
 		Use:     "due <task-id> [date]",
@@ -33,7 +34,7 @@ Examples:
 				return errors.New("invalid task ID")
 			}
 
-			if clear {
+			if clearDate {
 				t, err := deps.App.SetDueDate.Execute(id, nil)
 				if err != nil {
 					return err
@@ -63,7 +64,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVar(&clear, "clear", false, "Clear the due date")
+	cmd.Flags().BoolVar(&clearDate, "clear", false, "Clear the due date")
 
 	return cmd
 }

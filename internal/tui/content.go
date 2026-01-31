@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
+
 	"github.com/devbydaniel/tt/internal/dateutil"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/recurparse"
@@ -14,20 +15,20 @@ import (
 
 // Content displays the task list in the right panel
 type Content struct {
-	title          string
-	displayTasks   []task.Task      // tasks in display order (computed once when set)
-	taskSchedules  map[int64]string // task ID -> schedule name (for schedule grouping)
-	groupBy        string           // grouping mode: none, scope, date, schedule
-	hideScope      bool             // whether to hide the project/area column
-	width          int
-	height         int
-	viewport       viewport.Model
-	ready          bool
-	styles         *Styles
-	card           *Card
-	focused        bool // whether content panel has focus
-	showSelection  bool // whether to show selection indicator (even when not focused)
-	selectedIndex  int  // index into displayTasks (-1 = none)
+	title         string
+	displayTasks  []task.Task      // tasks in display order (computed once when set)
+	taskSchedules map[int64]string // task ID -> schedule name (for schedule grouping)
+	groupBy       string           // grouping mode: none, scope, date, schedule
+	hideScope     bool             // whether to hide the project/area column
+	width         int
+	height        int
+	viewport      viewport.Model
+	ready         bool
+	styles        *Styles
+	card          *Card
+	focused       bool // whether content panel has focus
+	showSelection bool // whether to show selection indicator (even when not focused)
+	selectedIndex int  // index into displayTasks (-1 = none)
 }
 
 // NewContent creates a new content panel
@@ -316,7 +317,6 @@ func (c Content) buildGroupedList(getGroup func(*task.Task) string) string {
 	return strings.Join(sections, "\n\n")
 }
 
-
 // View renders the content panel
 func (c Content) View() string {
 	var content string
@@ -332,7 +332,7 @@ func (c Content) View() string {
 // ScrollUp scrolls the content up
 func (c Content) ScrollUp() Content {
 	if c.ready {
-		c.viewport.LineUp(1)
+		c.viewport.ScrollUp(1)
 	}
 	return c
 }
@@ -340,7 +340,7 @@ func (c Content) ScrollUp() Content {
 // ScrollDown scrolls the content down
 func (c Content) ScrollDown() Content {
 	if c.ready {
-		c.viewport.LineDown(1)
+		c.viewport.ScrollDown(1)
 	}
 	return c
 }
@@ -348,7 +348,7 @@ func (c Content) ScrollDown() Content {
 // ScrollHalfPageUp scrolls up half a page
 func (c Content) ScrollHalfPageUp() Content {
 	if c.ready {
-		c.viewport.HalfViewUp()
+		c.viewport.HalfPageUp()
 	}
 	return c
 }
@@ -356,7 +356,7 @@ func (c Content) ScrollHalfPageUp() Content {
 // ScrollHalfPageDown scrolls down half a page
 func (c Content) ScrollHalfPageDown() Content {
 	if c.ready {
-		c.viewport.HalfViewDown()
+		c.viewport.HalfPageDown()
 	}
 	return c
 }

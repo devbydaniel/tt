@@ -63,8 +63,8 @@ func (r *Repository) Create(task *Task) error {
 }
 
 type ListFilter struct {
-	TaskType TaskType     // filter by task type ("task", "project", or empty for all)
-	ParentID *int64       // filter by parent project ID
+	TaskType TaskType // filter by task type ("task", "project", or empty for all)
+	ParentID *int64   // filter by parent project ID
 	AreaID   *int64
 	State    State        // filter by state (active, someday)
 	Today    bool         // planned_date = today OR overdue
@@ -244,7 +244,7 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	tasks, err := scanTasks(rows)
 	if err != nil {
@@ -388,7 +388,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	tasks, err := scanTasks(rows)
 	if err != nil {
@@ -477,7 +477,7 @@ func (r *Repository) getTagsForTask(taskID int64) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var tags []string
 	for rows.Next() {
@@ -517,7 +517,7 @@ func (r *Repository) loadTagsForTasks(tasks []Task) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var taskID int64
@@ -556,7 +556,7 @@ func (r *Repository) ListTags() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var tags []string
 	for rows.Next() {
@@ -603,7 +603,7 @@ func (r *Repository) GetTaskIDsByTag(tagName string) ([]int64, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []int64
 	for rows.Next() {

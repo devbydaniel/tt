@@ -7,8 +7,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/devbydaniel/tt/internal/dateparse"
 	datepicker "github.com/ethanefung/bubble-datepicker"
+
+	"github.com/devbydaniel/tt/internal/dateparse"
 )
 
 // DateModalMode indicates whether we're setting planned or due date
@@ -151,15 +152,14 @@ func (m DateModal) Update(msg tea.Msg) (DateModal, *DateResult) {
 					Date:   &parsed,
 					Mode:   m.mode,
 				}
-			} else {
-				// Picker focused - submit with picker's date
-				selectedDate := m.datepicker.Time
-				m = m.Close()
-				return m, &DateResult{
-					TaskID: m.taskID,
-					Date:   &selectedDate,
-					Mode:   m.mode,
-				}
+			}
+			// Picker focused - submit with picker's date
+			selectedDate := m.datepicker.Time
+			m = m.Close()
+			return m, &DateResult{
+				TaskID: m.taskID,
+				Date:   &selectedDate,
+				Mode:   m.mode,
 			}
 		}
 

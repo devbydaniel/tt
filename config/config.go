@@ -22,21 +22,21 @@ type SyncConfig struct {
 }
 
 type Config struct {
-	Database string
-	ClientID string // unique client identifier for sync (user-defined)
-	Sort     string // global default sort
-	Group    string // global default group
-	Today         ListSettings
-	Upcoming      ListSettings
-	Anytime       ListSettings
-	Someday       ListSettings
-	Log           ListSettings
+	Database    string
+	ClientID    string // unique client identifier for sync (user-defined)
+	Sort        string // global default sort
+	Group       string // global default group
+	Today       ListSettings
+	Upcoming    ListSettings
+	Anytime     ListSettings
+	Someday     ListSettings
+	Log         ListSettings
 	ProjectList ListSettings
 	Project     ListSettings
 	Area        ListSettings
 	Tag         ListSettings
 	List        ListSettings // for "all" view
-	Inbox         ListSettings
+	Inbox       ListSettings
 	Theme       ThemeConfig
 	Sync        SyncConfig
 }
@@ -173,21 +173,21 @@ func (c *Config) GetHideScope(listName string) bool {
 
 // fileConfig represents the TOML config file structure
 type fileConfig struct {
-	DataDir  string `toml:"data_dir"`
-	ClientID string `toml:"client_id"`
-	Sort     string `toml:"sort"`
-	Group    string `toml:"group"`
-	Today         ListSettings `toml:"today"`
-	Upcoming      ListSettings `toml:"upcoming"`
-	Anytime       ListSettings `toml:"anytime"`
-	Someday       ListSettings `toml:"someday"`
-	Log           ListSettings `toml:"log"`
+	DataDir     string       `toml:"data_dir"`
+	ClientID    string       `toml:"client_id"`
+	Sort        string       `toml:"sort"`
+	Group       string       `toml:"group"`
+	Today       ListSettings `toml:"today"`
+	Upcoming    ListSettings `toml:"upcoming"`
+	Anytime     ListSettings `toml:"anytime"`
+	Someday     ListSettings `toml:"someday"`
+	Log         ListSettings `toml:"log"`
 	ProjectList ListSettings `toml:"project_list"`
 	Project     ListSettings `toml:"project"`
 	Area        ListSettings `toml:"area"`
 	Tag         ListSettings `toml:"tag"`
 	List        ListSettings `toml:"list"`
-	Inbox         ListSettings `toml:"inbox"`
+	Inbox       ListSettings `toml:"inbox"`
 	Theme       ThemeConfig  `toml:"theme"`
 	Sync        SyncConfig   `toml:"sync"`
 }
@@ -195,7 +195,7 @@ type fileConfig struct {
 func Load() (*Config, error) {
 	dataDir := resolveDataDir()
 
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, err
 	}
 

@@ -23,7 +23,7 @@ func (c *CreateArea) Execute(name string) (*area.Area, error) {
 
 	// Emit sync event if sync is enabled
 	if c.SyncPersister != nil {
-		c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:  c.ClientID,
 			EventType: syncevent.EventTypeCreated,
 			Area:      a,

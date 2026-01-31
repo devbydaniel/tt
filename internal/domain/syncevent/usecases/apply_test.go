@@ -12,11 +12,11 @@ import (
 
 // mockTaskUpserter implements usecases.TaskUpserter for testing
 type mockTaskUpserter struct {
-	upserted    []*task.Task
-	deleted     []string
-	upsertErr   error
-	deleteErr   error
-	notFoundOn  string // Return ErrTaskNotFound for this UUID
+	upserted   []*task.Task
+	deleted    []string
+	upsertErr  error
+	deleteErr  error
+	notFoundOn string // Return ErrTaskNotFound for this UUID
 }
 
 func (m *mockTaskUpserter) Upsert(t *task.Task) error {

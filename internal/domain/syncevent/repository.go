@@ -88,7 +88,7 @@ func (r *Repository) GetUnpushed(limit int) ([]*SyncEvent, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var events []*SyncEvent
 	for rows.Next() {
@@ -272,7 +272,7 @@ func (r *Repository) GetLatestStatesSince(cursor int64, excludeEntityUUIDs []str
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var states []EntityState
 	for rows.Next() {

@@ -3,11 +3,12 @@ package usecases
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
-	"github.com/google/uuid"
 )
 
 // ProjectLookup is what this use case needs to look up projects (which are now tasks)
@@ -88,7 +89,7 @@ func (c *CreateTask) Execute(title string, opts *task.CreateOptions) (*task.Task
 
 	// Emit sync event if sync is enabled
 	if c.SyncPersister != nil {
-		c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:  c.ClientID,
 			EventType: syncevent.EventTypeCreated,
 			Task:      t,

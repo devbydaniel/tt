@@ -12,13 +12,13 @@ import (
 
 type App struct {
 	// Area use cases
-	CreateArea     *areausecases.CreateArea
-	ListAreas      *areausecases.ListAreas
-	GetAreaByName  *areausecases.GetAreaByName
-	GetAreaByID    *areausecases.GetAreaByID
-	GetAreaByUUID  *areausecases.GetAreaByUUID
-	DeleteArea     *areausecases.DeleteArea
-	RenameArea     *areausecases.RenameArea
+	CreateArea    *areausecases.CreateArea
+	ListAreas     *areausecases.ListAreas
+	GetAreaByName *areausecases.GetAreaByName
+	GetAreaByID   *areausecases.GetAreaByID
+	GetAreaByUUID *areausecases.GetAreaByUUID
+	DeleteArea    *areausecases.DeleteArea
+	RenameArea    *areausecases.RenameArea
 
 	// Sync event use cases
 	PersistSyncEvent *synceventusecases.PersistSyncEvent

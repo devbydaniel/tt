@@ -7,14 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/devbydaniel/tt/internal/dateparse"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/devbydaniel/tt/internal/recurparse"
-	"github.com/spf13/cobra"
 )
 
 func NewRecurCmd(deps *Dependencies) *cobra.Command {
-	var clear bool
+	var clearRecur bool
 	var pause bool
 	var resume bool
 	var endStr string
@@ -54,7 +55,7 @@ Examples:
 			}
 
 			// Handle --clear
-			if clear {
+			if clearRecur {
 				t, err := deps.App.SetRecurrence.Execute(id, nil, nil, nil)
 				if err != nil {
 					return err
@@ -137,7 +138,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVar(&clear, "clear", false, "Clear recurrence from task")
+	cmd.Flags().BoolVar(&clearRecur, "clear", false, "Clear recurrence from task")
 	cmd.Flags().BoolVar(&pause, "pause", false, "Pause recurrence (keeps rule)")
 	cmd.Flags().BoolVar(&resume, "resume", false, "Resume paused recurrence")
 	cmd.Flags().StringVar(&endStr, "end", "", "Set recurrence end date")

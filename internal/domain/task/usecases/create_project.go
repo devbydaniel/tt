@@ -3,11 +3,12 @@ package usecases
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
-	"github.com/google/uuid"
 )
 
 // AreaLookupForCreateProject is what this use case needs from the area domain
@@ -68,7 +69,7 @@ func (c *CreateProject) Execute(name string, opts *CreateProjectOptions) (*task.
 
 	// Emit sync event if sync is enabled
 	if c.SyncPersister != nil {
-		c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:  c.ClientID,
 			EventType: syncevent.EventTypeCreated,
 			Task:      p,

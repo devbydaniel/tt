@@ -5,10 +5,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/spf13/cobra"
+
 	"github.com/devbydaniel/tt/internal/dateparse"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
-	"github.com/spf13/cobra"
 )
 
 func NewEditCmd(deps *Dependencies) *cobra.Command {
@@ -167,11 +168,11 @@ Bulk editing with filters (all --where-* flags are ANDed together):
 					}
 					formatter.TaskDetails(t)
 					return nil
-				} else if len(ids) == 0 && !hasWhereFlags {
-					return errors.New("specify task IDs or --where-* filters")
-				} else {
-					return errors.New("no changes specified")
 				}
+				if len(ids) == 0 && !hasWhereFlags {
+					return errors.New("specify task IDs or --where-* filters")
+				}
+				return errors.New("no changes specified")
 			}
 
 			// Build changes list once (same for all tasks)

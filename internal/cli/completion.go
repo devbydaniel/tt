@@ -5,8 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/spf13/cobra"
+
+	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
 // CompletionRegistry handles dynamic flag completions

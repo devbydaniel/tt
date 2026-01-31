@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	"github.com/devbydaniel/tt/internal/domain/task"
-	"github.com/google/uuid"
 )
 
 // TaskLookup resolves a task ID to a task (for getting parent/recur parent UUIDs)
@@ -29,11 +30,11 @@ type PersistSyncEvent struct {
 
 // PersistOptions contains the options for persisting a sync event
 type PersistOptions struct {
-	ClientID   string               // Required: originating client identifier
-	EventType  syncevent.EventType  // Required: type of event
-	Task       *task.Task           // For task events
-	Area       *area.Area           // For area events
-	EntityUUID string               // Required for delete (when entity is already gone)
+	ClientID   string              // Required: originating client identifier
+	EventType  syncevent.EventType // Required: type of event
+	Task       *task.Task          // For task events
+	Area       *area.Area          // For area events
+	EntityUUID string              // Required for delete (when entity is already gone)
 }
 
 // Execute creates and persists a sync event for a task or area
@@ -53,10 +54,7 @@ func (p *PersistSyncEvent) Execute(opts *PersistOptions) (*syncevent.SyncEvent, 
 
 		// Build full snapshot for non-delete events
 		if opts.EventType != syncevent.EventTypeDeleted {
-			snapshot, err := p.buildTaskSnapshot(opts.Task)
-			if err != nil {
-				return nil, err
-			}
+			snapshot := p.buildTaskSnapshot(opts.Task)
 			jsonBytes, err := json.Marshal(snapshot)
 			if err != nil {
 				return nil, err
@@ -120,7 +118,7 @@ func (p *PersistSyncEvent) Execute(opts *PersistOptions) (*syncevent.SyncEvent, 
 }
 
 // buildTaskSnapshot creates a TaskSnapshotData from a task
-func (p *PersistSyncEvent) buildTaskSnapshot(t *task.Task) (*syncevent.TaskSnapshotData, error) {
+func (p *PersistSyncEvent) buildTaskSnapshot(t *task.Task) *syncevent.TaskSnapshotData {
 	snapshot := &syncevent.TaskSnapshotData{
 		UUID:        t.UUID,
 		Title:       t.Title,
@@ -177,5 +175,5 @@ func (p *PersistSyncEvent) buildTaskSnapshot(t *task.Task) (*syncevent.TaskSnaps
 		}
 	}
 
-	return snapshot, nil
+	return snapshot
 }

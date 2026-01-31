@@ -36,7 +36,7 @@ func (d *DeleteTag) Execute(tagName string) (int64, error) {
 			if err != nil {
 				continue // task may have been deleted
 			}
-			d.SyncPersister.Execute(&synceventusecases.PersistOptions{
+			_, _ = d.SyncPersister.Execute(&synceventusecases.PersistOptions{
 				ClientID:  d.ClientID,
 				EventType: syncevent.EventTypeUpdated,
 				Task:      t,

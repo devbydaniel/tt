@@ -2,6 +2,7 @@ package tui
 
 import (
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/devbydaniel/tt/internal/output"
 )
 
@@ -10,11 +11,11 @@ type Styles struct {
 	Theme *output.Theme
 
 	// Sidebar styles
-	SidebarBorder   lipgloss.Style
-	SectionHeader   lipgloss.Style
-	SelectedItem    lipgloss.Style
-	UnselectedItem  lipgloss.Style
-	FocusedSection  lipgloss.Style
+	SidebarBorder    lipgloss.Style
+	SectionHeader    lipgloss.Style
+	SelectedItem     lipgloss.Style
+	UnselectedItem   lipgloss.Style
+	FocusedSection   lipgloss.Style
 	UnfocusedSection lipgloss.Style
 
 	// Content styles

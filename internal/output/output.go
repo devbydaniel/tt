@@ -46,7 +46,7 @@ func (f *Formatter) TaskList(tasks []task.Task) {
 	}
 
 	idWidth := maxIDWidth(tasks)
-	f.renderTaskRows(tasks, 0, !f.hideScope, idWidth)
+	f.renderTaskRows(tasks, !f.hideScope, idWidth)
 }
 
 // GroupedTaskList displays tasks grouped by the specified field.
@@ -130,7 +130,7 @@ func (f *Formatter) groupedByScope(tasks []task.Task) {
 	// Render: No Scope first
 	if len(noScopeTasks) > 0 {
 		fmt.Fprintln(f.w, f.theme.Header.Render("No Scope"))
-		f.renderTaskRows(noScopeTasks, 0, !f.hideScope, idWidth)
+		f.renderTaskRows(noScopeTasks, !f.hideScope, idWidth)
 	}
 
 	// Combine all headers (group headers + project scopes) and sort
@@ -150,7 +150,7 @@ func (f *Formatter) groupedByScope(tasks []task.Task) {
 			f.renderProjectHeaderLine(proj)
 		} else if tasks, isGroup := groups[header]; isGroup {
 			fmt.Fprintln(f.w, f.theme.Header.Render(header))
-			f.renderTaskRows(tasks, 0, !f.hideScope, idWidth)
+			f.renderTaskRows(tasks, !f.hideScope, idWidth)
 		}
 	}
 }
@@ -176,7 +176,7 @@ func (f *Formatter) groupedByDate(tasks []task.Task) {
 	for _, category := range orderedCategories {
 		if len(dateGroups[category]) > 0 {
 			fmt.Fprintln(f.w, f.theme.Header.Render(category))
-			f.renderTaskRows(dateGroups[category], 0, true, idWidth)
+			f.renderTaskRows(dateGroups[category], true, idWidth)
 		}
 	}
 }
@@ -194,8 +194,8 @@ func maxIDWidth(tasks []task.Task) int {
 }
 
 // renderTaskRows renders task rows with optional indentation
-func (f *Formatter) renderTaskRows(tasks []task.Task, indent int, showScope bool, idWidth int) {
-	indentStr := strings.Repeat(" ", indent)
+func (f *Formatter) renderTaskRows(tasks []task.Task, showScope bool, idWidth int) {
+	indentStr := ""
 	for _, t := range tasks {
 		prefix := "  "
 		if isDueOrOverdue(&t) {
@@ -317,17 +317,6 @@ func formatRecurIndicator(t *task.Task) string {
 	return symbol
 }
 
-func formatTagIndicator(tags []string) string {
-	if len(tags) == 0 {
-		return ""
-	}
-	result := ""
-	for _, tag := range tags {
-		result += " #" + tag
-	}
-	return result
-}
-
 func formatTaskTitle(t *task.Task) string {
 	return sanitizeTitle(t.Title)
 }
@@ -376,52 +365,6 @@ func formatTagsForTable(tags []string) string {
 		result += "#" + tag
 	}
 	return result
-}
-
-func formatTaskDate(planned, due *time.Time) string {
-	now := time.Now()
-	todayYear, todayMonth, todayDay := now.Date()
-
-	// Prefer planned date, fall back to due date
-	var d *time.Time
-	if planned != nil {
-		d = planned
-	} else if due != nil {
-		d = due
-	}
-
-	if d == nil {
-		return ""
-	}
-
-	dateYear, dateMonth, dateDay := d.Date()
-
-	// Compare dates without time component
-	if dateYear == todayYear && dateMonth == todayMonth && dateDay == todayDay {
-		return "today"
-	}
-
-	tomorrow := now.AddDate(0, 0, 1)
-	tomorrowYear, tomorrowMonth, tomorrowDay := tomorrow.Date()
-	if dateYear == tomorrowYear && dateMonth == tomorrowMonth && dateDay == tomorrowDay {
-		return "tomorrow"
-	}
-
-	// Check if overdue (before today)
-	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.UTC)
-	dateOnly := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.UTC)
-	if dateOnly.Before(today) {
-		return "overdue"
-	}
-
-	// Within 7 days, show weekday
-	weekFromNow := today.AddDate(0, 0, 7)
-	if dateOnly.Before(weekFromNow) {
-		return d.Format("Mon")
-	}
-
-	// Show date
-	return d.Format("Jan 2")
 }
 
 func (f *Formatter) TasksCompleted(results []task.CompleteResult) {

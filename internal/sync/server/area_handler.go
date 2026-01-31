@@ -94,7 +94,7 @@ func (h *AreaHandler) handleCreateArea(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ErrorResponse
 // @Security BearerAuth
 // @Router /api/v1/areas [get]
-func (h *AreaHandler) handleListAreas(w http.ResponseWriter, r *http.Request) {
+func (h *AreaHandler) handleListAreas(w http.ResponseWriter, _ *http.Request) {
 	areas, err := h.App.ListAreas.Execute()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to list areas: "+err.Error())

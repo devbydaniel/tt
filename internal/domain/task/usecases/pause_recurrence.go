@@ -32,7 +32,7 @@ func (p *PauseRecurrence) Execute(id int64) (*task.Task, error) {
 
 	// Emit sync event if sync is enabled
 	if p.SyncPersister != nil {
-		p.SyncPersister.Execute(&synceventusecases.PersistOptions{
+		_, _ = p.SyncPersister.Execute(&synceventusecases.PersistOptions{
 			ClientID:  p.ClientID,
 			EventType: syncevent.EventTypeUpdated,
 			Task:      t,
