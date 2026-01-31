@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/devbydaniel/tt/internal/dateutil"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/recurparse"
 )
@@ -267,16 +268,10 @@ func (c Content) buildGroupedByScope() string {
 
 // buildGroupedByDate groups tasks by date categories
 func (c Content) buildGroupedByDate() string {
-	now := time.Now()
-	todayYear, todayMonth, todayDay := now.Date()
-	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
-	tomorrow := today.AddDate(0, 0, 1)
-	endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
-	endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local)
-	endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
+	today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear := dateutil.Boundaries()
 
 	return c.buildGroupedList(func(t *task.Task) string {
-		return c.getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
+		return dateutil.Category(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear)
 	})
 }
 
@@ -321,48 +316,6 @@ func (c Content) buildGroupedList(getGroup func(*task.Task) string) string {
 	return strings.Join(sections, "\n\n")
 }
 
-// getDateCategory determines which date category a task belongs to
-func (c Content) getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfMonth, endOfYear time.Time) string {
-	var d *time.Time
-	isPlanned := false
-	if planned != nil {
-		d = planned
-		isPlanned = true
-	} else if due != nil {
-		d = due
-	}
-
-	if d == nil {
-		return "No Date"
-	}
-
-	dateYear, dateMonth, dateDay := d.Date()
-	dateOnly := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.Local)
-
-	if dateOnly.Before(today) {
-		// Planned dates in past show as "Today", only due dates are "Overdue"
-		if isPlanned {
-			return "Today"
-		}
-		return "Overdue"
-	}
-	if dateOnly.Equal(today) {
-		return "Today"
-	}
-	if dateOnly.Equal(tomorrow) {
-		return "Tomorrow"
-	}
-	if dateOnly.Before(endOfWeek) || dateOnly.Equal(endOfWeek) {
-		return "This Week"
-	}
-	if dateOnly.Before(endOfMonth) || dateOnly.Equal(endOfMonth) {
-		return "This Month"
-	}
-	if dateOnly.Before(endOfYear) || dateOnly.Equal(endOfYear) {
-		return "This Year"
-	}
-	return "Later"
-}
 
 // View renders the content panel
 func (c Content) View() string {
@@ -736,15 +689,9 @@ func (c Content) selectedTaskLine() int {
 		}
 		isProjectItem = func(t *task.Task) bool { return false }
 	case "date":
-		now := time.Now()
-		todayYear, todayMonth, todayDay := now.Date()
-		today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
-		tomorrow := today.AddDate(0, 0, 1)
-		endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
-		endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local)
-		endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
+		today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear := dateutil.Boundaries()
 		getGroup = func(t *task.Task) string {
-			return c.getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
+			return dateutil.Category(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear)
 		}
 		isProjectItem = func(t *task.Task) bool { return false }
 	default:
@@ -913,25 +860,19 @@ func (c Content) orderByScope(tasks []task.Task) []task.Task {
 
 // orderByDate sorts tasks by date category
 func (c Content) orderByDate(tasks []task.Task) []task.Task {
-	now := time.Now()
-	todayYear, todayMonth, todayDay := now.Date()
-	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
-	tomorrow := today.AddDate(0, 0, 1)
-	endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
-	endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local)
-	endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
+	today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear := dateutil.Boundaries()
 
-	dateGroups := map[string][]task.Task{
-		"Overdue": {}, "Today": {}, "Tomorrow": {}, "This Week": {},
-		"This Month": {}, "This Year": {}, "Later": {}, "No Date": {},
+	orderedCategories := dateutil.OrderedCategories()
+	dateGroups := make(map[string][]task.Task, len(orderedCategories))
+	for _, cat := range orderedCategories {
+		dateGroups[cat] = nil
 	}
 
 	for _, t := range tasks {
-		category := c.getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
+		category := dateutil.Category(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear)
 		dateGroups[category] = append(dateGroups[category], t)
 	}
 
-	orderedCategories := []string{"Overdue", "Today", "Tomorrow", "This Week", "This Month", "This Year", "Later", "No Date"}
 	var result []task.Task
 	for _, category := range orderedCategories {
 		result = append(result, dateGroups[category]...)

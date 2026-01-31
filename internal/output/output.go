@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devbydaniel/tt/internal/dateutil"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/recurparse"
@@ -158,29 +159,16 @@ func (f *Formatter) groupedByScope(tasks []task.Task) {
 func (f *Formatter) groupedByDate(tasks []task.Task) {
 	idWidth := maxIDWidth(tasks)
 
-	// Define date categories
-	dateGroups := map[string][]task.Task{
-		"Overdue":    {},
-		"Today":      {},
-		"Tomorrow":   {},
-		"This Week":  {},
-		"This Month": {},
-		"This Year":  {},
-		"Later":      {},
-		"No Date":    {},
+	orderedCategories := dateutil.OrderedCategories()
+	dateGroups := make(map[string][]task.Task, len(orderedCategories))
+	for _, cat := range orderedCategories {
+		dateGroups[cat] = nil
 	}
-	orderedCategories := []string{"Overdue", "Today", "Tomorrow", "This Week", "This Month", "This Year", "Later", "No Date"}
 
-	now := time.Now()
-	todayYear, todayMonth, todayDay := now.Date()
-	today := time.Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0, time.Local)
-	tomorrow := today.AddDate(0, 0, 1)
-	endOfWeek := today.AddDate(0, 0, 7-int(today.Weekday()))
-	endOfMonth := time.Date(todayYear, todayMonth+1, 0, 0, 0, 0, 0, time.Local) // Last day of current month
-	endOfYear := time.Date(todayYear, 12, 31, 0, 0, 0, 0, time.Local)
+	today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear := dateutil.Boundaries()
 
 	for _, t := range tasks {
-		category := getDateCategory(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfYear)
+		category := dateutil.Category(t.PlannedDate, t.DueDate, today, tomorrow, endOfWeek, endOfMonth, endOfQuarter, endOfYear)
 		dateGroups[category] = append(dateGroups[category], t)
 	}
 
@@ -191,48 +179,6 @@ func (f *Formatter) groupedByDate(tasks []task.Task) {
 			f.renderTaskRows(dateGroups[category], 0, true, idWidth)
 		}
 	}
-}
-
-func getDateCategory(planned, due *time.Time, today, tomorrow, endOfWeek, endOfMonth, endOfYear time.Time) string {
-	var d *time.Time
-	isPlanned := false
-	if planned != nil {
-		d = planned
-		isPlanned = true
-	} else if due != nil {
-		d = due
-	}
-
-	if d == nil {
-		return "No Date"
-	}
-
-	dateYear, dateMonth, dateDay := d.Date()
-	dateOnly := time.Date(dateYear, dateMonth, dateDay, 0, 0, 0, 0, time.Local)
-
-	if dateOnly.Before(today) {
-		// Planned dates in past show as "Today", only due dates are "Overdue"
-		if isPlanned {
-			return "Today"
-		}
-		return "Overdue"
-	}
-	if dateOnly.Equal(today) {
-		return "Today"
-	}
-	if dateOnly.Equal(tomorrow) {
-		return "Tomorrow"
-	}
-	if dateOnly.Before(endOfWeek) || dateOnly.Equal(endOfWeek) {
-		return "This Week"
-	}
-	if dateOnly.Before(endOfMonth) || dateOnly.Equal(endOfMonth) {
-		return "This Month"
-	}
-	if dateOnly.Before(endOfYear) || dateOnly.Equal(endOfYear) {
-		return "This Year"
-	}
-	return "Later"
 }
 
 // maxIDWidth calculates the width needed for the largest task ID
