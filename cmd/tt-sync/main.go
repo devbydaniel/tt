@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/sync/server"
+	"github.com/devbydaniel/tt/internal/version"
 
 	_ "github.com/devbydaniel/tt/docs" // swagger docs
 )
@@ -31,6 +33,14 @@ import (
 // @description Enter "Bearer {token}" where {token} is your API key
 
 func main() {
+	showVersion := flag.Bool("version", false, "Print version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version.Full())
+		return
+	}
+
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

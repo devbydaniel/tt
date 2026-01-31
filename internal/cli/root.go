@@ -10,6 +10,7 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/output"
 	"github.com/devbydaniel/tt/internal/tui"
+	"github.com/devbydaniel/tt/internal/version"
 )
 
 type Dependencies struct {
@@ -26,6 +27,8 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 			return tui.Run(deps.App, deps.Theme, deps.Config)
 		},
 	}
+	rootCmd.Version = version.Version
+	rootCmd.SetVersionTemplate(version.Full() + "\n")
 
 	rootCmd.AddCommand(NewAddCmd(deps))
 	rootCmd.AddCommand(NewListCmd(deps))
