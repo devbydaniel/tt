@@ -1,85 +1,89 @@
-run:
-  timeout: 3m
-
+version: "2"
 linters:
   enable:
-    # Bugs & correctness
-    - govet
-    - staticcheck
-    - typecheck
     - bodyclose
-    - sqlclosecheck
+    - errname
+    - gocritic
+    - misspell
     - nilerr
-    - errcheck
-
-    # Code quality
-    - unused
-    - ineffassign
-    - gosimple
+    - revive
+    - sqlclosecheck
     - unconvert
     - unparam
-    - revive
-    - gocritic
-
-    # Style & consistency
-    - goimports
-    - misspell
-    - errname
-
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment # noisy, rarely worth optimising
-      - shadow         # too noisy on idiomatic err re-assignment
-  staticcheck:
-    checks: ["all"]
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-      - style
-    disabled-checks:
-      - hugeParam         # noisy for value types passed around in TUI code
-      - rangeValCopy
-      - singleCaseSwitch  # common pattern in Bubbletea Update() methods
-      - ifElseChain       # often clearer than switch for heterogeneous conditions
-      - paramTypeCombine  # stylistic, not worth enforcing
-  revive:
+  settings:
+    errcheck:
+      check-type-assertions: true
+    gocritic:
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+        - singleCaseSwitch
+        - ifElseChain
+        - paramTypeCombine
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+      enable-all: true
+    misspell:
+      locale: US
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: exported
+          disabled: true
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: unexported-return
+        - name: var-naming
+    staticcheck:
+      checks:
+        - all
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: exported
-        disabled: true
-      - name: increment-decrement
-      - name: indent-error-flow
-      - name: range
-      - name: receiver-naming
-      - name: redefines-builtin-id
-      - name: unexported-return
-      - name: var-naming
-  errcheck:
-    check-type-assertions: true
-  goimports:
-    local-prefixes: github.com/devbydaniel/tt
-  misspell:
-    locale: US
-
+      - linters:
+          - errcheck
+          - gocritic
+          - unparam
+        path: _test\.go
+      - linters:
+          - revive
+        path: _test\.go
+        text: unused-parameter
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # Test files can be more relaxed
-    - path: _test\.go
-      linters:
-        - errcheck
-        - unparam
-        - gocritic
-    # Allow unused params in interface implementations
-    - linters:
-        - revive
-      text: "unused-parameter"
-      path: _test\.go
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/devbydaniel/tt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
