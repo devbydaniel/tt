@@ -1,0 +1,94 @@
+version: 2
+
+builds:
+  - id: tt
+    main: ./cmd/tt
+    binary: tt
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/devbydaniel/tt/internal/version.Version={{.Version}}
+      - -X github.com/devbydaniel/tt/internal/version.Commit={{.Commit}}
+      - -X github.com/devbydaniel/tt/internal/version.Date={{.Date}}
+      - -X github.com/devbydaniel/tt/internal/version.BuiltBy=goreleaser
+
+  - id: tt-sync
+    main: ./cmd/tt-sync
+    binary: tt-sync
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/devbydaniel/tt/internal/version.Version={{.Version}}
+      - -X github.com/devbydaniel/tt/internal/version.Commit={{.Commit}}
+      - -X github.com/devbydaniel/tt/internal/version.Date={{.Date}}
+      - -X github.com/devbydaniel/tt/internal/version.BuiltBy=goreleaser
+
+archives:
+  - id: tt
+    builds:
+      - tt
+    name_template: "tt_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+  - id: tt-sync
+    builds:
+      - tt-sync
+    name_template: "tt-sync_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+
+brews:
+  - name: tt
+    ids:
+      - tt
+    repository:
+      owner: devbydaniel
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/devbydaniel/tt"
+    description: "A CLI & TUI task manager"
+    license: "MIT"
+
+  - name: tt-sync
+    ids:
+      - tt-sync
+    repository:
+      owner: devbydaniel
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/devbydaniel/tt"
+    description: "Sync server for tt task manager"
+    license: "MIT"
