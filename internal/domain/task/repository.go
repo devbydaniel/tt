@@ -127,6 +127,8 @@ func sortFieldToColumn(f SortField) string {
 		return "parent.title"
 	case SortByArea:
 		return "COALESCE(a.name, parent_area.name)"
+	case SortByDate:
+		return "COALESCE(t.planned_date, t.due_date)"
 	default:
 		return "t.id"
 	}
@@ -134,7 +136,7 @@ func sortFieldToColumn(f SortField) string {
 
 func isNullableField(f SortField) bool {
 	switch f {
-	case SortByPlanned, SortByDue, SortByProject, SortByArea:
+	case SortByPlanned, SortByDue, SortByDate, SortByProject, SortByArea:
 		return true
 	default:
 		return false

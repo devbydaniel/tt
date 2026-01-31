@@ -157,7 +157,7 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 	cmd.Flags().StringVarP(&areaName, "area", "a", "", "Filter by area name")
 	cmd.Flags().StringVar(&tagName, "tag", "", "Filter by tag")
 	cmd.Flags().StringVarP(&search, "search", "S", "", "Search task titles")
-	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, created, project, area (e.g. due,title:desc)")
+	cmd.Flags().StringVarP(&sortStr, "sort", "s", "", "Sort by field(s): id, title, planned, due, date, created, project, area (e.g. due,title:desc)")
 	cmd.Flags().BoolVar(&today, "today", false, "Show tasks planned for today or overdue")
 	cmd.Flags().BoolVar(&upcoming, "upcoming", false, "Show tasks with future dates")
 	cmd.Flags().BoolVar(&someday, "someday", false, "Show someday tasks")

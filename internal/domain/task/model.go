@@ -17,11 +17,12 @@ const (
 	SortByCreated SortField = "created"
 	SortByProject SortField = "project"
 	SortByArea    SortField = "area"
+	SortByDate    SortField = "date"
 )
 
 // ValidSortFields returns all valid sort field names
 func ValidSortFields() []string {
-	return []string{"id", "title", "planned", "due", "created", "project", "area"}
+	return []string{"id", "title", "planned", "due", "date", "created", "project", "area"}
 }
 
 // SortDirection represents ascending or descending order
@@ -108,6 +109,8 @@ func parseSortField(s string) (SortField, error) {
 		return SortByProject, nil
 	case "area":
 		return SortByArea, nil
+	case "date":
+		return SortByDate, nil
 	default:
 		return "", fmt.Errorf("invalid sort field: %q (valid: %s)", s, strings.Join(ValidSortFields(), ", "))
 	}
@@ -126,7 +129,7 @@ func parseSortDirection(s string) (SortDirection, error) {
 
 func defaultDirection(f SortField) SortDirection {
 	switch f {
-	case SortByPlanned, SortByDue, SortByCreated:
+	case SortByPlanned, SortByDue, SortByDate, SortByCreated:
 		return SortDesc
 	default:
 		return SortAsc

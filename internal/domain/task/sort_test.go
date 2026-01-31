@@ -54,12 +54,13 @@ func TestParseSort(t *testing.T) {
 		},
 		{
 			name:  "all valid fields",
-			input: "id,title,planned,due,created,project,area",
+			input: "id,title,planned,due,date,created,project,area",
 			want: []SortOption{
 				{Field: SortByID, Direction: SortAsc},
 				{Field: SortByTitle, Direction: SortAsc},
 				{Field: SortByPlanned, Direction: SortDesc},
 				{Field: SortByDue, Direction: SortDesc},
+				{Field: SortByDate, Direction: SortDesc},
 				{Field: SortByCreated, Direction: SortDesc},
 				{Field: SortByProject, Direction: SortAsc},
 				{Field: SortByArea, Direction: SortAsc},
@@ -123,7 +124,7 @@ func TestParseSort(t *testing.T) {
 
 func TestValidSortFields(t *testing.T) {
 	fields := ValidSortFields()
-	expected := []string{"id", "title", "planned", "due", "created", "project", "area"}
+	expected := []string{"id", "title", "planned", "due", "date", "created", "project", "area"}
 
 	if len(fields) != len(expected) {
 		t.Errorf("ValidSortFields() returned %d fields, want %d", len(fields), len(expected))

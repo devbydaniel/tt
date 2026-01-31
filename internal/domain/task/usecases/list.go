@@ -69,6 +69,10 @@ func (l *ListTasks) Execute(opts *task.ListOptions) ([]task.Task, error) {
 			filter.Today = true
 		case "upcoming":
 			filter.Upcoming = true
+			// Default sort by date ascending (nearest first) if no explicit sort
+			if len(filter.Sort) == 0 {
+				filter.Sort = []task.SortOption{{Field: task.SortByDate, Direction: task.SortAsc}}
+			}
 		case "anytime":
 			filter.Anytime = true
 			filter.TaskType = task.TaskTypeTask // Only show tasks, not projects
