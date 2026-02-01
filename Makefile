@@ -1,4 +1,4 @@
-.PHONY: build run dev test lint clean build-sync run-sync dev-sync
+.PHONY: build run dev test lint clean build-sync run-sync dev-sync docker-build docker-up docker-down
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
@@ -34,3 +34,12 @@ run-sync: build-sync
 
 dev-sync:
 	TT_DATA_DIR=./dev-data go run -ldflags '$(LDFLAGS)' ./cmd/tt-sync
+
+docker-build:
+	docker build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg DATE=$(DATE) -t tt-sync .
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
