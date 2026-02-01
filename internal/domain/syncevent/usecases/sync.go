@@ -91,7 +91,13 @@ func (s *SyncEvents) Execute() (*SyncEventsResult, error) {
 			cursor = resp.NewCursor
 		}
 
-		// If we pushed less than batch size and got all entities, we're done
+		// Stop if no events were sent (nothing left to push)
+		// or if no progress was made (all events rejected — avoids infinite loop)
+		if len(events) == 0 || len(resp.Accepted) == 0 {
+			break
+		}
+
+		// If we pushed less than batch size, we're done
 		if len(events) < DefaultBatchSize {
 			break
 		}

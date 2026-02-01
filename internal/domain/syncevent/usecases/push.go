@@ -61,6 +61,11 @@ func (p *PushEvents) Execute() (*PushResult, error) {
 			result.Errors = append(result.Errors, rejected.EventUUID+": "+rejected.Reason)
 		}
 
+		// Stop if no progress was made (all events rejected — avoids infinite loop)
+		if len(resp.Accepted) == 0 {
+			break
+		}
+
 		// If we got less than batch size, we're done
 		if len(events) < DefaultBatchSize {
 			break
