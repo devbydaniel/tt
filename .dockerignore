@@ -1,0 +1,14 @@
+dev-data/
+dist/
+.git/
+.idea/
+.vscode/
+.auto-claude/
+.worktrees/
+logs/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+tt
+tt-sync

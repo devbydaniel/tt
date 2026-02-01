@@ -1,0 +1,19 @@
+services:
+  tt-sync:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT: ${COMMIT:-none}
+        DATE: ${DATE:-unknown}
+    ports:
+      - "8080:8080"
+    volumes:
+      - tt-data:/data
+    environment:
+      - TT_SYNC_API_KEY=${TT_SYNC_API_KEY:?Set TT_SYNC_API_KEY in .env or environment}
+      - TT_DATA_DIR=/data
+    restart: unless-stopped
+
+volumes:
+  tt-data:
