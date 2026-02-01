@@ -7,7 +7,7 @@ services:
         COMMIT: ${COMMIT:-none}
         DATE: ${DATE:-unknown}
     ports:
-      - "8080:8080"
+      - "${TT_SYNC_PORT:-8080}:8080"
     volumes:
       - tt-data:/data
     environment:
