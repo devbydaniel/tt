@@ -97,7 +97,16 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		}
 		syncPersister = persistSyncEventUC
 		areaSyncPersister = persistSyncEventUC
-		resetSync = &synceventusecases.ResetSync{Repo: syncEventRepo}
+
+		// ResetSync needs the sync client to reset the server.
+		// Client is created below if syncCfg is available; we set it after.
+		resetSync = &synceventusecases.ResetSync{
+			Repo:          syncEventRepo,
+			TaskLister:    &taskusecases.ListAllTasks{Repo: taskRepo},
+			AreaLister:    listAreas,
+			SyncPersister: persistSyncEventUC,
+			ClientID:      clientID,
+		}
 	}
 
 	// Create area use cases with sync support
@@ -142,6 +151,10 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 			Client:   syncClient,
 			ClientID: clientID,
 			Applier:  applier,
+		}
+		// Wire the sync client into ResetSync so it can reset the server
+		if resetSync != nil {
+			resetSync.Client = syncClient
 		}
 	}
 

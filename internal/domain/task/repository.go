@@ -341,6 +341,43 @@ func (r *Repository) Uncomplete(id int64) error {
 	return nil
 }
 
+// ListAll returns all tasks (both todo and done) without any filters.
+// Used for sync reset to regenerate sync events for all existing tasks.
+func (r *Repository) ListAll() ([]Task, error) {
+	rows, err := r.db.Conn.Query(
+		`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
+		 FROM tasks t
+		 LEFT JOIN tasks parent ON t.parent_id = parent.id
+		 LEFT JOIN areas a ON t.area_id = a.id
+		 LEFT JOIN areas parent_area ON parent.area_id = parent_area.id
+		 ORDER BY t.id ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	tasks, err := scanTasks(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.loadTagsForTasks(tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
+// DeleteAll removes all tasks from the database. Returns the number of deleted tasks.
+func (r *Repository) DeleteAll() (int64, error) {
+	result, err := r.db.Conn.Exec("DELETE FROM tasks")
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 func (r *Repository) Delete(id int64) error {
 	result, err := r.db.Conn.Exec(`DELETE FROM tasks WHERE id = ?`, id)
 	if err != nil {

@@ -101,6 +101,32 @@ func (c *Client) PushEvents(clientID string, events []*SyncEvent) (*PushResponse
 	return &pushResp, nil
 }
 
+// Reset calls the server's sync reset endpoint to clear all server-side data.
+func (c *Client) Reset() error {
+	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/api/v1/sync/reset", nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("authentication failed: invalid API key")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // Sync performs bidirectional sync with the server.
 // It sends local events and receives the latest state for entities that changed.
 func (c *Client) Sync(clientID string, cursor int64, events []*SyncEvent) (*SyncResponse, error) {

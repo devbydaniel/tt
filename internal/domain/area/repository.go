@@ -93,6 +93,15 @@ func (r *Repository) GetByUUID(areaUUID string) (*Area, error) {
 	return &a, nil
 }
 
+// DeleteAll removes all areas from the database. Returns the number of deleted areas.
+func (r *Repository) DeleteAll() (int64, error) {
+	result, err := r.db.Conn.Exec("DELETE FROM areas")
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 func (r *Repository) Delete(id int64) error {
 	result, err := r.db.Conn.Exec(`DELETE FROM areas WHERE id = ?`, id)
 	if err != nil {

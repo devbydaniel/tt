@@ -13,9 +13,11 @@ import (
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/area"
+	areausecases "github.com/devbydaniel/tt/internal/domain/area/usecases"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
+	taskusecases "github.com/devbydaniel/tt/internal/domain/task/usecases"
 	"github.com/devbydaniel/tt/internal/sync/server"
 	"github.com/devbydaniel/tt/internal/version"
 
@@ -99,12 +101,15 @@ func run() error {
 		Repo:    syncEventRepo,
 		Applier: applier,
 	}
-	resetSync := &usecases.ResetSync{
+	resetSyncEvents := &usecases.ResetSyncEvents{
 		Repo: syncEventRepo,
 	}
 
+	deleteAllTasks := &taskusecases.DeleteAllTasks{Repo: taskRepo}
+	deleteAllAreas := &areausecases.DeleteAllAreas{Repo: areaRepo}
+
 	// Create handlers
-	syncHandler := server.NewHandler(receiveEvents, resetSync)
+	syncHandler := server.NewHandler(receiveEvents, resetSyncEvents, deleteAllTasks, deleteAllAreas)
 	taskHandler := server.NewTaskHandler(application)
 	areaHandler := server.NewAreaHandler(application)
 	projectHandler := server.NewProjectHandler(application)

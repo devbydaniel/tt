@@ -8,17 +8,26 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 )
 
+// AllDeleter can delete all entities of a given type.
+type AllDeleter interface {
+	Execute() (int64, error)
+}
+
 // Handler handles sync API requests.
 type Handler struct {
-	ReceiveEvents *usecases.ReceiveEvents
-	ResetSync     *usecases.ResetSync
+	ReceiveEvents   *usecases.ReceiveEvents
+	ResetSyncEvents *usecases.ResetSyncEvents
+	DeleteAllTasks  AllDeleter
+	DeleteAllAreas  AllDeleter
 }
 
 // NewHandler creates a new handler with the given use cases.
-func NewHandler(receiveEvents *usecases.ReceiveEvents, resetSync *usecases.ResetSync) *Handler {
+func NewHandler(receiveEvents *usecases.ReceiveEvents, resetSyncEvents *usecases.ResetSyncEvents, deleteAllTasks AllDeleter, deleteAllAreas AllDeleter) *Handler {
 	return &Handler{
-		ReceiveEvents: receiveEvents,
-		ResetSync:     resetSync,
+		ReceiveEvents:   receiveEvents,
+		ResetSyncEvents: resetSyncEvents,
+		DeleteAllTasks:  deleteAllTasks,
+		DeleteAllAreas:  deleteAllAreas,
 	}
 }
 
@@ -146,17 +155,39 @@ func (h *Handler) HandleSyncReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.ResetSync == nil {
+	if h.ResetSyncEvents == nil {
 		http.Error(w, "Sync reset not configured", http.StatusInternalServerError)
 		return
 	}
 
-	count, err := h.ResetSync.Execute()
+	// Delete all sync events
+	result, err := h.ResetSyncEvents.Execute()
 	if err != nil {
-		http.Error(w, "Failed to reset sync: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to reset sync events: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// Delete all materialized tasks and areas
+	var deletedTasks, deletedAreas int64
+	if h.DeleteAllTasks != nil {
+		deletedTasks, err = h.DeleteAllTasks.Execute()
+		if err != nil {
+			http.Error(w, "Failed to delete tasks: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if h.DeleteAllAreas != nil {
+		deletedAreas, err = h.DeleteAllAreas.Execute()
+		if err != nil {
+			http.Error(w, "Failed to delete areas: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]int64{"deleted": count})
+	_ = json.NewEncoder(w).Encode(map[string]int64{
+		"deletedEvents": result.DeletedEvents,
+		"deletedTasks":  deletedTasks,
+		"deletedAreas":  deletedAreas,
+	})
 }

@@ -86,13 +86,17 @@ func NewSyncCmd(deps *Dependencies) *cobra.Command {
 
 	resetCmd := &cobra.Command{
 		Use:   "reset",
-		Short: "Clear all local sync events",
+		Short: "Reset sync: clear server data, regenerate events from local database",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if deps.App.ResetSync == nil {
 				return fmt.Errorf("sync not configured: set client_id in config file")
 			}
 
-			fmt.Print("This will delete all local sync events. Continue? [y/N]: ")
+			fmt.Fprintln(os.Stdout, "This will:")
+			fmt.Fprintln(os.Stdout, "  1. Clear all data on the sync server")
+			fmt.Fprintln(os.Stdout, "  2. Clear local sync events and cursor")
+			fmt.Fprintln(os.Stdout, "  3. Regenerate sync events for all local tasks and areas")
+			fmt.Print("Continue? [y/N]: ")
 			reader := bufio.NewReader(os.Stdin)
 			response, err := reader.ReadString('\n')
 			if err != nil {
@@ -104,12 +108,14 @@ func NewSyncCmd(deps *Dependencies) *cobra.Command {
 				return nil
 			}
 
-			count, err := deps.App.ResetSync.Execute()
+			result, err := deps.App.ResetSync.Execute()
 			if err != nil {
 				return fmt.Errorf("reset failed: %w", err)
 			}
 
-			fmt.Fprintf(os.Stdout, "Deleted %d sync event(s).\n", count)
+			fmt.Fprintf(os.Stdout, "Deleted %d sync event(s).\n", result.DeletedEvents)
+			fmt.Fprintf(os.Stdout, "Regenerated %d sync event(s).\n", result.RegeneratedEvents)
+			fmt.Fprintln(os.Stdout, "Run 'tt sync' to push to the server.")
 			return nil
 		},
 	}
