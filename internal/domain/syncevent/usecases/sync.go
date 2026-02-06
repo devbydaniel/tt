@@ -67,10 +67,17 @@ func (s *SyncEvents) Execute() (*SyncEventsResult, error) {
 			result.Pushed += len(resp.Accepted)
 		}
 
-		// Record rejected events
-		for _, rejected := range resp.Rejected {
-			result.Rejected++
-			result.Errors = append(result.Errors, rejected.EventUUID+": "+rejected.Reason)
+		// Record rejected events and track failure counts
+		if len(resp.Rejected) > 0 {
+			rejectedUUIDs := make([]string, len(resp.Rejected))
+			for i, rejected := range resp.Rejected {
+				result.Rejected++
+				result.Errors = append(result.Errors, rejected.EventUUID+": "+rejected.Reason)
+				rejectedUUIDs[i] = rejected.EventUUID
+			}
+			if err := s.Repo.IncrementFailureCount(rejectedUUIDs); err != nil {
+				return result, err
+			}
 		}
 
 		// Apply received entity states

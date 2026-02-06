@@ -21,10 +21,12 @@ type App struct {
 	RenameArea    *areausecases.RenameArea
 
 	// Sync event use cases
-	PersistSyncEvent *synceventusecases.PersistSyncEvent
-	PushEvents       *synceventusecases.PushEvents
-	SyncEvents       *synceventusecases.SyncEvents
-	ResetSync        *synceventusecases.ResetSync
+	PersistSyncEvent  *synceventusecases.PersistSyncEvent
+	PushEvents        *synceventusecases.PushEvents
+	SyncEvents        *synceventusecases.SyncEvents
+	ResetSync         *synceventusecases.ResetSync
+	ListFailedEvents  *synceventusecases.ListFailedEvents
+	CleanFailedEvents *synceventusecases.CleanFailedEvents
 
 	// Project use cases (projects are now tasks with task_type='project')
 	CreateProject        *taskusecases.CreateProject
@@ -88,6 +90,8 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 	var areaSyncPersister areausecases.SyncEventPersister
 	var syncEventRepo *syncevent.Repository
 	var resetSync *synceventusecases.ResetSync
+	var listFailedEvents *synceventusecases.ListFailedEvents
+	var cleanFailedEvents *synceventusecases.CleanFailedEvents
 	if clientID != "" {
 		syncEventRepo = syncevent.NewRepository(db)
 		persistSyncEventUC := &synceventusecases.PersistSyncEvent{
@@ -107,6 +111,8 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 			SyncPersister: persistSyncEventUC,
 			ClientID:      clientID,
 		}
+		listFailedEvents = &synceventusecases.ListFailedEvents{Repo: syncEventRepo}
+		cleanFailedEvents = &synceventusecases.CleanFailedEvents{Repo: syncEventRepo}
 	}
 
 	// Create area use cases with sync support
@@ -305,10 +311,12 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		RenameArea:    renameArea,
 
 		// Sync event
-		PersistSyncEvent: persistSyncEventExposed,
-		PushEvents:       pushEvents,
-		SyncEvents:       syncEvents,
-		ResetSync:        resetSync,
+		PersistSyncEvent:  persistSyncEventExposed,
+		PushEvents:        pushEvents,
+		SyncEvents:        syncEvents,
+		ResetSync:         resetSync,
+		ListFailedEvents:  listFailedEvents,
+		CleanFailedEvents: cleanFailedEvents,
 
 		// Project (tasks with task_type='project')
 		CreateProject:        createProject,

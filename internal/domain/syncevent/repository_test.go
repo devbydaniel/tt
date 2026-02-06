@@ -420,3 +420,92 @@ func TestDeletedEventLatestState(t *testing.T) {
 		t.Error("deleted entity should have nil snapshot")
 	}
 }
+
+func TestIncrementFailureCount(t *testing.T) {
+	repo := setupRepo(t)
+
+	event := createTestEvent("client-1", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	repo.Create(event)
+
+	// Increment once
+	err := repo.IncrementFailureCount([]string{"event-1"})
+	if err != nil {
+		t.Fatalf("IncrementFailureCount() error = %v", err)
+	}
+
+	// Should still be in unpushed (failure_count=1, threshold=3)
+	unpushed, _ := repo.GetUnpushed(10)
+	if len(unpushed) != 1 {
+		t.Errorf("should still have 1 unpushed after 1 failure, got %d", len(unpushed))
+	}
+}
+
+func TestPermanentlyFailedExcludedFromUnpushed(t *testing.T) {
+	repo := setupRepo(t)
+
+	event := createTestEvent("client-1", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	repo.Create(event)
+
+	// Increment failure count to threshold
+	for i := 0; i < syncevent.MaxFailureCount; i++ {
+		if err := repo.IncrementFailureCount([]string{"event-1"}); err != nil {
+			t.Fatalf("IncrementFailureCount() error = %v", err)
+		}
+	}
+
+	// Should be excluded from unpushed
+	unpushed, _ := repo.GetUnpushed(10)
+	if len(unpushed) != 0 {
+		t.Errorf("permanently failed event should be excluded from unpushed, got %d", len(unpushed))
+	}
+
+	// Should appear in permanently failed list
+	failed, err := repo.GetPermanentlyFailed()
+	if err != nil {
+		t.Fatalf("GetPermanentlyFailed() error = %v", err)
+	}
+	if len(failed) != 1 {
+		t.Errorf("should have 1 permanently failed event, got %d", len(failed))
+	}
+}
+
+func TestDeletePermanentlyFailed(t *testing.T) {
+	repo := setupRepo(t)
+
+	event1 := createTestEvent("client-1", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	event2 := createTestEvent("client-1", "entity-2", "event-2", syncevent.EventTypeCreated, 1)
+	repo.Create(event1)
+	repo.Create(event2)
+
+	// Mark event-1 as permanently failed
+	for i := 0; i < syncevent.MaxFailureCount; i++ {
+		repo.IncrementFailureCount([]string{"event-1"})
+	}
+
+	// Delete permanently failed
+	count, err := repo.DeletePermanentlyFailed()
+	if err != nil {
+		t.Fatalf("DeletePermanentlyFailed() error = %v", err)
+	}
+	if count != 1 {
+		t.Errorf("deleted count = %d, want 1", count)
+	}
+
+	// event-2 should still be unpushed
+	unpushed, _ := repo.GetUnpushed(10)
+	if len(unpushed) != 1 {
+		t.Errorf("should have 1 unpushed after cleaning failed, got %d", len(unpushed))
+	}
+	if unpushed[0].EventUUID != "event-2" {
+		t.Errorf("remaining event = %s, want event-2", unpushed[0].EventUUID)
+	}
+}
+
+func TestIncrementFailureCountEmptySlice(t *testing.T) {
+	repo := setupRepo(t)
+
+	err := repo.IncrementFailureCount([]string{})
+	if err != nil {
+		t.Errorf("IncrementFailureCount(empty) should not error, got %v", err)
+	}
+}

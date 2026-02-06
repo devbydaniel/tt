@@ -73,14 +73,18 @@ func (r *Repository) GetNextEventVersion(entityType EntityType, entityUUID strin
 	return maxVersion.Int64 + 1, nil
 }
 
-// GetUnpushed returns events that haven't been pushed to the sync server yet.
+// MaxFailureCount is the number of rejection cycles before an event is marked permanently failed.
+const MaxFailureCount = 3
+
+// GetUnpushed returns events that haven't been pushed to the sync server yet,
+// excluding permanently failed events.
 func (r *Repository) GetUnpushed(limit int) ([]*SyncEvent, error) {
 	rows, err := r.db.Conn.Query(
 		`SELECT id, event_uuid, entity_type, entity_uuid, client_id,
 		        event_type, event_version, timestamp, snapshot,
 		        entity_title, entity_status
 		 FROM sync_events
-		 WHERE pushed_at IS NULL
+		 WHERE pushed_at IS NULL AND permanently_failed = 0
 		 ORDER BY timestamp ASC
 		 LIMIT ?`,
 		limit,
@@ -202,6 +206,76 @@ func (r *Repository) scanEventRow(row *sql.Row) (*SyncEvent, error) {
 	}
 
 	return &event, nil
+}
+
+// IncrementFailureCount increments the failure count for the given event UUIDs.
+// Events that reach MaxFailureCount are automatically marked as permanently failed.
+func (r *Repository) IncrementFailureCount(eventUUIDs []string) error {
+	if len(eventUUIDs) == 0 {
+		return nil
+	}
+
+	placeholders := make([]string, len(eventUUIDs))
+	args := make([]interface{}, len(eventUUIDs))
+	for i, uuid := range eventUUIDs {
+		placeholders[i] = "?"
+		args[i] = uuid
+	}
+
+	inClause := strings.Join(placeholders, ", ")
+
+	// Increment failure count
+	query := fmt.Sprintf(
+		`UPDATE sync_events SET failure_count = failure_count + 1 WHERE event_uuid IN (%s)`,
+		inClause,
+	)
+	if _, err := r.db.Conn.Exec(query, args...); err != nil {
+		return err
+	}
+
+	// Mark as permanently failed if threshold reached
+	query = fmt.Sprintf(
+		`UPDATE sync_events SET permanently_failed = 1 WHERE failure_count >= %d AND event_uuid IN (%s)`,
+		MaxFailureCount, inClause,
+	)
+	_, err := r.db.Conn.Exec(query, args...)
+	return err
+}
+
+// GetPermanentlyFailed returns all permanently failed sync events.
+func (r *Repository) GetPermanentlyFailed() ([]*SyncEvent, error) {
+	rows, err := r.db.Conn.Query(
+		`SELECT id, event_uuid, entity_type, entity_uuid, client_id,
+		        event_type, event_version, timestamp, snapshot,
+		        entity_title, entity_status
+		 FROM sync_events
+		 WHERE permanently_failed = 1
+		 ORDER BY timestamp ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var events []*SyncEvent
+	for rows.Next() {
+		event, err := r.scanEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, rows.Err()
+}
+
+// DeletePermanentlyFailed removes all permanently failed sync events.
+// Returns the number of deleted events.
+func (r *Repository) DeletePermanentlyFailed() (int64, error) {
+	result, err := r.db.Conn.Exec("DELETE FROM sync_events WHERE permanently_failed = 1")
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 // DeleteAll removes all sync events from the database.

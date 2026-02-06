@@ -374,6 +374,47 @@ func TestSyncCursorOnlyUpdatesWhenHigher(t *testing.T) {
 	}
 }
 
+func TestSyncRejectedEventsGetFailureTracking(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req syncevent.SyncRequest
+		json.NewDecoder(r.Body).Decode(&req)
+
+		rejected := make([]syncevent.RejectedEvent, len(req.Events))
+		for i, e := range req.Events {
+			rejected[i] = syncevent.RejectedEvent{
+				EventUUID: e.EventUUID,
+				Reason:    "bad client id",
+			}
+		}
+
+		resp := syncevent.SyncResponse{
+			Accepted:  []string{},
+			Rejected:  rejected,
+			NewCursor: 10,
+		}
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	sync, repo, _, _ := setupSyncTest(t, handler)
+	createUnpushedEvent(repo, "entity-1", "event-1")
+
+	// Reject MaxFailureCount times
+	for i := 0; i < syncevent.MaxFailureCount; i++ {
+		sync.Execute()
+	}
+
+	// Event should be permanently failed
+	unpushed, _ := repo.GetUnpushed(10)
+	if len(unpushed) != 0 {
+		t.Errorf("should have 0 unpushed after %d rejections, got %d", syncevent.MaxFailureCount, len(unpushed))
+	}
+
+	failed, _ := repo.GetPermanentlyFailed()
+	if len(failed) != 1 {
+		t.Errorf("should have 1 permanently failed, got %d", len(failed))
+	}
+}
+
 func TestSyncFullCycle(t *testing.T) {
 	// Simulates a realistic sync cycle:
 	// 1. Client has 2 local changes to push

@@ -120,7 +120,61 @@ func NewSyncCmd(deps *Dependencies) *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(pushCmd, resetCmd)
+	failedCmd := &cobra.Command{
+		Use:   "failed",
+		Short: "List permanently failed sync events",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if deps.App.ListFailedEvents == nil {
+				return fmt.Errorf("sync not configured: set client_id in config file")
+			}
+
+			events, err := deps.App.ListFailedEvents.Execute()
+			if err != nil {
+				return fmt.Errorf("listing failed events: %w", err)
+			}
+
+			if len(events) == 0 {
+				fmt.Fprintln(os.Stdout, "No permanently failed events.")
+				return nil
+			}
+
+			fmt.Fprintf(os.Stdout, "%d permanently failed event(s):\n", len(events))
+			for _, e := range events {
+				title := "<no title>"
+				if e.EntityTitle != nil {
+					title = *e.EntityTitle
+				}
+				fmt.Fprintf(os.Stdout, "  %s  %s  %s  %s  %q\n",
+					e.EventUUID, e.EntityType, e.EventType, e.EntityUUID, title)
+			}
+			fmt.Fprintln(os.Stdout, "\nRun 'tt sync clean' to remove these events.")
+			return nil
+		},
+	}
+
+	cleanCmd := &cobra.Command{
+		Use:   "clean",
+		Short: "Remove permanently failed sync events",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if deps.App.CleanFailedEvents == nil {
+				return fmt.Errorf("sync not configured: set client_id in config file")
+			}
+
+			result, err := deps.App.CleanFailedEvents.Execute()
+			if err != nil {
+				return fmt.Errorf("cleaning failed events: %w", err)
+			}
+
+			if result.Deleted == 0 {
+				fmt.Fprintln(os.Stdout, "No permanently failed events to clean.")
+			} else {
+				fmt.Fprintf(os.Stdout, "Removed %d permanently failed event(s).\n", result.Deleted)
+			}
+			return nil
+		},
+	}
+
+	cmd.AddCommand(pushCmd, resetCmd, failedCmd, cleanCmd)
 
 	return cmd
 }
