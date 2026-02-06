@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/devbydaniel/tt/compare/v0.4.0...v0.4.1) (2026-02-06)
+
+
+### Bug Fixes
+
+* use correct brews label ([ca2adac](https://github.com/devbydaniel/tt/commit/ca2adac954f3b7ec26adf96f0f7bf75207adcb92))
+
 ## [0.4.0](https://github.com/devbydaniel/tt/compare/v0.3.0...v0.4.0) (2026-02-06)
 
 
