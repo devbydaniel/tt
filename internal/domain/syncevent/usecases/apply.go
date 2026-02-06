@@ -81,7 +81,8 @@ func entitySortOrder(e syncevent.EntityState) int {
 			order = 2
 		}
 	} else {
-		// No snapshot (typical for deletes) — treat as regular task
+		// No snapshot — treat as regular task (deletes should normally have
+		// snapshots to allow project vs task distinction, but handle gracefully)
 		order = 2
 	}
 

@@ -52,16 +52,16 @@ func (p *PersistSyncEvent) Execute(opts *PersistOptions) (*syncevent.SyncEvent, 
 		status := string(opts.Task.Status)
 		entityStatus = &status
 
-		// Build full snapshot for non-delete events
-		if opts.EventType != syncevent.EventTypeDeleted {
-			snapshot := p.buildTaskSnapshot(opts.Task)
-			jsonBytes, err := json.Marshal(snapshot)
-			if err != nil {
-				return nil, err
-			}
-			jsonStr := string(jsonBytes)
-			snapshotJSON = &jsonStr
+		// Build snapshot for all events (including deletes — needed for
+		// entitySortOrder to distinguish project deletes from task deletes,
+		// which is required for correct FK-safe delete ordering)
+		snapshot := p.buildTaskSnapshot(opts.Task)
+		jsonBytes, err := json.Marshal(snapshot)
+		if err != nil {
+			return nil, err
 		}
+		jsonStr := string(jsonBytes)
+		snapshotJSON = &jsonStr
 
 	case opts.Area != nil:
 		entityType = syncevent.EntityTypeArea
@@ -69,19 +69,17 @@ func (p *PersistSyncEvent) Execute(opts *PersistOptions) (*syncevent.SyncEvent, 
 		entityTitle = &opts.Area.Name
 		// entityStatus stays nil for areas
 
-		// Build full snapshot for non-delete events
-		if opts.EventType != syncevent.EventTypeDeleted {
-			snapshot := &syncevent.AreaSnapshotData{
-				UUID: opts.Area.UUID,
-				Name: opts.Area.Name,
-			}
-			jsonBytes, err := json.Marshal(snapshot)
-			if err != nil {
-				return nil, err
-			}
-			jsonStr := string(jsonBytes)
-			snapshotJSON = &jsonStr
+		// Build snapshot for all events (including deletes)
+		snapshot := &syncevent.AreaSnapshotData{
+			UUID: opts.Area.UUID,
+			Name: opts.Area.Name,
 		}
+		jsonBytes, err := json.Marshal(snapshot)
+		if err != nil {
+			return nil, err
+		}
+		jsonStr := string(jsonBytes)
+		snapshotJSON = &jsonStr
 
 	default:
 		// Fallback for delete by UUID (legacy support)
