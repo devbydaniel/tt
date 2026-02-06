@@ -51,21 +51,34 @@ type ApplyResult struct {
 }
 
 // entitySortOrder returns a numeric priority for sorting entities.
-// Lower numbers are applied first: areas (0), project tasks (1), regular tasks (2).
+// For creates/updates: areas (0) → projects (1) → tasks (2) — parents before children.
+// For deletes: tasks (0) → projects (1) → areas (2) — children before parents,
+// so that FK constraints (ON DELETE RESTRICT) are not violated.
 func entitySortOrder(e syncevent.EntityState) int {
+	isDelete := syncevent.EventType(e.EventType) == syncevent.EventTypeDeleted
+
+	var order int
 	if e.EntityType == string(syncevent.EntityTypeArea) {
-		return 0
-	}
-	// For tasks, peek at the snapshot to determine if it's a project
-	if e.Snapshot != nil {
+		order = 0
+	} else if e.Snapshot != nil {
+		// For tasks, peek at the snapshot to determine if it's a project
 		var peek struct {
 			TaskType string `json:"taskType"`
 		}
 		if json.Unmarshal([]byte(*e.Snapshot), &peek) == nil && peek.TaskType == "project" {
-			return 1
+			order = 1
+		} else {
+			order = 2
 		}
+	} else {
+		// No snapshot (typical for deletes) — treat as regular task
+		order = 2
 	}
-	return 2
+
+	if isDelete {
+		return 2 - order
+	}
+	return order
 }
 
 // Apply applies the given entity states to the local database.
