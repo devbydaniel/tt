@@ -41,20 +41,22 @@ builds:
 
 archives:
   - id: tt
-    builds:
+    ids:
       - tt
     name_template: "tt_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
   - id: tt-sync
-    builds:
+    ids:
       - tt-sync
     name_template: "tt-sync_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: "checksums.txt"
@@ -68,7 +70,7 @@ changelog:
       - "^chore:"
       - "^ci:"
 
-brews:
+homebrew:
   - name: tt
     ids:
       - tt
