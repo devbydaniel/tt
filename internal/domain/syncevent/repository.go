@@ -22,7 +22,7 @@ func NewRepository(db *database.DB) *Repository {
 
 // Create inserts a new sync event into the database
 func (r *Repository) Create(event *SyncEvent) error {
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`INSERT INTO sync_events (
 			event_uuid, entity_type, entity_uuid, client_id,
 			event_type, event_version, timestamp, snapshot,
@@ -56,7 +56,7 @@ func (r *Repository) Create(event *SyncEvent) error {
 // Returns 1 if no events exist for the entity.
 func (r *Repository) GetNextEventVersion(entityType EntityType, entityUUID string) (int64, error) {
 	var maxVersion sql.NullInt64
-	err := r.db.Conn.QueryRow(
+	err := r.db.QueryRow(
 		`SELECT MAX(event_version) FROM sync_events
 		 WHERE entity_type = ? AND entity_uuid = ?`,
 		entityType, entityUUID,
@@ -79,7 +79,7 @@ const MaxFailureCount = 3
 // GetUnpushed returns events that haven't been pushed to the sync server yet,
 // excluding permanently failed events.
 func (r *Repository) GetUnpushed(limit int) ([]*SyncEvent, error) {
-	rows, err := r.db.Conn.Query(
+	rows, err := r.db.Query(
 		`SELECT id, event_uuid, entity_type, entity_uuid, client_id,
 		        event_type, event_version, timestamp, snapshot,
 		        entity_title, entity_status
@@ -126,13 +126,13 @@ func (r *Repository) MarkAsPushed(eventUUIDs []string, pushedAt time.Time) error
 		strings.Join(placeholders, ", "),
 	)
 
-	_, err := r.db.Conn.Exec(query, args...)
+	_, err := r.db.Exec(query, args...)
 	return err
 }
 
 // GetByUUID retrieves a sync event by its UUID.
 func (r *Repository) GetByUUID(eventUUID string) (*SyncEvent, error) {
-	row := r.db.Conn.QueryRow(
+	row := r.db.QueryRow(
 		`SELECT id, event_uuid, entity_type, entity_uuid, client_id,
 		        event_type, event_version, timestamp, snapshot,
 		        entity_title, entity_status
@@ -229,7 +229,7 @@ func (r *Repository) IncrementFailureCount(eventUUIDs []string) error {
 		`UPDATE sync_events SET failure_count = failure_count + 1 WHERE event_uuid IN (%s)`,
 		inClause,
 	)
-	if _, err := r.db.Conn.Exec(query, args...); err != nil {
+	if _, err := r.db.Exec(query, args...); err != nil {
 		return err
 	}
 
@@ -238,13 +238,13 @@ func (r *Repository) IncrementFailureCount(eventUUIDs []string) error {
 		`UPDATE sync_events SET permanently_failed = 1 WHERE failure_count >= %d AND event_uuid IN (%s)`,
 		MaxFailureCount, inClause,
 	)
-	_, err := r.db.Conn.Exec(query, args...)
+	_, err := r.db.Exec(query, args...)
 	return err
 }
 
 // GetPermanentlyFailed returns all permanently failed sync events.
 func (r *Repository) GetPermanentlyFailed() ([]*SyncEvent, error) {
-	rows, err := r.db.Conn.Query(
+	rows, err := r.db.Query(
 		`SELECT id, event_uuid, entity_type, entity_uuid, client_id,
 		        event_type, event_version, timestamp, snapshot,
 		        entity_title, entity_status
@@ -271,7 +271,7 @@ func (r *Repository) GetPermanentlyFailed() ([]*SyncEvent, error) {
 // DeletePermanentlyFailed removes all permanently failed sync events.
 // Returns the number of deleted events.
 func (r *Repository) DeletePermanentlyFailed() (int64, error) {
-	result, err := r.db.Conn.Exec("DELETE FROM sync_events WHERE permanently_failed = 1")
+	result, err := r.db.Exec("DELETE FROM sync_events WHERE permanently_failed = 1")
 	if err != nil {
 		return 0, err
 	}
@@ -281,7 +281,7 @@ func (r *Repository) DeletePermanentlyFailed() (int64, error) {
 // DeleteAll removes all sync events from the database.
 // Returns the number of deleted events.
 func (r *Repository) DeleteAll() (int64, error) {
-	result, err := r.db.Conn.Exec("DELETE FROM sync_events")
+	result, err := r.db.Exec("DELETE FROM sync_events")
 	if err != nil {
 		return 0, err
 	}
@@ -292,7 +292,7 @@ func (r *Repository) DeleteAll() (int64, error) {
 // Returns 0 if no events exist.
 func (r *Repository) GetMaxID() (int64, error) {
 	var maxID sql.NullInt64
-	err := r.db.Conn.QueryRow("SELECT MAX(id) FROM sync_events").Scan(&maxID)
+	err := r.db.QueryRow("SELECT MAX(id) FROM sync_events").Scan(&maxID)
 	if err != nil {
 		return 0, err
 	}
@@ -347,7 +347,7 @@ func (r *Repository) GetLatestStatesSince(cursor int64, excludeEventUUIDs []stri
 		ORDER BY e.id ASC
 	`, excludeClause)
 
-	rows, err := r.db.Conn.Query(query, args...)
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -379,7 +379,7 @@ func (r *Repository) GetLatestStatesSince(cursor int64, excludeEventUUIDs []stri
 // Returns empty string if key doesn't exist.
 func (r *Repository) GetSyncState(key string) (string, error) {
 	var value string
-	err := r.db.Conn.QueryRow("SELECT value FROM sync_state WHERE key = ?", key).Scan(&value)
+	err := r.db.QueryRow("SELECT value FROM sync_state WHERE key = ?", key).Scan(&value)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -391,7 +391,7 @@ func (r *Repository) GetSyncState(key string) (string, error) {
 
 // SetSyncState stores a sync state value.
 func (r *Repository) SetSyncState(key, value string) error {
-	_, err := r.db.Conn.Exec(
+	_, err := r.db.Exec(
 		"INSERT INTO sync_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
 		key, value,
 	)
@@ -404,7 +404,7 @@ const MaxPendingRetries = 10
 
 // SavePending inserts or updates an entity state in the pending resolution queue.
 func (r *Repository) SavePending(state EntityState) error {
-	_, err := r.db.Conn.Exec(
+	_, err := r.db.Exec(
 		`INSERT INTO pending_sync_resolution (entity_type, entity_uuid, event_type, snapshot, retry_count, updated_at)
 		 VALUES (?, ?, ?, ?, 0, datetime('now'))
 		 ON CONFLICT(entity_uuid) DO UPDATE SET
@@ -418,7 +418,7 @@ func (r *Repository) SavePending(state EntityState) error {
 
 // GetPending returns all pending entity states that haven't exceeded the retry limit.
 func (r *Repository) GetPending() ([]EntityState, error) {
-	rows, err := r.db.Conn.Query(
+	rows, err := r.db.Query(
 		`SELECT entity_type, entity_uuid, event_type, snapshot
 		 FROM pending_sync_resolution
 		 WHERE retry_count < ?
@@ -443,7 +443,7 @@ func (r *Repository) GetPending() ([]EntityState, error) {
 
 // IncrementPendingRetry increments the retry count for a pending entity.
 func (r *Repository) IncrementPendingRetry(entityUUID string) error {
-	_, err := r.db.Conn.Exec(
+	_, err := r.db.Exec(
 		`UPDATE pending_sync_resolution SET retry_count = retry_count + 1, updated_at = datetime('now')
 		 WHERE entity_uuid = ?`,
 		entityUUID,
@@ -453,7 +453,7 @@ func (r *Repository) IncrementPendingRetry(entityUUID string) error {
 
 // RemovePending removes a resolved entity from the pending queue.
 func (r *Repository) RemovePending(entityUUID string) error {
-	_, err := r.db.Conn.Exec(
+	_, err := r.db.Exec(
 		`DELETE FROM pending_sync_resolution WHERE entity_uuid = ?`,
 		entityUUID,
 	)
@@ -462,6 +462,6 @@ func (r *Repository) RemovePending(entityUUID string) error {
 
 // DeleteAllPending removes all entries from the pending resolution queue.
 func (r *Repository) DeleteAllPending() error {
-	_, err := r.db.Conn.Exec("DELETE FROM pending_sync_resolution")
+	_, err := r.db.Exec("DELETE FROM pending_sync_resolution")
 	return err
 }

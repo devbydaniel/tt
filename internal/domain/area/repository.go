@@ -24,7 +24,7 @@ func (r *Repository) Create(area *Area) error {
 		area.UUID = uuid.New().String()
 	}
 
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`INSERT INTO areas (uuid, name) VALUES (?, ?)`,
 		area.UUID, area.Name,
 	)
@@ -42,7 +42,7 @@ func (r *Repository) Create(area *Area) error {
 }
 
 func (r *Repository) List() ([]Area, error) {
-	rows, err := r.db.Conn.Query(`SELECT id, uuid, name FROM areas ORDER BY name`)
+	rows, err := r.db.Query(`SELECT id, uuid, name FROM areas ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (r *Repository) List() ([]Area, error) {
 }
 
 func (r *Repository) GetByID(id int64) (*Area, error) {
-	row := r.db.Conn.QueryRow(`SELECT id, uuid, name FROM areas WHERE id = ?`, id)
+	row := r.db.QueryRow(`SELECT id, uuid, name FROM areas WHERE id = ?`, id)
 
 	var a Area
 	if err := row.Scan(&a.ID, &a.UUID, &a.Name); err != nil {
@@ -66,7 +66,7 @@ func (r *Repository) GetByID(id int64) (*Area, error) {
 }
 
 func (r *Repository) GetByName(name string) (*Area, error) {
-	row := r.db.Conn.QueryRow(`SELECT id, uuid, name FROM areas WHERE name = ?`, name)
+	row := r.db.QueryRow(`SELECT id, uuid, name FROM areas WHERE name = ?`, name)
 
 	var a Area
 	if err := row.Scan(&a.ID, &a.UUID, &a.Name); err != nil {
@@ -80,7 +80,7 @@ func (r *Repository) GetByName(name string) (*Area, error) {
 }
 
 func (r *Repository) GetByUUID(areaUUID string) (*Area, error) {
-	row := r.db.Conn.QueryRow(`SELECT id, uuid, name FROM areas WHERE uuid = ?`, areaUUID)
+	row := r.db.QueryRow(`SELECT id, uuid, name FROM areas WHERE uuid = ?`, areaUUID)
 
 	var a Area
 	if err := row.Scan(&a.ID, &a.UUID, &a.Name); err != nil {
@@ -95,7 +95,7 @@ func (r *Repository) GetByUUID(areaUUID string) (*Area, error) {
 
 // DeleteAll removes all areas from the database. Returns the number of deleted areas.
 func (r *Repository) DeleteAll() (int64, error) {
-	result, err := r.db.Conn.Exec("DELETE FROM areas")
+	result, err := r.db.Exec("DELETE FROM areas")
 	if err != nil {
 		return 0, err
 	}
@@ -103,7 +103,7 @@ func (r *Repository) DeleteAll() (int64, error) {
 }
 
 func (r *Repository) Delete(id int64) error {
-	result, err := r.db.Conn.Exec(`DELETE FROM areas WHERE id = ?`, id)
+	result, err := r.db.Exec(`DELETE FROM areas WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (r *Repository) Delete(id int64) error {
 }
 
 func (r *Repository) DeleteByUUID(areaUUID string) error {
-	result, err := r.db.Conn.Exec(`DELETE FROM areas WHERE uuid = ?`, areaUUID)
+	result, err := r.db.Exec(`DELETE FROM areas WHERE uuid = ?`, areaUUID)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (r *Repository) DeleteByUUID(areaUUID string) error {
 }
 
 func (r *Repository) Update(area *Area) error {
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`UPDATE areas SET name = ? WHERE id = ?`,
 		area.Name, area.ID,
 	)
@@ -165,7 +165,7 @@ func (r *Repository) Upsert(a *Area) error {
 
 	if existing != nil {
 		// Update existing area
-		_, err = r.db.Conn.Exec(
+		_, err = r.db.Exec(
 			`UPDATE areas SET name = ? WHERE uuid = ?`,
 			a.Name, a.UUID,
 		)

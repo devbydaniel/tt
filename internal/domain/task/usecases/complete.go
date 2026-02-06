@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -15,94 +16,103 @@ type CompleteTasks struct {
 	Repo          *task.Repository
 	SyncPersister SyncEventPersister
 	ClientID      string
+	DB            *database.DB
 }
 
-func (c *CompleteTasks) Execute(ids []int64) ([]task.CompleteResult, error) {
-	completedAt := time.Now()
-	var results []task.CompleteResult
+func (c *CompleteTasks) Execute(ids []int64) (results []task.CompleteResult, err error) {
+	err = c.DB.RunInTx(func() error {
+		completedAt := time.Now()
 
-	for _, id := range ids {
-		// Get the task first to check if it's a project
-		t, err := c.Repo.GetByID(id)
-		if err != nil {
-			return results, err
-		}
-
-		// If it's a project, collect todo children before completing so we know which ones actually changed
-		var todoChildrenBeforeComplete []task.Task
-		if t.IsProject() {
-			children, err := c.Repo.ListAllChildren(id)
+		for _, id := range ids {
+			// Get the task first to check if it's a project
+			t, err := c.Repo.GetByID(id)
 			if err != nil {
-				return results, err
+				return err
 			}
-			for _, child := range children {
-				if child.Status == task.StatusTodo {
-					todoChildrenBeforeComplete = append(todoChildrenBeforeComplete, child)
-				}
-			}
-			if err := c.Repo.CompleteWithChildren(id, completedAt); err != nil {
-				return results, err
-			}
-		} else {
-			if err := c.Repo.Complete(id, completedAt); err != nil {
-				return results, err
-			}
-		}
 
-		// Refresh the task to get updated status
-		t, err = c.Repo.GetByID(id)
-		if err != nil {
-			return results, err
-		}
-
-		result := task.CompleteResult{Completed: *t}
-
-		// Emit sync event for completed task
-		if c.SyncPersister != nil {
-			_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
-				ClientID:  c.ClientID,
-				EventType: syncevent.EventTypeCompleted,
-				Task:      t,
-			})
-
-			// If it's a project, emit sync events only for children that were actually changed (todo → done)
+			// If it's a project, collect todo children before completing so we know which ones actually changed
+			var todoChildrenBeforeComplete []task.Task
 			if t.IsProject() {
-				for _, child := range todoChildrenBeforeComplete {
-					// Refresh child to get the updated state with correct completed_at
-					updatedChild, err := c.Repo.GetByID(child.ID)
-					if err != nil {
-						continue
+				children, err := c.Repo.ListAllChildren(id)
+				if err != nil {
+					return err
+				}
+				for _, child := range children {
+					if child.Status == task.StatusTodo {
+						todoChildrenBeforeComplete = append(todoChildrenBeforeComplete, child)
 					}
-					_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
-						ClientID:  c.ClientID,
-						EventType: syncevent.EventTypeCompleted,
-						Task:      updatedChild,
-					})
+				}
+				if err := c.Repo.CompleteWithChildren(id, completedAt); err != nil {
+					return err
+				}
+			} else {
+				if err := c.Repo.Complete(id, completedAt); err != nil {
+					return err
 				}
 			}
-		}
 
-		// Check if task should regenerate (not for projects)
-		if !t.IsProject() && t.RecurType != nil && t.RecurRule != nil && !t.RecurPaused {
-			nextTask := c.regenerateTask(t, completedAt)
-			if nextTask != nil {
-				result.NextTask = nextTask
+			// Refresh the task to get updated status
+			t, err = c.Repo.GetByID(id)
+			if err != nil {
+				return err
+			}
 
-				// Emit sync event for regenerated task
-				if c.SyncPersister != nil {
-					_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
-						ClientID:  c.ClientID,
-						EventType: syncevent.EventTypeCreated,
-						Task:      nextTask,
-					})
+			result := task.CompleteResult{Completed: *t}
+
+			// Emit sync event for completed task
+			if c.SyncPersister != nil {
+				if _, err := c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+					ClientID:  c.ClientID,
+					EventType: syncevent.EventTypeCompleted,
+					Task:      t,
+				}); err != nil {
+					return err
+				}
+
+				// If it's a project, emit sync events only for children that were actually changed (todo → done)
+				if t.IsProject() {
+					for _, child := range todoChildrenBeforeComplete {
+						// Refresh child to get the updated state with correct completed_at
+						updatedChild, err := c.Repo.GetByID(child.ID)
+						if err != nil {
+							return err
+						}
+						if _, err := c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+							ClientID:  c.ClientID,
+							EventType: syncevent.EventTypeCompleted,
+							Task:      updatedChild,
+						}); err != nil {
+							return err
+						}
+					}
 				}
 			}
+
+			// Check if task should regenerate (not for projects)
+			if !t.IsProject() && t.RecurType != nil && t.RecurRule != nil && !t.RecurPaused {
+				nextTask := c.regenerateTask(t, completedAt)
+				if nextTask != nil {
+					result.NextTask = nextTask
+
+					// Emit sync event for regenerated task
+					if c.SyncPersister != nil {
+						if _, err := c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+							ClientID:  c.ClientID,
+							EventType: syncevent.EventTypeCreated,
+							Task:      nextTask,
+						}); err != nil {
+							return err
+						}
+					}
+				}
+			}
+
+			results = append(results, result)
 		}
 
-		results = append(results, result)
-	}
-
-	return results, nil
+		return nil
+	})
+	return
 }
 
 func (c *CompleteTasks) regenerateTask(t *task.Task, completedAt time.Time) *task.Task {

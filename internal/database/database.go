@@ -10,8 +10,71 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
+// DBTX is the common interface between *sql.DB and *sql.Tx.
+type DBTX interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
 type DB struct {
 	Conn *sql.DB
+	tx   *sql.Tx
+}
+
+// Exec delegates to the active transaction if present, otherwise to Conn.
+func (db *DB) Exec(query string, args ...any) (sql.Result, error) {
+	if db.tx != nil {
+		return db.tx.Exec(query, args...)
+	}
+	return db.Conn.Exec(query, args...)
+}
+
+// Query delegates to the active transaction if present, otherwise to Conn.
+func (db *DB) Query(query string, args ...any) (*sql.Rows, error) {
+	if db.tx != nil {
+		return db.tx.Query(query, args...)
+	}
+	return db.Conn.Query(query, args...)
+}
+
+// QueryRow delegates to the active transaction if present, otherwise to Conn.
+func (db *DB) QueryRow(query string, args ...any) *sql.Row {
+	if db.tx != nil {
+		return db.tx.QueryRow(query, args...)
+	}
+	return db.Conn.QueryRow(query, args...)
+}
+
+// RunInTx executes fn within a database transaction. If a transaction is already
+// active (nested call), fn is called directly without creating a new transaction.
+// On error or panic, the transaction is rolled back.
+func (db *DB) RunInTx(fn func() error) error {
+	if db.tx != nil {
+		// Nested call — just run fn directly
+		return fn()
+	}
+
+	tx, err := db.Conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	db.tx = tx
+	defer func() {
+		db.tx = nil
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p) // re-panic after rollback
+		}
+	}()
+
+	if err := fn(); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func Open(path string) (*DB, error) {

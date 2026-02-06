@@ -11,6 +11,7 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
+	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/testutil"
 )
 
@@ -84,7 +85,7 @@ func TestResetSyncEventsEmptyDatabase(t *testing.T) {
 
 // --- ResetSync tests (client-side, full reset) ---
 
-func setupResetSync(t *testing.T, serverHandler http.HandlerFunc) (*usecases.ResetSync, *syncevent.Repository, *task.Repository, *area.Repository) {
+func setupResetSync(t *testing.T, serverHandler http.HandlerFunc) (*usecases.ResetSync, *syncevent.Repository, *task.Repository, *area.Repository, *database.DB) {
 	t.Helper()
 	db := testutil.NewTestDB(t)
 	repo := syncevent.NewRepository(db)
@@ -115,9 +116,10 @@ func setupResetSync(t *testing.T, serverHandler http.HandlerFunc) (*usecases.Res
 		AreaLister:    listAllAreas,
 		SyncPersister: persister,
 		ClientID:      "test-client",
+		DB:            db,
 	}
 
-	return reset, repo, taskRepo, areaRepo
+	return reset, repo, taskRepo, areaRepo, db
 }
 
 // listAllTasksUC implements usecases.AllTasksLister
@@ -174,7 +176,7 @@ func TestResetSyncResetsServerFirst(t *testing.T) {
 		okHandler(w, r)
 	})
 
-	reset, _, _, _ := setupResetSync(t, handler)
+	reset, _, _, _, _ := setupResetSync(t, handler)
 
 	_, err := reset.Execute()
 	if err != nil {
@@ -191,7 +193,7 @@ func TestResetSyncFailsIfServerUnreachable(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	reset, repo, _, _ := setupResetSync(t, handler)
+	reset, repo, _, _, _ := setupResetSync(t, handler)
 
 	// Create an event to verify it's NOT deleted on failure
 	snapshot := `{}`
@@ -214,7 +216,7 @@ func TestResetSyncFailsIfServerUnreachable(t *testing.T) {
 }
 
 func TestResetSyncRegeneratesEventsForTasks(t *testing.T) {
-	reset, repo, taskRepo, _ := setupResetSync(t, http.HandlerFunc(okHandler))
+	reset, repo, taskRepo, _, _ := setupResetSync(t, http.HandlerFunc(okHandler))
 
 	// Create some tasks directly in the DB
 	taskRepo.Create(&task.Task{UUID: "uuid-1", Title: "Task 1", TaskType: task.TaskTypeTask, State: task.StateActive, Status: task.StatusTodo})
@@ -237,7 +239,7 @@ func TestResetSyncRegeneratesEventsForTasks(t *testing.T) {
 }
 
 func TestResetSyncRegeneratesEventsForAreas(t *testing.T) {
-	reset, repo, _, areaRepo := setupResetSync(t, http.HandlerFunc(okHandler))
+	reset, repo, _, areaRepo, _ := setupResetSync(t, http.HandlerFunc(okHandler))
 
 	areaRepo.Create(&area.Area{Name: "Work"})
 	areaRepo.Create(&area.Area{Name: "Personal"})
@@ -258,7 +260,7 @@ func TestResetSyncRegeneratesEventsForAreas(t *testing.T) {
 }
 
 func TestResetSyncClearsOldEventsBeforeRegenerating(t *testing.T) {
-	reset, repo, taskRepo, _ := setupResetSync(t, http.HandlerFunc(okHandler))
+	reset, repo, taskRepo, _, _ := setupResetSync(t, http.HandlerFunc(okHandler))
 
 	// Create old sync events
 	snapshot := `{}`
@@ -294,7 +296,7 @@ func TestResetSyncClearsOldEventsBeforeRegenerating(t *testing.T) {
 }
 
 func TestResetSyncCompletedTasksGetCorrectEventType(t *testing.T) {
-	reset, repo, taskRepo, _ := setupResetSync(t, http.HandlerFunc(okHandler))
+	reset, repo, taskRepo, _, _ := setupResetSync(t, http.HandlerFunc(okHandler))
 
 	// Create a completed task
 	completedAt := time.Now()
@@ -317,7 +319,7 @@ func TestResetSyncCompletedTasksGetCorrectEventType(t *testing.T) {
 }
 
 func TestResetSyncResetsCursor(t *testing.T) {
-	reset, repo, _, _ := setupResetSync(t, http.HandlerFunc(okHandler))
+	reset, repo, _, _, _ := setupResetSync(t, http.HandlerFunc(okHandler))
 
 	repo.SetSyncState(usecases.SyncStateServerCursor, "999")
 

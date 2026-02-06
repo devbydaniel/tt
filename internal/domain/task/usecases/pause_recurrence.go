@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -13,31 +14,38 @@ type PauseRecurrence struct {
 	Repo          *task.Repository
 	SyncPersister SyncEventPersister
 	ClientID      string
+	DB            *database.DB
 }
 
-func (p *PauseRecurrence) Execute(id int64) (*task.Task, error) {
-	t, err := p.Repo.GetByID(id)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, task.ErrTaskNotFound
+func (p *PauseRecurrence) Execute(id int64) (result *task.Task, err error) {
+	err = p.DB.RunInTx(func() error {
+		t, err := p.Repo.GetByID(id)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return task.ErrTaskNotFound
+			}
+			return err
 		}
-		return nil, err
-	}
 
-	t.RecurPaused = true
+		t.RecurPaused = true
 
-	if err := p.Repo.Update(t); err != nil {
-		return nil, err
-	}
+		if err := p.Repo.Update(t); err != nil {
+			return err
+		}
 
-	// Emit sync event if sync is enabled
-	if p.SyncPersister != nil {
-		_, _ = p.SyncPersister.Execute(&synceventusecases.PersistOptions{
-			ClientID:  p.ClientID,
-			EventType: syncevent.EventTypeUpdated,
-			Task:      t,
-		})
-	}
+		// Emit sync event if sync is enabled
+		if p.SyncPersister != nil {
+			if _, err := p.SyncPersister.Execute(&synceventusecases.PersistOptions{
+				ClientID:  p.ClientID,
+				EventType: syncevent.EventTypeUpdated,
+				Task:      t,
+			}); err != nil {
+				return err
+			}
+		}
 
-	return t, nil
+		result = t
+		return nil
+	})
+	return
 }

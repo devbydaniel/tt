@@ -43,7 +43,7 @@ func (r *Repository) Create(task *Task) error {
 		taskType = TaskTypeTask
 	}
 
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`INSERT INTO tasks (uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		task.UUID, task.Title, task.Description, taskType, task.ParentID, task.AreaID, plannedDate, dueDate, task.State, task.Status, task.CreatedAt.Format(time.RFC3339),
 		task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.RecurParentID,
@@ -240,7 +240,7 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 
 	query += buildOrderByClause(filter)
 
-	rows, err := r.db.Conn.Query(query, args...)
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +260,7 @@ func (r *Repository) List(filter *ListFilter) ([]Task, error) {
 }
 
 func (r *Repository) GetByID(id int64) (*Task, error) {
-	row := r.db.Conn.QueryRow(
+	row := r.db.QueryRow(
 		`SELECT id, uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE id = ?`,
 		id,
 	)
@@ -302,7 +302,7 @@ func (r *Repository) GetByID(id int64) (*Task, error) {
 }
 
 func (r *Repository) Complete(id int64, completedAt time.Time) error {
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`UPDATE tasks SET status = ?, completed_at = ? WHERE id = ? AND status = ?`,
 		StatusDone, completedAt.Format(time.RFC3339), id, StatusTodo,
 	)
@@ -322,7 +322,7 @@ func (r *Repository) Complete(id int64, completedAt time.Time) error {
 }
 
 func (r *Repository) Uncomplete(id int64) error {
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`UPDATE tasks SET status = ?, completed_at = NULL WHERE id = ? AND status = ?`,
 		StatusTodo, id, StatusDone,
 	)
@@ -344,7 +344,7 @@ func (r *Repository) Uncomplete(id int64) error {
 // ListAll returns all tasks (both todo and done) without any filters.
 // Used for sync reset to regenerate sync events for all existing tasks.
 func (r *Repository) ListAll() ([]Task, error) {
-	rows, err := r.db.Conn.Query(
+	rows, err := r.db.Query(
 		`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
 		 FROM tasks t
 		 LEFT JOIN tasks parent ON t.parent_id = parent.id
@@ -371,7 +371,7 @@ func (r *Repository) ListAll() ([]Task, error) {
 
 // DeleteAll removes all tasks from the database. Returns the number of deleted tasks.
 func (r *Repository) DeleteAll() (int64, error) {
-	result, err := r.db.Conn.Exec("DELETE FROM tasks")
+	result, err := r.db.Exec("DELETE FROM tasks")
 	if err != nil {
 		return 0, err
 	}
@@ -379,7 +379,7 @@ func (r *Repository) DeleteAll() (int64, error) {
 }
 
 func (r *Repository) Delete(id int64) error {
-	result, err := r.db.Conn.Exec(`DELETE FROM tasks WHERE id = ?`, id)
+	result, err := r.db.Exec(`DELETE FROM tasks WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}
@@ -400,7 +400,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 	var err error
 
 	if since != nil {
-		rows, err = r.db.Conn.Query(
+		rows, err = r.db.Query(
 			`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
 			 FROM tasks t
 			 LEFT JOIN tasks parent ON t.parent_id = parent.id
@@ -411,7 +411,7 @@ func (r *Repository) ListCompleted(since *time.Time) ([]Task, error) {
 			StatusDone, since.Format(time.RFC3339),
 		)
 	} else {
-		rows, err = r.db.Conn.Query(
+		rows, err = r.db.Query(
 			`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
 			 FROM tasks t
 			 LEFT JOIN tasks parent ON t.parent_id = parent.id
@@ -455,7 +455,7 @@ func (r *Repository) Update(task *Task) error {
 		recurEnd = &s
 	}
 
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`UPDATE tasks SET title = ?, description = ?, parent_id = ?, area_id = ?, planned_date = ?, due_date = ?, state = ?, recur_type = ?, recur_rule = ?, recur_end = ?, recur_paused = ? WHERE id = ?`,
 		task.Title, task.Description, task.ParentID, task.AreaID, plannedDate, dueDate, task.State, task.RecurType, task.RecurRule, recurEnd, task.RecurPaused, task.ID,
 	)
@@ -510,7 +510,7 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 
 // getTagsForTask returns all tag names for a single task
 func (r *Repository) getTagsForTask(taskID int64) ([]string, error) {
-	rows, err := r.db.Conn.Query(`SELECT tag_name FROM task_tags WHERE task_id = ? ORDER BY tag_name`, taskID)
+	rows, err := r.db.Query(`SELECT tag_name FROM task_tags WHERE task_id = ? ORDER BY tag_name`, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -547,7 +547,7 @@ func (r *Repository) loadTagsForTasks(tasks []Task) error {
 		placeholders += ",?"
 	}
 
-	rows, err := r.db.Conn.Query(
+	rows, err := r.db.Query(
 		`SELECT task_id, tag_name FROM task_tags WHERE task_id IN (`+placeholders+`) ORDER BY tag_name`,
 		ids...,
 	)
@@ -571,7 +571,7 @@ func (r *Repository) loadTagsForTasks(tasks []Task) error {
 
 // AddTag adds a tag to a task
 func (r *Repository) AddTag(taskID int64, tagName string) error {
-	_, err := r.db.Conn.Exec(
+	_, err := r.db.Exec(
 		`INSERT OR IGNORE INTO task_tags (task_id, tag_name) VALUES (?, ?)`,
 		taskID, tagName,
 	)
@@ -580,7 +580,7 @@ func (r *Repository) AddTag(taskID int64, tagName string) error {
 
 // RemoveTag removes a tag from a task
 func (r *Repository) RemoveTag(taskID int64, tagName string) error {
-	_, err := r.db.Conn.Exec(
+	_, err := r.db.Exec(
 		`DELETE FROM task_tags WHERE task_id = ? AND tag_name = ?`,
 		taskID, tagName,
 	)
@@ -589,7 +589,7 @@ func (r *Repository) RemoveTag(taskID int64, tagName string) error {
 
 // ListTags returns all unique tags in use
 func (r *Repository) ListTags() ([]string, error) {
-	rows, err := r.db.Conn.Query(`SELECT DISTINCT tag_name FROM task_tags ORDER BY tag_name`)
+	rows, err := r.db.Query(`SELECT DISTINCT tag_name FROM task_tags ORDER BY tag_name`)
 	if err != nil {
 		return nil, err
 	}
@@ -609,13 +609,13 @@ func (r *Repository) ListTags() ([]string, error) {
 // SetTags replaces all tags on a task
 func (r *Repository) SetTags(taskID int64, tags []string) error {
 	// Delete existing tags
-	if _, err := r.db.Conn.Exec(`DELETE FROM task_tags WHERE task_id = ?`, taskID); err != nil {
+	if _, err := r.db.Exec(`DELETE FROM task_tags WHERE task_id = ?`, taskID); err != nil {
 		return err
 	}
 
 	// Insert new tags
 	for _, tag := range tags {
-		if _, err := r.db.Conn.Exec(
+		if _, err := r.db.Exec(
 			`INSERT INTO task_tags (task_id, tag_name) VALUES (?, ?)`,
 			taskID, tag,
 		); err != nil {
@@ -627,7 +627,7 @@ func (r *Repository) SetTags(taskID int64, tags []string) error {
 
 // DeleteTag removes a tag from all tasks and returns the number of affected tasks
 func (r *Repository) DeleteTag(tagName string) (int64, error) {
-	result, err := r.db.Conn.Exec(`DELETE FROM task_tags WHERE tag_name = ?`, tagName)
+	result, err := r.db.Exec(`DELETE FROM task_tags WHERE tag_name = ?`, tagName)
 	if err != nil {
 		return 0, err
 	}
@@ -636,7 +636,7 @@ func (r *Repository) DeleteTag(tagName string) (int64, error) {
 
 // GetTaskIDsByTag returns the IDs of all tasks that have a specific tag
 func (r *Repository) GetTaskIDsByTag(tagName string) ([]int64, error) {
-	rows, err := r.db.Conn.Query(`SELECT task_id FROM task_tags WHERE tag_name = ?`, tagName)
+	rows, err := r.db.Query(`SELECT task_id FROM task_tags WHERE tag_name = ?`, tagName)
 	if err != nil {
 		return nil, err
 	}
@@ -655,7 +655,7 @@ func (r *Repository) GetTaskIDsByTag(tagName string) ([]int64, error) {
 
 // GetByName finds a task by title and type (for project lookup)
 func (r *Repository) GetByName(name string, taskType TaskType) (*Task, error) {
-	row := r.db.Conn.QueryRow(
+	row := r.db.QueryRow(
 		`SELECT id, uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE title = ? AND task_type = ?`,
 		name, taskType,
 	)
@@ -702,7 +702,7 @@ func (r *Repository) GetByName(name string, taskType TaskType) (*Task, error) {
 // CompleteWithChildren completes a task and all its child tasks (for projects)
 func (r *Repository) CompleteWithChildren(id int64, completedAt time.Time) error {
 	// Complete all child tasks first
-	_, err := r.db.Conn.Exec(
+	_, err := r.db.Exec(
 		`UPDATE tasks SET status = ?, completed_at = ? WHERE parent_id = ? AND status = ?`,
 		StatusDone, completedAt.Format(time.RFC3339), id, StatusTodo,
 	)
@@ -711,7 +711,7 @@ func (r *Repository) CompleteWithChildren(id int64, completedAt time.Time) error
 	}
 
 	// Complete the parent task
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`UPDATE tasks SET status = ?, completed_at = ? WHERE id = ? AND status = ?`,
 		StatusDone, completedAt.Format(time.RFC3339), id, StatusTodo,
 	)
@@ -737,7 +737,7 @@ func (r *Repository) ListChildren(parentID int64) ([]Task, error) {
 
 // ListAllChildren returns all child tasks including completed ones (for deletion)
 func (r *Repository) ListAllChildren(parentID int64) ([]Task, error) {
-	rows, err := r.db.Conn.Query(
+	rows, err := r.db.Query(
 		`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
 		 FROM tasks t
 		 LEFT JOIN tasks parent ON t.parent_id = parent.id
@@ -766,7 +766,7 @@ func (r *Repository) ListAllChildren(parentID int64) ([]Task, error) {
 
 // ListAllByArea returns all tasks in an area including completed ones (for area deletion)
 func (r *Repository) ListAllByArea(areaID int64) ([]Task, error) {
-	rows, err := r.db.Conn.Query(
+	rows, err := r.db.Query(
 		`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
 		 FROM tasks t
 		 LEFT JOIN tasks parent ON t.parent_id = parent.id
@@ -795,7 +795,7 @@ func (r *Repository) ListAllByArea(areaID int64) ([]Task, error) {
 
 // GetByUUID finds a task by its UUID.
 func (r *Repository) GetByUUID(uuid string) (*Task, error) {
-	row := r.db.Conn.QueryRow(
+	row := r.db.QueryRow(
 		`SELECT id, uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id FROM tasks WHERE uuid = ?`,
 		uuid,
 	)
@@ -841,7 +841,7 @@ func (r *Repository) GetByUUID(uuid string) (*Task, error) {
 
 // DeleteByUUID deletes a task by its UUID.
 func (r *Repository) DeleteByUUID(uuid string) error {
-	result, err := r.db.Conn.Exec(`DELETE FROM tasks WHERE uuid = ?`, uuid)
+	result, err := r.db.Exec(`DELETE FROM tasks WHERE uuid = ?`, uuid)
 	if err != nil {
 		return err
 	}
@@ -891,7 +891,7 @@ func (r *Repository) Upsert(t *Task) error {
 
 	if existing != nil {
 		// Update existing task
-		_, err = r.db.Conn.Exec(
+		_, err = r.db.Exec(
 			`UPDATE tasks SET title = ?, description = ?, task_type = ?, parent_id = ?, area_id = ?,
 			 planned_date = ?, due_date = ?, state = ?, status = ?, completed_at = ?,
 			 recur_type = ?, recur_rule = ?, recur_end = ?, recur_paused = ?, recur_parent_id = ?
@@ -920,7 +920,7 @@ func (r *Repository) Upsert(t *Task) error {
 		taskType = TaskTypeTask
 	}
 
-	result, err := r.db.Conn.Exec(
+	result, err := r.db.Exec(
 		`INSERT INTO tasks (uuid, title, description, task_type, parent_id, area_id, planned_date, due_date, state, status, created_at, completed_at, recur_type, recur_rule, recur_end, recur_paused, recur_parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.UUID, t.Title, t.Description, taskType, t.ParentID, t.AreaID, plannedDate, dueDate, t.State, t.Status, createdAtStr, completedAtStr,
 		t.RecurType, t.RecurRule, recurEnd, t.RecurPaused, t.RecurParentID,

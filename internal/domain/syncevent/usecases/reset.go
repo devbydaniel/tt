@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -62,73 +63,77 @@ type ResetSync struct {
 	AreaLister    AllAreasLister
 	SyncPersister SyncPersister
 	ClientID      string
+	DB            *database.DB
 }
 
 // Execute performs the full sync reset.
-func (r *ResetSync) Execute() (*ResetResult, error) {
-	result := &ResetResult{}
-
-	// Step 1: Reset the server (if configured)
+func (r *ResetSync) Execute() (result *ResetResult, err error) {
+	// Step 1: Reset the server (if configured) — outside transaction (network call)
 	if r.Client != nil {
 		if err := r.Client.Reset(); err != nil {
 			return nil, err
 		}
 	}
 
-	// Step 2: Clear local sync events, cursor, and pending resolution queue
-	deleted, err := r.Repo.DeleteAll()
-	if err != nil {
-		return nil, err
-	}
-	result.DeletedEvents = deleted
+	err = r.DB.RunInTx(func() error {
+		result = &ResetResult{}
 
-	if err := r.Repo.SetSyncState(SyncStateServerCursor, "0"); err != nil {
-		return nil, err
-	}
-
-	if err := r.Repo.DeleteAllPending(); err != nil {
-		return nil, err
-	}
-
-	// Step 3: Regenerate sync events for all local areas
-	areas, err := r.AreaLister.Execute()
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range areas {
-		_, err := r.SyncPersister.Execute(&PersistOptions{
-			ClientID:  r.ClientID,
-			EventType: syncevent.EventTypeCreated,
-			Area:      &areas[i],
-		})
+		// Step 2: Clear local sync events, cursor, and pending resolution queue
+		deleted, err := r.Repo.DeleteAll()
 		if err != nil {
-			return nil, err
+			return err
 		}
-		result.RegeneratedEvents++
-	}
+		result.DeletedEvents = deleted
 
-	// Step 4: Regenerate sync events for all local tasks
-	tasks, err := r.TaskLister.Execute()
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range tasks {
-		eventType := syncevent.EventTypeCreated
-		if tasks[i].Status == task.StatusDone {
-			eventType = syncevent.EventTypeCompleted
+		if err := r.Repo.SetSyncState(SyncStateServerCursor, "0"); err != nil {
+			return err
 		}
-		_, err := r.SyncPersister.Execute(&PersistOptions{
-			ClientID:  r.ClientID,
-			EventType: eventType,
-			Task:      &tasks[i],
-		})
+
+		if err := r.Repo.DeleteAllPending(); err != nil {
+			return err
+		}
+
+		// Step 3: Regenerate sync events for all local areas
+		areas, err := r.AreaLister.Execute()
 		if err != nil {
-			return nil, err
+			return err
 		}
-		result.RegeneratedEvents++
-	}
 
-	return result, nil
+		for i := range areas {
+			_, err := r.SyncPersister.Execute(&PersistOptions{
+				ClientID:  r.ClientID,
+				EventType: syncevent.EventTypeCreated,
+				Area:      &areas[i],
+			})
+			if err != nil {
+				return err
+			}
+			result.RegeneratedEvents++
+		}
+
+		// Step 4: Regenerate sync events for all local tasks
+		tasks, err := r.TaskLister.Execute()
+		if err != nil {
+			return err
+		}
+
+		for i := range tasks {
+			eventType := syncevent.EventTypeCreated
+			if tasks[i].Status == task.StatusDone {
+				eventType = syncevent.EventTypeCompleted
+			}
+			_, err := r.SyncPersister.Execute(&PersistOptions{
+				ClientID:  r.ClientID,
+				EventType: eventType,
+				Task:      &tasks[i],
+			})
+			if err != nil {
+				return err
+			}
+			result.RegeneratedEvents++
+		}
+
+		return nil
+	})
+	return
 }

@@ -110,6 +110,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 			AreaLister:    listAreas,
 			SyncPersister: persistSyncEventUC,
 			ClientID:      clientID,
+			DB:            db,
 		}
 		listFailedEvents = &synceventusecases.ListFailedEvents{Repo: syncEventRepo}
 		cleanFailedEvents = &synceventusecases.CleanFailedEvents{Repo: syncEventRepo}
@@ -120,11 +121,13 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		Repo:          areaRepo,
 		SyncPersister: areaSyncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	renameArea := &areausecases.RenameArea{
 		Repo:          areaRepo,
 		SyncPersister: areaSyncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 
 	// Create deleteTasks first (needed by deleteArea)
@@ -132,6 +135,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 
 	// Create deleteArea with task deletion support
@@ -141,6 +145,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		TaskDeleter:   deleteTasks,
 		SyncPersister: areaSyncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 
 	// Create push events use case (nil if sync server not configured)
@@ -181,6 +186,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		AreaLookup:    getAreaByName,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	listProjects := &taskusecases.ListProjects{Repo: taskRepo}
 	listAllProjects := &taskusecases.ListAllProjects{Repo: taskRepo}
@@ -193,6 +199,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		AreaLookup:    getAreaByName,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	listTasks := &taskusecases.ListTasks{
 		Repo:          taskRepo,
@@ -203,95 +210,113 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	uncompleteTasks := &taskusecases.UncompleteTasks{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	listCompletedTasks := &taskusecases.ListCompletedTasks{Repo: taskRepo}
 	deferTask := &taskusecases.DeferTask{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	activateTask := &taskusecases.ActivateTask{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	setPlannedDate := &taskusecases.SetPlannedDate{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	setDueDate := &taskusecases.SetDueDate{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	setTaskProject := &taskusecases.SetTaskProject{
 		Repo:          taskRepo,
 		ProjectLookup: getProjectByName,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	setTaskArea := &taskusecases.SetTaskArea{
 		Repo:          taskRepo,
 		AreaLookup:    getAreaByName,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	setTaskTitle := &taskusecases.SetTaskTitle{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	setTaskDescription := &taskusecases.SetTaskDescription{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	setRecurrence := &taskusecases.SetRecurrence{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	pauseRecurrence := &taskusecases.PauseRecurrence{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	resumeRecurrence := &taskusecases.ResumeRecurrence{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	setRecurrenceEnd := &taskusecases.SetRecurrenceEnd{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	addTag := &taskusecases.AddTag{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	removeTag := &taskusecases.RemoveTag{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	listTagsUC := &taskusecases.ListTags{Repo: taskRepo}
 	setTags := &taskusecases.SetTags{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 	deleteTag := &taskusecases.DeleteTag{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,
+		DB:            db,
 	}
 
 	// Expose sync persister for direct access (nil if sync disabled)
