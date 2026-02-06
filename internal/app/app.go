@@ -115,13 +115,24 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		SyncPersister: areaSyncPersister,
 		ClientID:      clientID,
 	}
-	deleteArea := &areausecases.DeleteArea{
+	renameArea := &areausecases.RenameArea{
 		Repo:          areaRepo,
 		SyncPersister: areaSyncPersister,
 		ClientID:      clientID,
 	}
-	renameArea := &areausecases.RenameArea{
+
+	// Create deleteTasks first (needed by deleteArea)
+	deleteTasks := &taskusecases.DeleteTasks{
+		Repo:          taskRepo,
+		SyncPersister: syncPersister,
+		ClientID:      clientID,
+	}
+
+	// Create deleteArea with task deletion support
+	deleteArea := &areausecases.DeleteArea{
 		Repo:          areaRepo,
+		TaskLister:    taskRepo,
+		TaskDeleter:   deleteTasks,
 		SyncPersister: areaSyncPersister,
 		ClientID:      clientID,
 	}
@@ -187,11 +198,6 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		ClientID:      clientID,
 	}
 	uncompleteTasks := &taskusecases.UncompleteTasks{
-		Repo:          taskRepo,
-		SyncPersister: syncPersister,
-		ClientID:      clientID,
-	}
-	deleteTasks := &taskusecases.DeleteTasks{
 		Repo:          taskRepo,
 		SyncPersister: syncPersister,
 		ClientID:      clientID,

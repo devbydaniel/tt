@@ -54,6 +54,23 @@ func (c *CompleteTasks) Execute(ids []int64) ([]task.CompleteResult, error) {
 				EventType: syncevent.EventTypeCompleted,
 				Task:      t,
 			})
+
+			// If it's a project, also emit sync events for all completed children
+			if t.IsProject() {
+				children, err := c.Repo.ListAllChildren(id)
+				if err == nil {
+					for _, child := range children {
+						if child.Status == task.StatusDone {
+							childCopy := child // avoid capturing loop variable
+							_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+								ClientID:  c.ClientID,
+								EventType: syncevent.EventTypeCompleted,
+								Task:      &childCopy,
+							})
+						}
+					}
+				}
+			}
 		}
 
 		// Check if task should regenerate (not for projects)

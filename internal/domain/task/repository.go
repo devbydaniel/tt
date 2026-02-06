@@ -735,6 +735,64 @@ func (r *Repository) ListChildren(parentID int64) ([]Task, error) {
 	return r.List(&ListFilter{ParentID: &parentID, TaskType: TaskTypeTask})
 }
 
+// ListAllChildren returns all child tasks including completed ones (for deletion)
+func (r *Repository) ListAllChildren(parentID int64) ([]Task, error) {
+	rows, err := r.db.Conn.Query(
+		`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
+		 FROM tasks t
+		 LEFT JOIN tasks parent ON t.parent_id = parent.id
+		 LEFT JOIN areas a ON t.area_id = a.id
+		 LEFT JOIN areas parent_area ON parent.area_id = parent_area.id
+		 WHERE t.parent_id = ?
+		 ORDER BY t.id ASC`,
+		parentID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	tasks, err := scanTasks(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.loadTagsForTasks(tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
+// ListAllByArea returns all tasks in an area including completed ones (for area deletion)
+func (r *Repository) ListAllByArea(areaID int64) ([]Task, error) {
+	rows, err := r.db.Conn.Query(
+		`SELECT t.id, t.uuid, t.title, t.description, t.task_type, t.parent_id, t.area_id, t.planned_date, t.due_date, t.state, t.status, t.created_at, t.completed_at, t.recur_type, t.recur_rule, t.recur_end, t.recur_paused, t.recur_parent_id, parent.title, COALESCE(a.name, parent_area.name)
+		 FROM tasks t
+		 LEFT JOIN tasks parent ON t.parent_id = parent.id
+		 LEFT JOIN areas a ON t.area_id = a.id
+		 LEFT JOIN areas parent_area ON parent.area_id = parent_area.id
+		 WHERE t.area_id = ?
+		 ORDER BY t.id ASC`,
+		areaID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	tasks, err := scanTasks(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.loadTagsForTasks(tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
 // GetByUUID finds a task by its UUID.
 func (r *Repository) GetByUUID(uuid string) (*Task, error) {
 	row := r.db.Conn.QueryRow(

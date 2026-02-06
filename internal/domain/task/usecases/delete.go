@@ -26,6 +26,32 @@ func (d *DeleteTasks) Execute(ids []int64) ([]task.Task, error) {
 			}
 			return deleted, err
 		}
+
+		// If it's a project, delete all children first (each emits sync event)
+		if t.IsProject() {
+			children, err := d.Repo.ListAllChildren(id)
+			if err != nil {
+				return deleted, err
+			}
+			for _, child := range children {
+				if err := d.Repo.Delete(child.ID); err != nil {
+					return deleted, err
+				}
+				// Emit sync event for child
+				if d.SyncPersister != nil {
+					childCopy := child // avoid capturing loop variable
+					_, _ = d.SyncPersister.Execute(&synceventusecases.PersistOptions{
+						ClientID:   d.ClientID,
+						EventType:  syncevent.EventTypeDeleted,
+						Task:       &childCopy,
+						EntityUUID: child.UUID,
+					})
+				}
+				deleted = append(deleted, child)
+			}
+		}
+
+		// Delete the task itself
 		if err := d.Repo.Delete(id); err != nil {
 			return deleted, err
 		}
