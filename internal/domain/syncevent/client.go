@@ -103,7 +103,7 @@ func (c *Client) PushEvents(clientID string, events []*SyncEvent) (*PushResponse
 
 // Reset calls the server's sync reset endpoint to clear all server-side data.
 func (c *Client) Reset() error {
-	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/api/v1/sync/reset", nil)
+	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/api/v1/sync/reset", http.NoBody)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
