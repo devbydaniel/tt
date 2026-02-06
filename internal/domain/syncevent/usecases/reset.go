@@ -18,7 +18,7 @@ type ResetSyncEvents struct {
 	Repo *syncevent.Repository
 }
 
-// Execute deletes all sync events and resets the cursor.
+// Execute deletes all sync events, resets the cursor, and clears the pending resolution queue.
 func (r *ResetSyncEvents) Execute() (*ResetResult, error) {
 	count, err := r.Repo.DeleteAll()
 	if err != nil {
@@ -26,6 +26,10 @@ func (r *ResetSyncEvents) Execute() (*ResetResult, error) {
 	}
 
 	if err := r.Repo.SetSyncState(SyncStateServerCursor, "0"); err != nil {
+		return nil, err
+	}
+
+	if err := r.Repo.DeleteAllPending(); err != nil {
 		return nil, err
 	}
 
@@ -71,7 +75,7 @@ func (r *ResetSync) Execute() (*ResetResult, error) {
 		}
 	}
 
-	// Step 2: Clear local sync events and cursor
+	// Step 2: Clear local sync events, cursor, and pending resolution queue
 	deleted, err := r.Repo.DeleteAll()
 	if err != nil {
 		return nil, err
@@ -79,6 +83,10 @@ func (r *ResetSync) Execute() (*ResetResult, error) {
 	result.DeletedEvents = deleted
 
 	if err := r.Repo.SetSyncState(SyncStateServerCursor, "0"); err != nil {
+		return nil, err
+	}
+
+	if err := r.Repo.DeleteAllPending(); err != nil {
 		return nil, err
 	}
 
