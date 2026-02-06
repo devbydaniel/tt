@@ -274,6 +274,85 @@ func TestExecuteSyncCursorPagination(t *testing.T) {
 	}
 }
 
+// batchTrackingApplier tracks the number of Apply calls and entities per call
+type batchTrackingApplier struct {
+	calls [][]syncevent.EntityState
+}
+
+func (b *batchTrackingApplier) Apply(entities []syncevent.EntityState) (*usecases.ApplyResult, error) {
+	// Copy the slice to avoid mutation issues
+	copied := make([]syncevent.EntityState, len(entities))
+	copy(copied, entities)
+	b.calls = append(b.calls, copied)
+	return &usecases.ApplyResult{Applied: len(entities)}, nil
+}
+
+func TestExecuteBatchAppliesAllEventsAtOnce(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	repo := syncevent.NewRepository(db)
+	applier := &batchTrackingApplier{}
+	receive := &usecases.ReceiveEvents{Repo: repo, Applier: applier}
+
+	req := &usecases.ReceiveRequest{
+		ClientID: "client-1",
+		Events: []*syncevent.SyncEvent{
+			createEvent("client-1", "entity-1", "event-1", syncevent.EventTypeCreated),
+			createEvent("client-1", "entity-2", "event-2", syncevent.EventTypeCreated),
+			createEvent("client-1", "entity-3", "event-3", syncevent.EventTypeCreated),
+		},
+	}
+
+	result, err := receive.Execute(req)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if len(result.Accepted) != 3 {
+		t.Fatalf("accepted count = %d, want 3", len(result.Accepted))
+	}
+
+	// Apply should be called exactly once with all 3 entities (batch apply)
+	if len(applier.calls) != 1 {
+		t.Fatalf("Apply() call count = %d, want 1 (batch apply)", len(applier.calls))
+	}
+	if len(applier.calls[0]) != 3 {
+		t.Errorf("Apply() entity count = %d, want 3", len(applier.calls[0]))
+	}
+}
+
+func TestExecuteSyncBatchAppliesAllEventsAtOnce(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	repo := syncevent.NewRepository(db)
+	applier := &batchTrackingApplier{}
+	receive := &usecases.ReceiveEvents{Repo: repo, Applier: applier}
+
+	req := &usecases.SyncRequest{
+		ClientID: "client-1",
+		Cursor:   0,
+		Events: []*syncevent.SyncEvent{
+			createEvent("client-1", "entity-1", "event-1", syncevent.EventTypeCreated),
+			createEvent("client-1", "entity-2", "event-2", syncevent.EventTypeCreated),
+		},
+	}
+
+	result, err := receive.ExecuteSync(req)
+	if err != nil {
+		t.Fatalf("ExecuteSync() error = %v", err)
+	}
+
+	if len(result.Accepted) != 2 {
+		t.Fatalf("accepted count = %d, want 2", len(result.Accepted))
+	}
+
+	// Apply should be called exactly once with all 2 entities (batch apply)
+	if len(applier.calls) != 1 {
+		t.Fatalf("Apply() call count = %d, want 1 (batch apply)", len(applier.calls))
+	}
+	if len(applier.calls[0]) != 2 {
+		t.Errorf("Apply() entity count = %d, want 2", len(applier.calls[0]))
+	}
+}
+
 func TestExecuteSyncReturnsLatestEventPerEntity(t *testing.T) {
 	receive, repo := setupReceiveEvents(t)
 

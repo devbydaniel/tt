@@ -37,6 +37,9 @@ func (r *ReceiveEvents) Execute(req *ReceiveRequest) (*ReceiveResult, error) {
 		Rejected: make([]RejectedEvent, 0),
 	}
 
+	// Collect entity states for batch apply after the loop
+	var pendingStates []syncevent.EntityState
+
 	for _, event := range req.Events {
 		// Validate client ID matches
 		if event.ClientID != req.ClientID {
@@ -65,19 +68,23 @@ func (r *ReceiveEvents) Execute(req *ReceiveRequest) (*ReceiveResult, error) {
 			return nil, err
 		}
 
-		// Apply to database if applier is configured
+		// Collect entity state for batch apply
 		if r.Applier != nil {
-			entityState := syncevent.EntityState{
+			pendingStates = append(pendingStates, syncevent.EntityState{
 				EntityType: string(event.EntityType),
 				EntityUUID: event.EntityUUID,
 				EventType:  string(event.EventType),
 				Snapshot:   event.Snapshot,
-			}
-			// Ignore apply errors - event is already stored
-			_, _ = r.Applier.Apply([]syncevent.EntityState{entityState})
+			})
 		}
 
 		result.Accepted = append(result.Accepted, event.EventUUID)
+	}
+
+	// Batch-apply all accepted events so sorting logic in Apply works correctly
+	if r.Applier != nil && len(pendingStates) > 0 {
+		// Ignore apply errors - events are already stored
+		_, _ = r.Applier.Apply(pendingStates)
 	}
 
 	return result, nil
@@ -108,6 +115,9 @@ func (r *ReceiveEvents) ExecuteSync(req *SyncRequest) (*SyncResult, error) {
 	// Track which entity UUIDs we just received (to exclude from response)
 	acceptedEntityUUIDs := make([]string, 0)
 
+	// Collect entity states for batch apply after the loop
+	var pendingStates []syncevent.EntityState
+
 	// Process incoming events
 	for _, event := range req.Events {
 		// Validate client ID matches
@@ -137,20 +147,24 @@ func (r *ReceiveEvents) ExecuteSync(req *SyncRequest) (*SyncResult, error) {
 			return nil, err
 		}
 
-		// Apply to database if applier is configured
+		// Collect entity state for batch apply
 		if r.Applier != nil {
-			entityState := syncevent.EntityState{
+			pendingStates = append(pendingStates, syncevent.EntityState{
 				EntityType: string(event.EntityType),
 				EntityUUID: event.EntityUUID,
 				EventType:  string(event.EventType),
 				Snapshot:   event.Snapshot,
-			}
-			// Ignore apply errors - event is already stored
-			_, _ = r.Applier.Apply([]syncevent.EntityState{entityState})
+			})
 		}
 
 		result.Accepted = append(result.Accepted, event.EventUUID)
 		acceptedEntityUUIDs = append(acceptedEntityUUIDs, event.EntityUUID)
+	}
+
+	// Batch-apply all accepted events so sorting logic in Apply works correctly
+	if r.Applier != nil && len(pendingStates) > 0 {
+		// Ignore apply errors - events are already stored
+		_, _ = r.Applier.Apply(pendingStates)
 	}
 
 	// Get latest states since cursor, excluding entities we just received
