@@ -235,8 +235,9 @@ func TestCursorExcludesEntities(t *testing.T) {
 	repo.Create(event2)
 	repo.Create(event3)
 
-	// Exclude entity-2 from results (simulates client just pushed entity-2)
-	states, _, err := repo.GetLatestStatesSince(0, []string{"entity-2"})
+	// Exclude event-2 from results (simulates client just pushed event-2)
+	// Since event-2 is the latest event for entity-2, entity-2 should be excluded
+	states, _, err := repo.GetLatestStatesSince(0, []string{"event-2"})
 	if err != nil {
 		t.Fatalf("GetLatestStatesSince() error = %v", err)
 	}
@@ -249,6 +250,36 @@ func TestCursorExcludesEntities(t *testing.T) {
 		if state.EntityUUID == "entity-2" {
 			t.Error("entity-2 should be excluded from results")
 		}
+	}
+}
+
+func TestCursorExcludesEventNotEntity(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Client A creates entity-1
+	event1 := createTestEvent("client-a", "entity-1", "event-1", syncevent.EventTypeCreated, 1)
+	// Client B also updates entity-1 (newer event)
+	event2 := createTestEvent("client-b", "entity-1", "event-2", syncevent.EventTypeUpdated, 2)
+
+	repo.Create(event1)
+	repo.Create(event2)
+
+	// Client A pushed event-1, but event-2 (from client B) is newer.
+	// Entity-1 should still be returned because its latest event (event-2) is NOT excluded.
+	states, _, err := repo.GetLatestStatesSince(0, []string{"event-1"})
+	if err != nil {
+		t.Fatalf("GetLatestStatesSince() error = %v", err)
+	}
+
+	if len(states) != 1 {
+		t.Fatalf("states count = %d, want 1 (entity-1 should be returned with third-party update)", len(states))
+	}
+
+	if states[0].EntityUUID != "entity-1" {
+		t.Errorf("expected entity-1, got %s", states[0].EntityUUID)
+	}
+	if states[0].EventType != string(syncevent.EventTypeUpdated) {
+		t.Errorf("expected updated event type, got %s", states[0].EventType)
 	}
 }
 

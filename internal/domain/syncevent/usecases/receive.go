@@ -112,8 +112,9 @@ func (r *ReceiveEvents) ExecuteSync(req *SyncRequest) (*SyncResult, error) {
 		Rejected: make([]RejectedEvent, 0),
 	}
 
-	// Track which entity UUIDs we just received (to exclude from response)
-	acceptedEntityUUIDs := make([]string, 0)
+	// Track which event UUIDs we just received (to exclude from response only
+	// if they are the latest event for their entity - see GetLatestStatesSince)
+	acceptedEventUUIDs := make([]string, 0)
 
 	// Collect entity states for batch apply after the loop
 	var pendingStates []syncevent.EntityState
@@ -158,7 +159,7 @@ func (r *ReceiveEvents) ExecuteSync(req *SyncRequest) (*SyncResult, error) {
 		}
 
 		result.Accepted = append(result.Accepted, event.EventUUID)
-		acceptedEntityUUIDs = append(acceptedEntityUUIDs, event.EntityUUID)
+		acceptedEventUUIDs = append(acceptedEventUUIDs, event.EventUUID)
 	}
 
 	// Batch-apply all accepted events so sorting logic in Apply works correctly
@@ -167,8 +168,8 @@ func (r *ReceiveEvents) ExecuteSync(req *SyncRequest) (*SyncResult, error) {
 		_, _ = r.Applier.Apply(pendingStates)
 	}
 
-	// Get latest states since cursor, excluding entities we just received
-	entities, newCursor, err := r.Repo.GetLatestStatesSince(req.Cursor, acceptedEntityUUIDs)
+	// Get latest states since cursor, excluding entities whose latest event we just received
+	entities, newCursor, err := r.Repo.GetLatestStatesSince(req.Cursor, acceptedEventUUIDs)
 	if err != nil {
 		return nil, err
 	}

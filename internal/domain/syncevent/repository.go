@@ -237,34 +237,39 @@ type EntityState struct {
 }
 
 // GetLatestStatesSince returns the latest snapshot per entity since cursor,
-// excluding entities in excludeEntityUUIDs (the ones client just pushed).
+// excluding entities whose latest event is in excludeEventUUIDs (the ones client just pushed).
+// If another client made a newer change to the same entity, it will still be returned.
 // Returns the entity states and the new cursor (max ID seen).
-func (r *Repository) GetLatestStatesSince(cursor int64, excludeEntityUUIDs []string) ([]EntityState, int64, error) {
-	// Build the exclusion clause
+func (r *Repository) GetLatestStatesSince(cursor int64, excludeEventUUIDs []string) ([]EntityState, int64, error) {
+	// Build the exclusion clause - exclude entities only if their latest event
+	// is one the client just pushed, not if any event matches
 	var excludeClause string
 	var args []any
 	args = append(args, cursor)
 
-	if len(excludeEntityUUIDs) > 0 {
-		placeholders := make([]string, len(excludeEntityUUIDs))
-		for i, uuid := range excludeEntityUUIDs {
+	if len(excludeEventUUIDs) > 0 {
+		placeholders := make([]string, len(excludeEventUUIDs))
+		for i, uuid := range excludeEventUUIDs {
 			placeholders[i] = "?"
 			args = append(args, uuid)
 		}
-		excludeClause = fmt.Sprintf(" AND entity_uuid NOT IN (%s)", strings.Join(placeholders, ", "))
+		excludeClause = fmt.Sprintf(" AND e.event_uuid NOT IN (%s)", strings.Join(placeholders, ", "))
 	}
 
-	// Query to get the latest event per entity since cursor
-	// Using a subquery to find max ID per entity, then joining to get full data
+	// Query to get the latest event per entity since cursor.
+	// The exclusion is applied AFTER finding the latest event per entity,
+	// so we only skip entities where the latest event itself was pushed by this client.
+	// If a third party made a newer change, their event will be the latest and won't be excluded.
 	query := fmt.Sprintf(`
 		SELECT e.entity_type, e.entity_uuid, e.event_type, e.snapshot
 		FROM sync_events e
 		INNER JOIN (
 			SELECT entity_uuid, MAX(id) as max_id
 			FROM sync_events
-			WHERE id > ?%s
+			WHERE id > ?
 			GROUP BY entity_uuid
 		) latest ON e.entity_uuid = latest.entity_uuid AND e.id = latest.max_id
+		WHERE 1=1%s
 		ORDER BY e.id ASC
 	`, excludeClause)
 
