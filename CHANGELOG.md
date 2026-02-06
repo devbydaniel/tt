@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.0](https://github.com/devbydaniel/tt/compare/v0.3.0...v0.4.0) (2026-02-06)
+
+
+### Features
+
+* add transaction support to use cases for atomic DB mutations + sync events ([1ace79b](https://github.com/devbydaniel/tt/commit/1ace79b4f5b36bd535bca2896af69b8f0b159fbc))
+
+
+### Bug Fixes
+
+* batch-apply events on server side instead of one-by-one ([#5](https://github.com/devbydaniel/tt/issues/5)) ([bc97c9b](https://github.com/devbydaniel/tt/commit/bc97c9be11aa2f90360661e4ae40956dcf4aa2a9))
+* clear pending resolution queue during sync reset ([e729beb](https://github.com/devbydaniel/tt/commit/e729beb377fc1ac81faf5556f31d88a1d2fd9b72))
+* emit sync events in DeleteAll operations ([d51e12c](https://github.com/devbydaniel/tt/commit/d51e12c540c87f1026b572a9eca07bdedbc1c402))
+* exclude by event UUID not entity UUID in GetLatestStatesSince ([d264769](https://github.com/devbydaniel/tt/commit/d2647698d00220677f3bcca5d3ae0440c2a598c2))
+* fix linting errors ([e37a26b](https://github.com/devbydaniel/tt/commit/e37a26b30700edf48590ea1047e35fae742bf3ad))
+* include snapshots in delete events for correct FK-safe sort order ([4a3def7](https://github.com/devbydaniel/tt/commit/4a3def730818de2dd56a65196eb9a9f1fa1938e6))
+* only emit sync events for newly-completed children in project completion ([eac7519](https://github.com/devbydaniel/tt/commit/eac7519397913d19f451610bb6d19712112498ae))
+* operation-aware sort in Apply to prevent FK violations on deletes ([3c301bb](https://github.com/devbydaniel/tt/commit/3c301bba1a04c7cdb5e3cdebeb8fe06026f30771))
+* **sync:** Apply projects before tasks to prevent orphans ([3a0a0f1](https://github.com/devbydaniel/tt/commit/3a0a0f1b47e468f030e7d9a67b65db38231d867b))
+
 ## [0.3.0](https://github.com/devbydaniel/tt/compare/v0.2.0...v0.3.0) (2026-02-06)
 
 
