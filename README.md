@@ -487,19 +487,28 @@ make clean    # Remove binary
 
 ## Sync Server
 
-The `tt-sync` server enables syncing tasks between multiple devices.
+The `tt-sync` server enables syncing tasks between multiple devices using event-based synchronization.
 
-### Building
+### Server Setup
+
+**Build the server:**
 
 ```bash
-make build-sync    # Build the sync server binary
+make build-sync    # Creates tt-sync binary
 ```
 
-### Configuration
+**Configure the server:**
 
-The sync server loads configuration from environment variables and `.env` file.
+The server requires an API key for authentication. Set it via environment variable or `.env` file:
 
-**Environment variables:**
+```bash
+# Option 1: Copy the example and configure
+cp .env.example .env
+# Edit .env and set TT_SYNC_API_KEY=your-secret-key
+
+# Option 2: Set environment variable directly
+export TT_SYNC_API_KEY=your-secret-key
+```
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -507,27 +516,97 @@ The sync server loads configuration from environment variables and `.env` file.
 | `TT_DATA_DIR` | No | Data directory (default: `~/.local/share/tt`) |
 | `PORT` | No | HTTP port (default: `8080`) |
 
-**Quick start:**
+**Run the server:**
 
 ```bash
-# Copy the example and configure
-cp .env.example .env
-# Edit .env and set TT_SYNC_API_KEY
-
-# Run the server
-make run-sync
+make run-sync       # Build and run
+# or
+./tt-sync           # Run directly after building
 ```
 
 **Docker:**
 
 ```bash
-docker run -e TT_SYNC_API_KEY=your-secret -e TT_DATA_DIR=/data -v ./data:/data tt-sync
+docker run -e TT_SYNC_API_KEY=your-secret -e TT_DATA_DIR=/data -v ./data:/data -p 8080:8080 tt-sync
 ```
 
+### Client Configuration
+
+Configure each client to connect to the sync server in `~/.config/tt/config.toml`:
+
+```toml
+# Unique identifier for this device (required for sync)
+client_id = "macbook"  # e.g., "macbook", "work-pc", "phone"
+
+[sync]
+url = "http://localhost:8080"    # Your sync server URL
+api_key = "your-secret-key"      # Must match server's TT_SYNC_API_KEY
+```
+
+Or use environment variables:
+
+```bash
+export TT_CLIENT_ID=macbook
+export TT_SYNC_URL=http://localhost:8080
+export TT_SYNC_API_KEY=your-secret-key
+```
+
+### Syncing
+
+```bash
+tt sync           # Bidirectional sync: push local changes, pull remote changes
+tt sync push      # Push only: send local changes to server (no pull)
+```
+
+The sync command:
+- Pushes all local changes since last sync
+- Pulls changes from other clients
+- Applies remote changes to your local database
+
+### Resetting Sync
+
+**Reset sync (keep local data, clear server):**
+
+Use this when sync gets into a bad state and you want to start fresh while keeping your local tasks:
+
+```bash
+tt sync reset
+```
+
+This will:
+1. Clear all data on the sync server
+2. Clear local sync events and cursor
+3. Regenerate sync events from your current local tasks
+
+After reset, run `tt sync` to push your local data to the server.
+
+**Reset client (start fresh locally):**
+
+If you want to reset a client to match the server (discard local changes):
+
+```bash
+# Simply delete your local database
+rm ~/.local/share/tt/tasks.db    # Default location
+# or
+rm $TT_DATA_DIR/tasks.db         # If using custom data dir
+
+# Then sync to pull everything from server
+tt sync
+```
+
+### API Endpoints
+
 The server exposes:
-- `GET /health` - Health check
-- `POST /api/v1/events` - Push events (requires API key)
-- `POST /api/v1/sync` - Bidirectional sync (requires API key)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check (no auth required) |
+| `/api/v1/sync` | POST | Bidirectional sync |
+| `/api/v1/events` | POST | Push events only |
+| `/api/v1/sync/reset` | POST | Reset server data |
+| `/swagger/` | GET | API documentation |
+
+All `/api/v1/*` endpoints require `Authorization: Bearer <api_key>` header.
 
 ## Shell Completion
 
