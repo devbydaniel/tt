@@ -70,7 +70,7 @@ changelog:
       - "^chore:"
       - "^ci:"
 
-homebrew:
+brews:
   - name: tt
     ids:
       - tt
