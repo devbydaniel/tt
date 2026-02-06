@@ -50,18 +50,34 @@ type ApplyResult struct {
 	Skipped int
 }
 
+// entitySortOrder returns a numeric priority for sorting entities.
+// Lower numbers are applied first: areas (0), project tasks (1), regular tasks (2).
+func entitySortOrder(e syncevent.EntityState) int {
+	if e.EntityType == string(syncevent.EntityTypeArea) {
+		return 0
+	}
+	// For tasks, peek at the snapshot to determine if it's a project
+	if e.Snapshot != nil {
+		var peek struct {
+			TaskType string `json:"taskType"`
+		}
+		if json.Unmarshal([]byte(*e.Snapshot), &peek) == nil && peek.TaskType == "project" {
+			return 1
+		}
+	}
+	return 2
+}
+
 // Apply applies the given entity states to the local database.
-// Entities are sorted so areas are applied before tasks, ensuring
-// that area references in tasks can be resolved.
+// Entities are sorted so areas are applied first, then project tasks,
+// then regular tasks — ensuring that references can be resolved.
 func (a *ApplyEntityStates) Apply(entities []syncevent.EntityState) (*ApplyResult, error) {
 	result := &ApplyResult{}
 
-	// Sort entities: areas first, then tasks
-	// This ensures areas exist before tasks that reference them are applied
+	// Sort entities: areas first, then projects, then regular tasks
+	// This ensures areas and projects exist before tasks that reference them
 	sort.SliceStable(entities, func(i, j int) bool {
-		iIsArea := entities[i].EntityType == string(syncevent.EntityTypeArea)
-		jIsArea := entities[j].EntityType == string(syncevent.EntityTypeArea)
-		return iIsArea && !jIsArea
+		return entitySortOrder(entities[i]) < entitySortOrder(entities[j])
 	})
 
 	for _, entity := range entities {

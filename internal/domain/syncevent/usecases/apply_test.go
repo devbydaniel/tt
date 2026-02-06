@@ -16,7 +16,8 @@ type mockTaskUpserter struct {
 	deleted    []string
 	upsertErr  error
 	deleteErr  error
-	notFoundOn string // Return ErrTaskNotFound for this UUID
+	notFoundOn string            // Return ErrTaskNotFound for this UUID
+	upsertFn   func(t *task.Task) // Optional callback after upsert
 }
 
 func (m *mockTaskUpserter) Upsert(t *task.Task) error {
@@ -24,6 +25,9 @@ func (m *mockTaskUpserter) Upsert(t *task.Task) error {
 		return m.upsertErr
 	}
 	m.upserted = append(m.upserted, t)
+	if m.upsertFn != nil {
+		m.upsertFn(t)
+	}
 	return nil
 }
 
@@ -326,6 +330,102 @@ func TestApplyPropagatesDeleteError(t *testing.T) {
 	if err == nil {
 		t.Error("Apply() should propagate delete error")
 	}
+}
+
+func TestApplyProjectsBeforeChildTasks(t *testing.T) {
+	// When a child task and its parent project arrive in the same batch,
+	// the project must be upserted first so the child can resolve its parentUuid.
+	upserter := &mockTaskUpserter{}
+	taskLookup := &mockTaskByUUIDLookup{
+		tasks: make(map[string]*task.Task),
+	}
+	apply := &usecases.ApplyEntityStates{
+		TaskUpserter:     upserter,
+		TaskByUUIDLookup: taskLookup,
+	}
+
+	// Override Upsert to register tasks in the lookup (simulating real DB behavior)
+	upserter.upsertFn = func(t *task.Task) {
+		taskLookup.tasks[t.UUID] = t
+		// Assign a fake ID when first upserted
+		if t.ID == 0 {
+			t.ID = int64(len(taskLookup.tasks))
+		}
+	}
+
+	projectSnapshot := syncevent.TaskSnapshotData{
+		UUID:      "proj-1",
+		Title:     "My Project",
+		TaskType:  "project",
+		State:     "active",
+		Status:    "todo",
+		CreatedAt: "2024-01-01T00:00:00Z",
+	}
+	projectJSON, _ := json.Marshal(projectSnapshot)
+	projectStr := string(projectJSON)
+
+	parentUUID := "proj-1"
+	childSnapshot := syncevent.TaskSnapshotData{
+		UUID:       "task-1",
+		Title:      "Child Task",
+		TaskType:   "task",
+		ParentUUID: &parentUUID,
+		State:      "active",
+		Status:     "todo",
+		CreatedAt:  "2024-01-01T00:00:00Z",
+	}
+	childJSON, _ := json.Marshal(childSnapshot)
+	childStr := string(childJSON)
+
+	// Deliberately put child BEFORE project in the input
+	entities := []syncevent.EntityState{
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "task-1",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &childStr,
+		},
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "proj-1",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &projectStr,
+		},
+	}
+
+	result, err := apply.Apply(entities)
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+	if result.Applied != 2 {
+		t.Errorf("applied = %d, want 2", result.Applied)
+	}
+
+	// The child task should have its ParentID resolved
+	var childTask *task.Task
+	for _, u := range upserter.upserted {
+		if u.UUID == "task-1" {
+			childTask = u
+		}
+	}
+	if childTask == nil {
+		t.Fatal("child task not found in upserted list")
+	}
+	if childTask.ParentID == nil {
+		t.Error("child task ParentID is nil — project was not applied before child")
+	}
+}
+
+// mockTaskByUUIDLookup implements usecases.TaskByUUIDLookup for testing
+type mockTaskByUUIDLookup struct {
+	tasks map[string]*task.Task
+}
+
+func (m *mockTaskByUUIDLookup) GetByUUID(uuid string) (*task.Task, error) {
+	if t, ok := m.tasks[uuid]; ok {
+		return t, nil
+	}
+	return nil, task.ErrTaskNotFound
 }
 
 func TestApplyInvalidJSON(t *testing.T) {
