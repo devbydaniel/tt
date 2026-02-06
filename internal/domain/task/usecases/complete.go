@@ -28,8 +28,18 @@ func (c *CompleteTasks) Execute(ids []int64) ([]task.CompleteResult, error) {
 			return results, err
 		}
 
-		// If it's a project, complete it along with all its children
+		// If it's a project, collect todo children before completing so we know which ones actually changed
+		var todoChildrenBeforeComplete []task.Task
 		if t.IsProject() {
+			children, err := c.Repo.ListAllChildren(id)
+			if err != nil {
+				return results, err
+			}
+			for _, child := range children {
+				if child.Status == task.StatusTodo {
+					todoChildrenBeforeComplete = append(todoChildrenBeforeComplete, child)
+				}
+			}
 			if err := c.Repo.CompleteWithChildren(id, completedAt); err != nil {
 				return results, err
 			}
@@ -55,20 +65,19 @@ func (c *CompleteTasks) Execute(ids []int64) ([]task.CompleteResult, error) {
 				Task:      t,
 			})
 
-			// If it's a project, also emit sync events for all completed children
+			// If it's a project, emit sync events only for children that were actually changed (todo → done)
 			if t.IsProject() {
-				children, err := c.Repo.ListAllChildren(id)
-				if err == nil {
-					for _, child := range children {
-						if child.Status == task.StatusDone {
-							childCopy := child // avoid capturing loop variable
-							_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
-								ClientID:  c.ClientID,
-								EventType: syncevent.EventTypeCompleted,
-								Task:      &childCopy,
-							})
-						}
+				for _, child := range todoChildrenBeforeComplete {
+					// Refresh child to get the updated state with correct completed_at
+					updatedChild, err := c.Repo.GetByID(child.ID)
+					if err != nil {
+						continue
 					}
+					_, _ = c.SyncPersister.Execute(&synceventusecases.PersistOptions{
+						ClientID:  c.ClientID,
+						EventType: syncevent.EventTypeCompleted,
+						Task:      updatedChild,
+					})
 				}
 			}
 		}
