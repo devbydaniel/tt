@@ -17,7 +17,7 @@ type mockTaskUpserter struct {
 	deleted    []string
 	upsertErr  error
 	deleteErr  error
-	notFoundOn string            // Return ErrTaskNotFound for this UUID
+	notFoundOn string             // Return ErrTaskNotFound for this UUID
 	upsertFn   func(t *task.Task) // Optional callback after upsert
 }
 
@@ -498,14 +498,6 @@ func TestApplyDeletesTasksBeforeAreaInBatch(t *testing.T) {
 	// and that the order of deleted slices is correct.
 	// Actually, let's use a shared slice to track call order.
 
-	// Re-implement with order tracking via a channel approach:
-	// Since mocks append to their own slices, we need a shared tracker.
-	type deleteOp struct {
-		entityType string
-		uuid       string
-	}
-	var ops []deleteOp
-
 	// Override with tracking mocks
 	trackingTaskMock := &mockTaskUpserter{}
 	trackingAreaMock := &mockAreaUpserter{}
@@ -519,7 +511,6 @@ func TestApplyDeletesTasksBeforeAreaInBatch(t *testing.T) {
 	_ = deleteOrder
 	_ = origTaskDelete
 	_ = origAreaDelete
-	_ = ops
 
 	apply.TaskUpserter = trackingTaskMock
 	apply.AreaUpserter = trackingAreaMock
@@ -736,6 +727,7 @@ func TestApplyDeleteOrderingTasksBeforeProject(t *testing.T) {
 		t.Errorf("second deleted = %s, want proj-1", taskUpserter.deleted[1])
 	}
 }
+
 // mockAreaByUUIDLookup implements usecases.AreaByUUIDLookup for testing
 type mockAreaByUUIDLookup struct {
 	areas map[string]*area.Area

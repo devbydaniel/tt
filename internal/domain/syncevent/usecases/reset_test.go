@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	"github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
-	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/testutil"
 )
 
