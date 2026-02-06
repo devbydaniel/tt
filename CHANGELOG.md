@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/devbydaniel/tt/compare/v0.2.0...v0.3.0) (2026-02-06)
+
+
+### Features
+
+* **sync:** add docker compose ([#5](https://github.com/devbydaniel/tt/issues/5)) ([9ca5bab](https://github.com/devbydaniel/tt/commit/9ca5bab04e56ec06cb5d7e2fad564b44f305d390))
+
+
+### Bug Fixes
+
+* fix linting ([60192e9](https://github.com/devbydaniel/tt/commit/60192e9fc5e50fcd45dde74a9fe650361d854904))
+* gitignore binary ([b7a3387](https://github.com/devbydaniel/tt/commit/b7a3387babb17a3ce6339ac10440233f94091127))
+* make port configurable ([55d3199](https://github.com/devbydaniel/tt/commit/55d319951aadacdc18bcf619d2cef4c4a8963a66))
+* switch from AGENTS to CLAUDE ([def9907](https://github.com/devbydaniel/tt/commit/def9907ef5b093e271d304aaeca4c90a7a0852e9))
+* **sync:** create sync events for cascading tasks ([b795e44](https://github.com/devbydaniel/tt/commit/b795e4450cba1fb2a41ca0d9cb058482b3396c81))
+* **sync:** fix syncing reset logic ([af6fd73](https://github.com/devbydaniel/tt/commit/af6fd7332173d89f488f97d323bb09e30e0810f2))
+* **sync:** stop if events are not processed ([97e2321](https://github.com/devbydaniel/tt/commit/97e232177bf86e0ad41949b21a98b8a4fbf2699b))
+* update env.example ([6185e9b](https://github.com/devbydaniel/tt/commit/6185e9bd230fadd43035bdabc189720be20b434a))
+
 ## [0.2.0](https://github.com/devbydaniel/tt/compare/v0.1.0...v0.2.0) (2026-01-31)
 
 
