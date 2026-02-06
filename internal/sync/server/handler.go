@@ -9,8 +9,9 @@ import (
 )
 
 // AllDeleter can delete all entities of a given type.
+// When skipSyncEvents is true, no sync events are emitted (used during reset).
 type AllDeleter interface {
-	Execute() (int64, error)
+	Execute(skipSyncEvents ...bool) (int64, error)
 }
 
 // Handler handles sync API requests.
@@ -170,14 +171,14 @@ func (h *Handler) HandleSyncReset(w http.ResponseWriter, r *http.Request) {
 	// Delete all materialized tasks and areas
 	var deletedTasks, deletedAreas int64
 	if h.DeleteAllTasks != nil {
-		deletedTasks, err = h.DeleteAllTasks.Execute()
+		deletedTasks, err = h.DeleteAllTasks.Execute(true) // skip sync events during reset
 		if err != nil {
 			http.Error(w, "Failed to delete tasks: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 	if h.DeleteAllAreas != nil {
-		deletedAreas, err = h.DeleteAllAreas.Execute()
+		deletedAreas, err = h.DeleteAllAreas.Execute(true) // skip sync events during reset
 		if err != nil {
 			http.Error(w, "Failed to delete areas: "+err.Error(), http.StatusInternalServerError)
 			return
