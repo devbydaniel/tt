@@ -377,3 +377,86 @@ func TestExecuteSyncReturnsLatestEventPerEntity(t *testing.T) {
 		t.Errorf("event type = %s, want completed", result.Entities[0].EventType)
 	}
 }
+
+func createAreaEvent(clientID, entityUUID, eventUUID string, eventType syncevent.EventType) *syncevent.SyncEvent {
+	snapshot := `{"uuid":"` + entityUUID + `","name":"Test Area","description":"","createdAt":"2024-01-01T00:00:00Z"}`
+	return &syncevent.SyncEvent{
+		EventUUID:    eventUUID,
+		EntityType:   syncevent.EntityTypeArea,
+		EntityUUID:   entityUUID,
+		ClientID:     clientID,
+		EventType:    eventType,
+		EventVersion: 1,
+		Timestamp:    time.Now(),
+		Snapshot:     &snapshot,
+	}
+}
+
+func createTaskEventWithArea(clientID, entityUUID, eventUUID, areaUUID string, eventType syncevent.EventType) *syncevent.SyncEvent {
+	snapshot := `{"uuid":"` + entityUUID + `","title":"Test Task","areaUuid":"` + areaUUID + `","taskType":"task","state":"inbox","status":"todo","createdAt":"2024-01-01T00:00:00Z"}`
+	return &syncevent.SyncEvent{
+		EventUUID:    eventUUID,
+		EntityType:   syncevent.EntityTypeTask,
+		EntityUUID:   entityUUID,
+		ClientID:     clientID,
+		EventType:    eventType,
+		EventVersion: 1,
+		Timestamp:    time.Now(),
+		Snapshot:     &snapshot,
+	}
+}
+
+func TestReceiveEventsBatchAppliesParentAndChild(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	repo := syncevent.NewRepository(db)
+	applier := &batchTrackingApplier{}
+	receive := &usecases.ReceiveEvents{Repo: repo, Applier: applier}
+
+	areaUUID := "area-123"
+	taskUUID := "task-456"
+
+	// Send child task before parent area to test batch processing
+	// (Note: sorting order is tested separately in apply_test.go)
+	req := &usecases.ReceiveRequest{
+		ClientID: "client-1",
+		Events: []*syncevent.SyncEvent{
+			createTaskEventWithArea("client-1", taskUUID, "event-task", areaUUID, syncevent.EventTypeCreated),
+			createAreaEvent("client-1", areaUUID, "event-area", syncevent.EventTypeCreated),
+		},
+	}
+
+	result, err := receive.Execute(req)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if len(result.Accepted) != 2 {
+		t.Fatalf("accepted count = %d, want 2", len(result.Accepted))
+	}
+
+	// The key test: Apply should be called exactly once with both entities (batch apply)
+	// This verifies the fix for issue #5 - server applying events one-by-one
+	if len(applier.calls) != 1 {
+		t.Fatalf("Apply() call count = %d, want 1 (batch apply)", len(applier.calls))
+	}
+
+	entities := applier.calls[0]
+	if len(entities) != 2 {
+		t.Fatalf("Apply() entity count = %d, want 2", len(entities))
+	}
+
+	// Verify both entities were included
+	entityUUIDs := []string{entities[0].EntityUUID, entities[1].EntityUUID}
+	if !contains(entityUUIDs, areaUUID) || !contains(entityUUIDs, taskUUID) {
+		t.Errorf("batch should contain both area %s and task %s, got %v", areaUUID, taskUUID, entityUUIDs)
+	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}

@@ -156,6 +156,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 			TaskByUUIDLookup: taskRepo,
 			AreaByUUIDLookup: areaRepo,
 			AreaUpserter:     areaRepo,
+			PendingRepo:      syncEventRepo,
 		}
 		syncEvents = &synceventusecases.SyncEvents{
 			Repo:     syncEventRepo,

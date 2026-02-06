@@ -318,3 +318,71 @@ func (r *Repository) SetSyncState(key, value string) error {
 	)
 	return err
 }
+
+// MaxPendingRetries is the maximum number of times a pending entity will be retried
+// before being considered permanently unresolvable.
+const MaxPendingRetries = 10
+
+// SavePending inserts or updates an entity state in the pending resolution queue.
+func (r *Repository) SavePending(state EntityState) error {
+	_, err := r.db.Conn.Exec(
+		`INSERT INTO pending_sync_resolution (entity_type, entity_uuid, event_type, snapshot, retry_count, updated_at)
+		 VALUES (?, ?, ?, ?, 0, datetime('now'))
+		 ON CONFLICT(entity_uuid) DO UPDATE SET
+		   event_type = excluded.event_type,
+		   snapshot = excluded.snapshot,
+		   updated_at = datetime('now')`,
+		state.EntityType, state.EntityUUID, state.EventType, state.Snapshot,
+	)
+	return err
+}
+
+// GetPending returns all pending entity states that haven't exceeded the retry limit.
+func (r *Repository) GetPending() ([]EntityState, error) {
+	rows, err := r.db.Conn.Query(
+		`SELECT entity_type, entity_uuid, event_type, snapshot
+		 FROM pending_sync_resolution
+		 WHERE retry_count < ?
+		 ORDER BY id ASC`,
+		MaxPendingRetries,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var states []EntityState
+	for rows.Next() {
+		var s EntityState
+		if err := rows.Scan(&s.EntityType, &s.EntityUUID, &s.EventType, &s.Snapshot); err != nil {
+			return nil, err
+		}
+		states = append(states, s)
+	}
+	return states, rows.Err()
+}
+
+// IncrementPendingRetry increments the retry count for a pending entity.
+func (r *Repository) IncrementPendingRetry(entityUUID string) error {
+	_, err := r.db.Conn.Exec(
+		`UPDATE pending_sync_resolution SET retry_count = retry_count + 1, updated_at = datetime('now')
+		 WHERE entity_uuid = ?`,
+		entityUUID,
+	)
+	return err
+}
+
+// RemovePending removes a resolved entity from the pending queue.
+func (r *Repository) RemovePending(entityUUID string) error {
+	_, err := r.db.Conn.Exec(
+		`DELETE FROM pending_sync_resolution WHERE entity_uuid = ?`,
+		entityUUID,
+	)
+	return err
+}
+
+// DeleteAllPending removes all entries from the pending resolution queue.
+func (r *Repository) DeleteAllPending() error {
+	_, err := r.db.Conn.Exec("DELETE FROM pending_sync_resolution")
+	return err
+}

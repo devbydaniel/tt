@@ -736,6 +736,419 @@ func TestApplyDeleteOrderingTasksBeforeProject(t *testing.T) {
 		t.Errorf("second deleted = %s, want proj-1", taskUpserter.deleted[1])
 	}
 }
+// mockAreaByUUIDLookup implements usecases.AreaByUUIDLookup for testing
+type mockAreaByUUIDLookup struct {
+	areas map[string]*area.Area
+}
+
+func (m *mockAreaByUUIDLookup) GetByUUID(uuid string) (*area.Area, error) {
+	if a, ok := m.areas[uuid]; ok {
+		return a, nil
+	}
+	return nil, area.ErrAreaNotFound
+}
+
+// mockPendingRepo implements usecases.PendingRepo for testing
+type mockPendingRepo struct {
+	pending       map[string]syncevent.EntityState
+	retryCounts   map[string]int
+	saveErr       error
+	getPendingErr error
+}
+
+func newMockPendingRepo() *mockPendingRepo {
+	return &mockPendingRepo{
+		pending:     make(map[string]syncevent.EntityState),
+		retryCounts: make(map[string]int),
+	}
+}
+
+func (m *mockPendingRepo) SavePending(state syncevent.EntityState) error {
+	if m.saveErr != nil {
+		return m.saveErr
+	}
+	m.pending[state.EntityUUID] = state
+	return nil
+}
+
+func (m *mockPendingRepo) GetPending() ([]syncevent.EntityState, error) {
+	if m.getPendingErr != nil {
+		return nil, m.getPendingErr
+	}
+	var result []syncevent.EntityState
+	for _, s := range m.pending {
+		if m.retryCounts[s.EntityUUID] < 10 {
+			result = append(result, s)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockPendingRepo) IncrementPendingRetry(entityUUID string) error {
+	m.retryCounts[entityUUID]++
+	return nil
+}
+
+func (m *mockPendingRepo) RemovePending(entityUUID string) error {
+	delete(m.pending, entityUUID)
+	return nil
+}
+
+func TestApplySecondPassResolvesWithinBatchRefs(t *testing.T) {
+	// Two regular tasks in same batch: child references parent.
+	// Both have sort priority 2 (regular task), so parent might be processed
+	// after child. Second pass should fix the reference.
+	upserter := &mockTaskUpserter{}
+	taskLookup := &mockTaskByUUIDLookup{
+		tasks: make(map[string]*task.Task),
+	}
+	apply := &usecases.ApplyEntityStates{
+		TaskUpserter:     upserter,
+		TaskByUUIDLookup: taskLookup,
+	}
+
+	// Simulate DB behavior: upsert registers the task in lookup
+	upserter.upsertFn = func(t *task.Task) {
+		taskLookup.tasks[t.UUID] = t
+		if t.ID == 0 {
+			t.ID = int64(len(taskLookup.tasks))
+		}
+	}
+
+	parentUUID := "parent-task"
+	parentSnapshot := syncevent.TaskSnapshotData{
+		UUID:      "parent-task",
+		Title:     "Parent Task",
+		TaskType:  "task",
+		State:     "active",
+		Status:    "todo",
+		CreatedAt: "2024-01-01T00:00:00Z",
+	}
+	parentJSON, _ := json.Marshal(parentSnapshot)
+	parentStr := string(parentJSON)
+
+	childSnapshot := syncevent.TaskSnapshotData{
+		UUID:       "child-task",
+		Title:      "Child Task",
+		TaskType:   "task",
+		ParentUUID: &parentUUID,
+		State:      "active",
+		Status:     "todo",
+		CreatedAt:  "2024-01-01T00:00:00Z",
+	}
+	childJSON, _ := json.Marshal(childSnapshot)
+	childStr := string(childJSON)
+
+	// Put child BEFORE parent — they have the same sort priority (both regular tasks)
+	entities := []syncevent.EntityState{
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "child-task",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &childStr,
+		},
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "parent-task",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &parentStr,
+		},
+	}
+
+	result, err := apply.Apply(entities)
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+	if result.Applied != 2 {
+		t.Errorf("applied = %d, want 2", result.Applied)
+	}
+
+	// Find the LAST upsert of child-task (second pass should have re-applied it)
+	var childTask *task.Task
+	for i := len(upserter.upserted) - 1; i >= 0; i-- {
+		if upserter.upserted[i].UUID == "child-task" {
+			childTask = upserter.upserted[i]
+			break
+		}
+	}
+	if childTask == nil {
+		t.Fatal("child task not found in upserted list")
+	}
+	if childTask.ParentID == nil {
+		t.Error("child task ParentID is nil after second pass — reference was not resolved")
+	}
+}
+
+func TestApplyDefersUnresolvableToQueue(t *testing.T) {
+	// Task references a parent that doesn't exist at all (not in this batch).
+	// Should be deferred to the pending queue.
+	upserter := &mockTaskUpserter{}
+	taskLookup := &mockTaskByUUIDLookup{
+		tasks: make(map[string]*task.Task),
+	}
+	pendingRepo := newMockPendingRepo()
+
+	apply := &usecases.ApplyEntityStates{
+		TaskUpserter:     upserter,
+		TaskByUUIDLookup: taskLookup,
+		PendingRepo:      pendingRepo,
+	}
+
+	upserter.upsertFn = func(t *task.Task) {
+		taskLookup.tasks[t.UUID] = t
+		if t.ID == 0 {
+			t.ID = int64(len(taskLookup.tasks))
+		}
+	}
+
+	missingParent := "nonexistent-parent"
+	childSnapshot := syncevent.TaskSnapshotData{
+		UUID:       "orphan-task",
+		Title:      "Orphan Task",
+		TaskType:   "task",
+		ParentUUID: &missingParent,
+		State:      "active",
+		Status:     "todo",
+		CreatedAt:  "2024-01-01T00:00:00Z",
+	}
+	childJSON, _ := json.Marshal(childSnapshot)
+	childStr := string(childJSON)
+
+	entities := []syncevent.EntityState{
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "orphan-task",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &childStr,
+		},
+	}
+
+	result, err := apply.Apply(entities)
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+	if result.Applied != 1 {
+		t.Errorf("applied = %d, want 1", result.Applied)
+	}
+	if result.Deferred != 1 {
+		t.Errorf("deferred = %d, want 1", result.Deferred)
+	}
+
+	// Check that it was saved to the pending queue
+	if _, exists := pendingRepo.pending["orphan-task"]; !exists {
+		t.Error("orphan-task should be in the pending queue")
+	}
+}
+
+func TestApplyRetryPendingResolvesOnSubsequentBatch(t *testing.T) {
+	// First batch: task with unresolved parent → deferred.
+	// Second batch: parent arrives → pending task gets resolved.
+	upserter := &mockTaskUpserter{}
+	taskLookup := &mockTaskByUUIDLookup{
+		tasks: make(map[string]*task.Task),
+	}
+	pendingRepo := newMockPendingRepo()
+
+	apply := &usecases.ApplyEntityStates{
+		TaskUpserter:     upserter,
+		TaskByUUIDLookup: taskLookup,
+		PendingRepo:      pendingRepo,
+	}
+
+	upserter.upsertFn = func(t *task.Task) {
+		taskLookup.tasks[t.UUID] = t
+		if t.ID == 0 {
+			t.ID = int64(len(taskLookup.tasks))
+		}
+	}
+
+	// First batch: child with missing parent
+	parentUUID := "parent-task"
+	childSnapshot := syncevent.TaskSnapshotData{
+		UUID:       "child-task",
+		Title:      "Child Task",
+		TaskType:   "task",
+		ParentUUID: &parentUUID,
+		State:      "active",
+		Status:     "todo",
+		CreatedAt:  "2024-01-01T00:00:00Z",
+	}
+	childJSON, _ := json.Marshal(childSnapshot)
+	childStr := string(childJSON)
+
+	result1, err := apply.Apply([]syncevent.EntityState{
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "child-task",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &childStr,
+		},
+	})
+	if err != nil {
+		t.Fatalf("First Apply() error = %v", err)
+	}
+	if result1.Deferred != 1 {
+		t.Errorf("first batch deferred = %d, want 1", result1.Deferred)
+	}
+
+	// Second batch: parent arrives
+	parentSnapshot := syncevent.TaskSnapshotData{
+		UUID:      "parent-task",
+		Title:     "Parent Task",
+		TaskType:  "task",
+		State:     "active",
+		Status:    "todo",
+		CreatedAt: "2024-01-01T00:00:00Z",
+	}
+	parentJSON, _ := json.Marshal(parentSnapshot)
+	parentStr := string(parentJSON)
+
+	result2, err := apply.Apply([]syncevent.EntityState{
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "parent-task",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &parentStr,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Second Apply() error = %v", err)
+	}
+	if result2.Applied != 2 { // 1 from batch + 1 from pending retry
+		t.Errorf("second batch applied = %d, want 2", result2.Applied)
+	}
+
+	// Pending queue should now be empty
+	if len(pendingRepo.pending) != 0 {
+		t.Errorf("pending queue should be empty, has %d items", len(pendingRepo.pending))
+	}
+
+	// Child task should now have ParentID resolved
+	var childTask *task.Task
+	for i := len(upserter.upserted) - 1; i >= 0; i-- {
+		if upserter.upserted[i].UUID == "child-task" {
+			childTask = upserter.upserted[i]
+			break
+		}
+	}
+	if childTask == nil {
+		t.Fatal("child task not found")
+	}
+	if childTask.ParentID == nil {
+		t.Error("child task ParentID should be resolved after retry")
+	}
+}
+
+func TestApplyAreaRefResolvedInSecondPass(t *testing.T) {
+	// Task references an area UUID. Area is in the same batch but task
+	// gets processed in a way that the area ref needs second pass.
+	// Actually, areas are sorted before tasks, so this should work in first pass.
+	// But let's test the cross-batch case with the pending queue.
+	upserter := &mockTaskUpserter{}
+	taskLookup := &mockTaskByUUIDLookup{tasks: make(map[string]*task.Task)}
+	areaLookup := &mockAreaByUUIDLookup{areas: make(map[string]*area.Area)}
+	areaMock := &mockAreaUpserter{}
+	pendingRepo := newMockPendingRepo()
+
+	apply := &usecases.ApplyEntityStates{
+		TaskUpserter:     upserter,
+		TaskByUUIDLookup: taskLookup,
+		AreaByUUIDLookup: areaLookup,
+		AreaUpserter:     areaMock,
+		PendingRepo:      pendingRepo,
+	}
+
+	upserter.upsertFn = func(t *task.Task) {
+		taskLookup.tasks[t.UUID] = t
+		if t.ID == 0 {
+			t.ID = int64(len(taskLookup.tasks))
+		}
+	}
+
+	// First batch: task references area that doesn't exist yet
+	areaUUID := "area-1"
+	taskSnapshot := syncevent.TaskSnapshotData{
+		UUID:      "task-1",
+		Title:     "Task with area",
+		TaskType:  "task",
+		AreaUUID:  &areaUUID,
+		State:     "active",
+		Status:    "todo",
+		CreatedAt: "2024-01-01T00:00:00Z",
+	}
+	taskJSON, _ := json.Marshal(taskSnapshot)
+	taskStr := string(taskJSON)
+
+	result1, err := apply.Apply([]syncevent.EntityState{
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "task-1",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &taskStr,
+		},
+	})
+	if err != nil {
+		t.Fatalf("First Apply() error = %v", err)
+	}
+	if result1.Deferred != 1 {
+		t.Errorf("deferred = %d, want 1", result1.Deferred)
+	}
+
+	// Second batch: area arrives
+	areaLookup.areas["area-1"] = &area.Area{ID: 42, UUID: "area-1", Name: "Work"}
+	areaSnapshot := `{"uuid":"area-1","name":"Work"}`
+	result2, err := apply.Apply([]syncevent.EntityState{
+		{
+			EntityType: string(syncevent.EntityTypeArea),
+			EntityUUID: "area-1",
+			EventType:  string(syncevent.EventTypeCreated),
+			Snapshot:   &areaSnapshot,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Second Apply() error = %v", err)
+	}
+	// 1 area from batch + 1 task from pending retry
+	if result2.Applied != 2 {
+		t.Errorf("second batch applied = %d, want 2", result2.Applied)
+	}
+
+	// Pending queue should be empty
+	if len(pendingRepo.pending) != 0 {
+		t.Errorf("pending queue should be empty, has %d items", len(pendingRepo.pending))
+	}
+}
+
+func TestApplyDeletesNotDeferred(t *testing.T) {
+	// Delete events should never be deferred — they have no refs to resolve
+	upserter := &mockTaskUpserter{}
+	pendingRepo := newMockPendingRepo()
+	apply := &usecases.ApplyEntityStates{
+		TaskUpserter: upserter,
+		PendingRepo:  pendingRepo,
+	}
+
+	entities := []syncevent.EntityState{
+		{
+			EntityType: string(syncevent.EntityTypeTask),
+			EntityUUID: "task-1",
+			EventType:  string(syncevent.EventTypeDeleted),
+			Snapshot:   nil,
+		},
+	}
+
+	result, err := apply.Apply(entities)
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+	if result.Deferred != 0 {
+		t.Errorf("deferred = %d, want 0 for deletes", result.Deferred)
+	}
+	if len(pendingRepo.pending) != 0 {
+		t.Error("deletes should not be queued in pending")
+	}
+}
+
 func TestApplyDeleteOrderingTasksBeforeAreas(t *testing.T) {
 	// When deleting an area and its tasks, tasks should be deleted first
 	// to avoid FK violations (ON DELETE RESTRICT)
