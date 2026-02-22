@@ -58,6 +58,19 @@ archives:
         formats:
           - zip
 
+dockers:
+  - id: tt-sync
+    ids:
+      - tt-sync
+    image_templates:
+      - "ghcr.io/devbydaniel/tt-sync:{{ .Version }}"
+      - "ghcr.io/devbydaniel/tt-sync:latest"
+    dockerfile: Dockerfile.tt-sync
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    goos: linux
+    goarch: amd64
+
 checksum:
   name_template: "checksums.txt"
 
