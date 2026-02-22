@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/devbydaniel/tt/compare/v0.4.1...v0.4.2) (2026-02-22)
+
+
+### Bug Fixes
+
+* add Docker image publishing for tt-sync ([51b3f12](https://github.com/devbydaniel/tt/commit/51b3f128bcd0e80d9c4a152d6ad89f26cc99e0a8))
+
 ## [0.4.1](https://github.com/devbydaniel/tt/compare/v0.4.0...v0.4.1) (2026-02-06)
 
 
