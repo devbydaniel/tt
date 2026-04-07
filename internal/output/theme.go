@@ -82,6 +82,26 @@ var presets = map[string]themeColors{
 		ID:      "#565f89", // Comment
 		Scope:   "#7dcfff", // Cyan
 	},
+	"kanagawa": {
+		Muted:   "#727169", // Fuji Gray
+		Accent:  "#e6c384", // Carp Yellow
+		Warning: "#c34043", // Autumn Red
+		Success: "#98bb6c", // Spring Green
+		Error:   "#c34043", // Autumn Red
+		Header:  "#7e9cd8", // Crystal Blue
+		ID:      "#727169", // Fuji Gray
+		Scope:   "#7aa89f", // Wave Aqua
+	},
+	"houston": {
+		Muted:   "#909198", // Comment
+		Accent:  "#ffd493", // Peach
+		Warning: "#f44747", // Red
+		Success: "#4bf3c8", // Mint
+		Error:   "#f44747", // Red
+		Header:  "#54b9ff", // Blue
+		ID:      "#909198", // Comment
+		Scope:   "#00daef", // Cyan (focus accent)
+	},
 	// Light themes
 	"solarized-light": {
 		Muted:   "#93a1a1", // Base1
@@ -204,6 +224,8 @@ func AvailableThemes() []string {
 		"nord",
 		"gruvbox",
 		"tokyo-night",
+		"kanagawa",
+		"houston",
 		"solarized-light",
 		"catppuccin-latte",
 	}

@@ -434,6 +434,8 @@ name = "dracula"  # Use a preset theme
 | `nord`             | Dark  |
 | `gruvbox`          | Dark  |
 | `tokyo-night`      | Dark  |
+| `kanagawa`         | Dark  |
+| `houston`          | Dark  |
 | `solarized-light`  | Light |
 | `catppuccin-latte` | Light |
 
