@@ -12,6 +12,7 @@ import (
 	"github.com/devbydaniel/tt/config"
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/comment"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	taskusecases "github.com/devbydaniel/tt/internal/domain/task/usecases"
 	"github.com/devbydaniel/tt/internal/output"
@@ -56,6 +57,7 @@ type Model struct {
 	completeModal      CompleteModal
 	createProjectModal CreateProjectModal
 	createAreaModal    CreateAreaModal
+
 	help               help.Model
 	focusArea          FocusArea
 	detailVisible      bool // whether the detail pane is shown
@@ -97,6 +99,7 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 		completeModal:      NewCompleteModal(styles),
 		createProjectModal: NewCreateProjectModal(styles),
 		createAreaModal:    NewCreateAreaModal(styles),
+
 		help:               helpModel,
 	}
 }
@@ -498,6 +501,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+		case key.Matches(msg, keys.AISync):
+			if m.focusArea == FocusContent {
+				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
+					binary, err := findAIBinary(&m.config.AI)
+					if err != nil {
+						m.err = err
+						return m, nil
+					}
+					return m, launchAISync(selectedTask, binary)
+				}
+			}
+
 		case key.Matches(msg, keys.Delete):
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
@@ -852,6 +867,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tags = msg.tags
 		m.sidebar = m.sidebar.SetData(m.areas, m.projects, msg.tags)
 		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
+		return m, nil
+
+	case aiSyncFinishedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		return m, m.loadData
+
+	case commentsLoadedMsg:
+		if msg.err != nil {
+			return m, nil // silently ignore comment load errors
+		}
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.taskID {
+			m.detailPane = m.detailPane.SetComments(msg.comments)
+		}
 		return m, nil
 	}
 
@@ -1296,7 +1327,7 @@ func (m Model) openDetailPane() (tea.Model, tea.Cmd) {
 	// Recalculate layout for three-column mode
 	m = m.recalculateLayout()
 
-	return m, nil
+	return m, m.loadComments(selectedTask.ID)
 }
 
 // recalculateLayout recalculates component sizes based on current state
@@ -1479,6 +1510,21 @@ type tagsAndTasksUpdatedMsg struct {
 	preserveIndex  int   // fallback index if task not found
 }
 
+// commentsLoadedMsg carries loaded comments for the detail pane
+type commentsLoadedMsg struct {
+	taskID   int64
+	comments []comment.Comment
+	err      error
+}
+
+// loadComments fetches comments for a task
+func (m Model) loadComments(taskID int64) tea.Cmd {
+	return func() tea.Msg {
+		comments, err := m.app.ListComments.Execute(taskID)
+		return commentsLoadedMsg{taskID: taskID, comments: comments, err: err}
+	}
+}
+
 // View implements tea.Model
 func (m Model) View() string {
 	if m.err != nil {
@@ -1562,7 +1608,6 @@ func (m Model) View() string {
 	if m.createAreaModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.createAreaModal.View(), helpView)
 	}
-
 	// Render sidebar and content side by side (gap can be 0 for tight layouts)
 	contentView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.content.View())
 	var mainView string

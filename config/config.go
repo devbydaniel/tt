@@ -21,6 +21,12 @@ type SyncConfig struct {
 	APIKey string `toml:"api_key"` // shared secret for authentication
 }
 
+// AIConfig holds configuration for AI assistant integration
+type AIConfig struct {
+	Provider string `toml:"provider"` // AI provider name (e.g., "claude")
+	Binary   string `toml:"binary"`   // binary name or path (e.g., "claude")
+}
+
 type Config struct {
 	Database    string
 	NotesDir    string // directory where markdown notes are stored
@@ -40,6 +46,7 @@ type Config struct {
 	Inbox       ListSettings
 	Theme       ThemeConfig
 	Sync        SyncConfig
+	AI          AIConfig
 }
 
 // ThemeConfig holds color and icon settings for output formatting
@@ -192,6 +199,7 @@ type fileConfig struct {
 	Inbox       ListSettings `toml:"inbox"`
 	Theme       ThemeConfig  `toml:"theme"`
 	Sync        SyncConfig   `toml:"sync"`
+	AI          AIConfig     `toml:"ai"`
 }
 
 func Load() (*Config, error) {
@@ -228,6 +236,7 @@ func Load() (*Config, error) {
 			cfg.Inbox = fc.Inbox
 			cfg.Theme = fc.Theme
 			cfg.Sync = fc.Sync
+			cfg.AI = fc.AI
 		}
 	}
 
@@ -314,5 +323,11 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if notesDir := os.Getenv("TT_NOTES_DIR"); notesDir != "" {
 		cfg.NotesDir = expandTilde(notesDir)
+	}
+	if cfg.AI.Provider == "" {
+		cfg.AI.Provider = "claude"
+	}
+	if cfg.AI.Binary == "" {
+		cfg.AI.Binary = "claude"
 	}
 }

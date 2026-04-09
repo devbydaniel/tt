@@ -4,6 +4,8 @@ import (
 	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	areausecases "github.com/devbydaniel/tt/internal/domain/area/usecases"
+	"github.com/devbydaniel/tt/internal/domain/comment"
+	commentusecases "github.com/devbydaniel/tt/internal/domain/comment/usecases"
 	"github.com/devbydaniel/tt/internal/domain/note"
 	noteusecases "github.com/devbydaniel/tt/internal/domain/note/usecases"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
@@ -68,6 +70,10 @@ type App struct {
 	ListNotes   *noteusecases.ListNotes
 	CreateNote  *noteusecases.CreateNote
 	SearchNotes *noteusecases.SearchNotes
+
+	// Comment use cases
+	AddComment   *commentusecases.AddComment
+	ListComments *commentusecases.ListComments
 }
 
 // SyncConfig holds sync configuration.
@@ -80,6 +86,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig, notesDir string)
 	// Create repositories
 	areaRepo := area.NewRepository(db)
 	taskRepo := task.NewRepository(db)
+	commentRepo := comment.NewRepository(db)
 	noteRepo := note.NewRepository(notesDir)
 
 	// Create read-only area use cases first (needed by sync persister)
@@ -389,5 +396,12 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig, notesDir string)
 		ListNotes:   &noteusecases.ListNotes{Repo: noteRepo},
 		CreateNote:  &noteusecases.CreateNote{Repo: noteRepo},
 		SearchNotes: &noteusecases.SearchNotes{Repo: noteRepo},
+
+		// Comments
+		AddComment: &commentusecases.AddComment{
+			Repo:       commentRepo,
+			TaskLookup: getTask,
+		},
+		ListComments: &commentusecases.ListComments{Repo: commentRepo},
 	}
 }

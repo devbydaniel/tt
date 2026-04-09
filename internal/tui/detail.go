@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/devbydaniel/tt/internal/domain/comment"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
@@ -17,12 +18,14 @@ const (
 	DetailFieldPlanned
 	DetailFieldDue
 	DetailFieldTags
+	DetailFieldComments
 	detailFieldCount // sentinel for wrapping
 )
 
 // DetailPane displays task details in a third column
 type DetailPane struct {
 	task         *task.Task
+	comments     []comment.Comment
 	focusedField DetailField
 	width        int
 	height       int
@@ -50,7 +53,14 @@ func (d DetailPane) SetSize(width, height int) DetailPane {
 // SetTask sets the task to display
 func (d DetailPane) SetTask(t *task.Task) DetailPane {
 	d.task = t
+	d.comments = nil
 	d.focusedField = DetailFieldTitle
+	return d
+}
+
+// SetComments sets the comments to display
+func (d DetailPane) SetComments(comments []comment.Comment) DetailPane {
+	d.comments = comments
 	return d
 }
 
@@ -153,6 +163,37 @@ func (d DetailPane) buildContent() string {
 		tags = strings.Join(tagStrs, " ")
 	}
 	sections = append(sections, d.renderField(DetailFieldTags, "Tags", tags))
+
+	// Comments
+	commentsLabel := fmt.Sprintf("Comments (%d)", len(d.comments))
+	commentsValue := "None"
+	if len(d.comments) > 0 {
+		var lines []string
+		// Show last 3 comments
+		start := 0
+		if len(d.comments) > 3 {
+			start = len(d.comments) - 3
+			lines = append(lines, theme.Muted.Render(fmt.Sprintf("... %d earlier", start)))
+		}
+		for _, c := range d.comments[start:] {
+			header := theme.Muted.Render(fmt.Sprintf("%s @ %s", c.Author, c.CreatedAt.Format("Jan 2 15:04")))
+			body := c.Body
+			bodyMax := d.width - 10
+			if bodyMax < 10 {
+				bodyMax = 10
+			}
+			if len(body) > bodyMax {
+				body = body[:bodyMax-3] + "..."
+			}
+			// Truncate to first line if multiline
+			if idx := strings.Index(body, "\n"); idx != -1 {
+				body = body[:idx] + "..."
+			}
+			lines = append(lines, header+"\n    "+body)
+		}
+		commentsValue = strings.Join(lines, "\n    ")
+	}
+	sections = append(sections, d.renderField(DetailFieldComments, commentsLabel, commentsValue))
 
 	return strings.Join(sections, "\n\n")
 }

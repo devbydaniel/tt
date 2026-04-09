@@ -22,7 +22,8 @@ type keyMap struct {
 	Toggle       key.Binding
 	Someday      key.Binding
 	Delete       key.Binding
-	Quit         key.Binding
+	AISync  key.Binding
+	Quit    key.Binding
 }
 
 // sidebarKeyMap provides help bindings when sidebar is focused
@@ -51,7 +52,7 @@ func (k sidebarProjectKeyMap) FullHelp() [][]key.Binding {
 type contentKeyMap struct{}
 
 func (k contentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Someday, keys.Delete, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Someday, keys.Delete, keys.AISync, keys.Quit}
 }
 
 func (k contentKeyMap) FullHelp() [][]key.Binding {
@@ -327,6 +328,10 @@ var keys = keyMap{
 	Delete: key.NewBinding(
 		key.WithKeys("backspace"),
 		key.WithHelp("bksp", "delete"),
+	),
+	AISync: key.NewBinding(
+		key.WithKeys("c"),
+		key.WithHelp("c", "ai chat"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
