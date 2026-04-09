@@ -23,6 +23,7 @@ type SyncConfig struct {
 
 type Config struct {
 	Database    string
+	NotesDir    string // directory where markdown notes are stored
 	ClientID    string // unique client identifier for sync (user-defined)
 	Sort        string // global default sort
 	Group       string // global default group
@@ -174,6 +175,7 @@ func (c *Config) GetHideScope(listName string) bool {
 // fileConfig represents the TOML config file structure
 type fileConfig struct {
 	DataDir     string       `toml:"data_dir"`
+	NotesDir    string       `toml:"notes_dir"`
 	ClientID    string       `toml:"client_id"`
 	Sort        string       `toml:"sort"`
 	Group       string       `toml:"group"`
@@ -201,11 +203,15 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Database: filepath.Join(dataDir, "tasks.db"),
+		NotesDir: filepath.Join(dataDir, "notes"),
 	}
 
 	if configPath := configFilePath(); configPath != "" {
 		var fc fileConfig
 		if _, err := toml.DecodeFile(configPath, &fc); err == nil {
+			if fc.NotesDir != "" {
+				cfg.NotesDir = expandTilde(fc.NotesDir)
+			}
 			cfg.ClientID = fc.ClientID
 			cfg.Sort = fc.Sort
 			cfg.Group = fc.Group
@@ -305,5 +311,8 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if clientID := os.Getenv("TT_CLIENT_ID"); clientID != "" {
 		cfg.ClientID = clientID
+	}
+	if notesDir := os.Getenv("TT_NOTES_DIR"); notesDir != "" {
+		cfg.NotesDir = expandTilde(notesDir)
 	}
 }

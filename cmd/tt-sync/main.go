@@ -80,7 +80,7 @@ func run() error {
 	}
 
 	// Create app with server clientID (no syncCfg - server doesn't sync to itself)
-	application := app.New(db, serverClientID, nil)
+	application := app.New(db, serverClientID, nil, "")
 
 	// Create repositories for applying sync events
 	taskRepo := task.NewRepository(db)

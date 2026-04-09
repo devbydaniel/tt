@@ -4,6 +4,8 @@ import (
 	"github.com/devbydaniel/tt/internal/database"
 	"github.com/devbydaniel/tt/internal/domain/area"
 	areausecases "github.com/devbydaniel/tt/internal/domain/area/usecases"
+	"github.com/devbydaniel/tt/internal/domain/note"
+	noteusecases "github.com/devbydaniel/tt/internal/domain/note/usecases"
 	"github.com/devbydaniel/tt/internal/domain/syncevent"
 	synceventusecases "github.com/devbydaniel/tt/internal/domain/syncevent/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -61,6 +63,11 @@ type App struct {
 	ListTags           *taskusecases.ListTags
 	SetTags            *taskusecases.SetTags
 	DeleteTag          *taskusecases.DeleteTag
+
+	// Note use cases (filesystem-backed, no DB)
+	ListNotes   *noteusecases.ListNotes
+	CreateNote  *noteusecases.CreateNote
+	SearchNotes *noteusecases.SearchNotes
 }
 
 // SyncConfig holds sync configuration.
@@ -69,10 +76,11 @@ type SyncConfig struct {
 	APIKey string
 }
 
-func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
+func New(db *database.DB, clientID string, syncCfg *SyncConfig, notesDir string) *App {
 	// Create repositories
 	areaRepo := area.NewRepository(db)
 	taskRepo := task.NewRepository(db)
+	noteRepo := note.NewRepository(notesDir)
 
 	// Create read-only area use cases first (needed by sync persister)
 	listAreas := &areausecases.ListAreas{Repo: areaRepo}
@@ -376,5 +384,10 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig) *App {
 		ListTags:           listTagsUC,
 		SetTags:            setTags,
 		DeleteTag:          deleteTag,
+
+		// Notes
+		ListNotes:   &noteusecases.ListNotes{Repo: noteRepo},
+		CreateNote:  &noteusecases.CreateNote{Repo: noteRepo},
+		SearchNotes: &noteusecases.SearchNotes{Repo: noteRepo},
 	}
 }

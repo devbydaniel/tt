@@ -274,6 +274,63 @@ tt delete 1
 tt delete 1 2 3
 ```
 
+### Notes
+
+Attach markdown notes to any task, project, or area. Notes live as plain
+`.md` files on disk under the notes directory (default: `<data_dir>/notes`),
+organized as `<entity_type>/<entity_uuid>/YYYYMMDD--<slug>.md`.
+
+Notes are **not** synced with the task database. If you want them on multiple
+devices, point Syncthing/iCloud/Dropbox at the notes directory.
+
+**Interactive (fzf + `$EDITOR`)**
+
+```bash
+tt notes --task 5              # fzf-pick a note for task #5, edit in $EDITOR
+tt notes --project Work        # same, by project name
+tt notes --project 12          # same, by project ID
+tt notes --area Health         # same, by area name
+
+tt notes add --task 5          # prompt for title, then open $EDITOR on the new file
+tt notes add --project Work
+tt notes add --area Health
+```
+
+If `bat` is installed, the fzf preview uses it for syntax-highlighted markdown.
+If `fzf` isn't installed, `tt notes --task <id>` falls back to a numeric picker.
+
+**Non-interactive (scripts and AI agents)**
+
+```bash
+# List notes — text or JSON, optionally filtered by entity
+tt notes ls                            # all notes everywhere
+tt notes ls --task 5
+tt notes ls --project Work --json
+
+# Create a note non-interactively (prints the path)
+tt notes add --task 5 --title "Kickoff" --body "first thoughts"
+tt notes add --area Health --title "Retro" --body-file retro.md
+echo "from stdin" | tt notes add --task 5 --title "Stream" --body-file -
+
+# Substring search across notes (case-insensitive)
+tt notes search "kickoff"              # all notes
+tt notes search "kickoff" --task 5     # scoped to one entity
+tt notes search "kickoff" --json       # structured matches
+```
+
+Reading and editing existing notes by path is left to plain Unix tools — `cat`,
+`bat`, `vim`, `rg`, etc. Once you have a path from `tt notes ls`, you don't
+need `tt` to operate on it.
+
+**Configuration**
+
+```toml
+# Override the notes directory in ~/.config/tt/config.toml
+notes_dir = "~/Documents/tt-notes"
+```
+
+Or via environment: `TT_NOTES_DIR=/path/to/notes`.
+
 ### Interactive TUI
 
 Running `tt` without arguments launches the interactive terminal UI:

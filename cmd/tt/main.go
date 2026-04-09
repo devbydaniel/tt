@@ -42,7 +42,7 @@ func run() error {
 			APIKey: cfg.Sync.APIKey,
 		}
 	}
-	application := app.New(db, cfg.ClientID, syncCfg)
+	application := app.New(db, cfg.ClientID, syncCfg, cfg.NotesDir)
 	theme := output.NewTheme(&cfg.Theme)
 
 	deps := &cli.Dependencies{

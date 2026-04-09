@@ -8,6 +8,7 @@ Layered: `cmd/` → `internal/cli/` → `internal/app/` → `internal/domain/*/u
 
 - **Use case-based**: Each operation is its own struct with focused dependencies
 - **Consumer-defined interfaces**: Cross-domain deps use interfaces defined by the consumer
+- **Cross-domain communication**: Domain modules communicate with each other only via use cases. Never import or use a repository from another domain directly.
 - **App wiring**: `internal/app/app.go` creates all use cases and resolves dependencies
 
 ## Adding a CLI Command
