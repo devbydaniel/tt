@@ -444,7 +444,7 @@ func runInteractiveNotes(deps *Dependencies, ref entityRef) error {
 		return err
 	}
 	if selectedPath == "" {
-		return nil // user cancelled
+		return nil // user canceled
 	}
 	return openInEditor(selectedPath)
 }
@@ -468,7 +468,7 @@ func shellQuote(s string) string {
 }
 
 // pickNoteWithFzf displays notes in fzf and returns the absolute path of the
-// selection, or "" if the user cancelled. Falls back to a numeric prompt if
+// selection, or "" if the user canceled. Falls back to a numeric prompt if
 // fzf is not installed.
 func pickNoteWithFzf(notes []note.Note) (string, error) {
 	if _, err := exec.LookPath("fzf"); err != nil {
