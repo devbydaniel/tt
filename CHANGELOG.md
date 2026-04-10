@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.5.0](https://github.com/devbydaniel/tt/compare/v0.4.2...v0.5.0) (2026-04-10)
+
+
+### Features
+
+* add comment/note indicators on task lists and enhance TUI detail pane ([af4b0e6](https://github.com/devbydaniel/tt/commit/af4b0e6e37a5c107b29af3de5272b22a521b11a8))
+* add notes — markdown notes attached to tasks, projects, and areas ([5fb586a](https://github.com/devbydaniel/tt/commit/5fb586a28b8b07cf69ee49e5507cdb790c4d261c))
+* add task comments and AI assistant launch from TUI ([b4501b6](https://github.com/devbydaniel/tt/commit/b4501b67479eee9cc1bdecc0eec428b52b1e5373))
+* **theme:** add houston preset ([00a373c](https://github.com/devbydaniel/tt/commit/00a373cbebd50e2e765123df4944cee74e65175f))
+* **tui:** add dual-view detail pane with data/comments toggle ([8397095](https://github.com/devbydaniel/tt/commit/839709578a45053e318461603c14a512716d1589))
+* **tui:** add fzf note search with 's' key in notes views ([090a5c3](https://github.com/devbydaniel/tt/commit/090a5c3223980e9390f1748c27d2b3b11df48a75))
+* **tui:** add note creation and deletion in notes views ([78990d7](https://github.com/devbydaniel/tt/commit/78990d7b132000a94d13124a595a3605d9042902))
+* **tui:** make sidebar sections full-height with Tab cycling ([298f789](https://github.com/devbydaniel/tt/commit/298f789cb9509aeafa86bfd2e5ae35c6e3d84b32))
+* **tui:** mute note date prefixes and shorten date format ([dc421a1](https://github.com/devbydaniel/tt/commit/dc421a1efc7e676d4bdf83258483935ab3fb36f9))
+* **tui:** unify pane headers with left-aligned title and right-aligned tabs ([eccbf9e](https://github.com/devbydaniel/tt/commit/eccbf9e11fb2c1d45060481d85ff1450d82956ab))
+* **tui:** use H/L to navigate detail view modes linearly ([cd13999](https://github.com/devbydaniel/tt/commit/cd13999d6af688d4b5638bbc360180b49f92c821))
+* **tui:** use Tab to toggle between tasks and notes views ([5daafa4](https://github.com/devbydaniel/tt/commit/5daafa416e2b210802a3634ef988297f6e99cb98))
+* use pilcrow (¶) as note indicator instead of [n] ([497576f](https://github.com/devbydaniel/tt/commit/497576f8ef8a959b6240adc49e89d1742b9de11c))
+
+
+### Bug Fixes
+
+* resolve lint issues (goimports, gocritic, misspell) ([17dafaf](https://github.com/devbydaniel/tt/commit/17dafafe998103717f624a1320ea3ba95b81a87b))
+* use American spelling 'canceled' to satisfy misspell linter ([b228027](https://github.com/devbydaniel/tt/commit/b2280274c44efdf3380046daefb3660fd7df4f34))
+
 ## [0.4.2](https://github.com/devbydaniel/tt/compare/v0.4.1...v0.4.2) (2026-02-22)
 
 
