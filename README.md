@@ -341,32 +341,32 @@ tt
 
 #### Layout
 
-The TUI has three panes:
+The TUI has three panes with a context-sensitive help bar at the bottom:
 
 - **Sidebar** (left) - Navigate between views (Inbox, Today, Upcoming, Anytime, Someday) and your areas/projects/tags
-- **Task list** (center) - View and manage tasks for the selected filter
-- **Detail pane** (right) - Edit task properties, opens with `Enter` or `l`
+- **Content** (center) - View tasks or notes for the selected filter, toggle with `Tab`
+- **Detail pane** (right) - Inspect and edit the selected task, toggle between data fields and notes with `Tab`
+
+Each pane has a header showing the current view title (left-aligned) and available tabs (right-aligned).
 
 #### Navigation
-
-These keys work throughout the TUI:
 
 | Key | Action |
 |-----|--------|
 | `j/k` or `↑/↓` | Move up/down |
 | `h/l` | Switch panes left/right |
-| `Tab` / `Shift+Tab` | Cycle between sections |
+| `Tab` / `Shift+Tab` | Context-dependent: cycle sidebar sections, toggle Tasks/Notes in content, or cycle detail views |
 | `Enter` | Select / edit field |
 | `Esc` | Go back / close |
 | `q` | Quit |
 
 #### Sidebar
 
-The sidebar has three sections you can cycle through with `Tab`:
+The sidebar has three full-height sections you can cycle through with `Tab`:
 
 1. **Lists** - Inbox, Today, Upcoming, Anytime, Someday
-2. **Scopes** - Your areas and projects (hierarchical)
-3. **Tags** - All tags in use
+2. **Scopes** - Your areas and projects (hierarchical, projects nested under areas)
+3. **Tags** - All tags in use (prefixed with `#`)
 
 **Creating items:**
 - `a` - Add new task (from Lists section), or add new project (from Scopes section)
@@ -387,7 +387,11 @@ The sidebar has three sections you can cycle through with `Tab`:
 | `r` | Rename area |
 | `Backspace` | Delete area |
 
-#### Task List (Content Pane)
+#### Content Pane
+
+The content pane has two views, toggled with `Tab`:
+
+**Tasks view** (default):
 
 | Key | Action |
 |-----|--------|
@@ -399,25 +403,56 @@ The sidebar has three sections you can cycle through with `Tab`:
 | `t` | Edit tags |
 | `s` | Toggle someday/active |
 | `a` | Add new task |
+| `!` | Launch AI sync for selected task |
 | `Backspace` | Delete task |
 | `Enter` or `l` | Open detail pane |
 
+Tasks display inline indicators: `★` for planned today, `⚑` for due/overdue, and `¶` for tasks with notes attached.
+
+**Notes view** (press `Tab`):
+
+Shows scope-level notes for the selected project or area.
+
+| Key | Action |
+|-----|--------|
+| `a` | Create new note |
+| `s` | Search notes with fzf |
+| `Enter` | Open note in `$EDITOR` |
+| `Backspace` | Delete note |
+
 #### Detail Pane
 
-The detail pane shows editable fields for the selected task:
+The detail pane has two view modes, toggled with `Tab`:
+
+**Data view** - Editable fields for the selected task:
 
 - **Title** - Task name
-- **Description** - Multi-line notes
+- **Description** - Multi-line text
 - **Scope** - Project/area assignment
 - **Planned** - Start date
 - **Due** - Due date
 - **Tags** - Associated tags
 
-Navigate with `j/k` and press `Enter` to edit any field.
+Navigate with `j/k` or `Tab`/`Shift+Tab` and press `Enter` to edit any field.
+
+**Notes view** - Notes attached to the selected task:
+
+| Key | Action |
+|-----|--------|
+| `a` | Create new note for this task |
+| `s` | Search notes with fzf |
+| `Enter` | Open note in `$EDITOR` |
+| `Backspace` | Delete note |
+
+#### AI Sync
+
+Press `!` on any task to launch an AI assistant (e.g., Claude Code) with the task's full context — title, description, dates, tags, project, and area. The AI can modify the task using `tt` CLI commands and returns to the TUI when done.
+
+Configure the AI binary in `~/.config/tt/config.toml`.
 
 #### Modals
 
-**Add Task** - Multi-field form. Use `Tab` to move between fields, `Enter` to submit, `Esc` to cancel.
+**Add Task** - Multi-field form. Use `Tab` to move between fields, `Enter` to submit, `Esc` to cancel. Pre-fills scope when invoked from a project/area view.
 
 **Date Picker** - Type natural dates (e.g., `tomorrow`, `+3d`, `friday`) or press `Tab` to switch to a calendar picker. Use arrow keys to navigate the calendar.
 
@@ -426,6 +461,8 @@ Navigate with `j/k` and press `Enter` to edit any field.
 **Tags** - Toggle tags with `Space`, type to filter existing tags or create new ones.
 
 **Description** - Multi-line text editor. Save with `Ctrl+S` or `Alt+Enter`.
+
+**Create Note** - Enter a title and the note opens immediately in `$EDITOR`.
 
 The TUI respects your theme and sort/group settings from the config file.
 
