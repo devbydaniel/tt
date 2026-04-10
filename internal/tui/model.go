@@ -61,6 +61,7 @@ type Model struct {
 	createProjectModal CreateProjectModal
 	createAreaModal    CreateAreaModal
 	createNoteModal    CreateNoteModal
+	helpModal          HelpModal
 
 	help          help.Model
 	focusArea     FocusArea
@@ -104,6 +105,7 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 		createProjectModal: NewCreateProjectModal(styles),
 		createAreaModal:    NewCreateAreaModal(styles),
 		createNoteModal:    NewCreateNoteModal(styles),
+		helpModal:          NewHelpModal(styles),
 
 		help: helpModel,
 	}
@@ -327,9 +329,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Route keys to help modal when active
+		if m.helpModal.Active() {
+			var closed bool
+			m.helpModal, closed = m.helpModal.Update(msg)
+			if closed {
+				return m, nil
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
+
+		case key.Matches(msg, keys.Help):
+			m.helpModal = m.helpModal.SetSize(m.width, m.height-1)
+			m.helpModal = m.helpModal.Open(m.currentHelpBindings())
+			return m, nil
 
 		case key.Matches(msg, keys.Enter):
 			if m.focusArea == FocusSidebar {
@@ -1907,29 +1924,10 @@ func (m Model) View() string {
 		helpView = m.help.View(createAreaKeys)
 	case m.createNoteModal.Active():
 		helpView = m.help.View(createNoteKeys)
-	case m.focusArea == FocusSidebar:
-		if m.getSelectedProject() != nil {
-			helpView = m.help.View(sidebarProjectKeys)
-		} else if m.sidebar.SelectedItem().Type == "area" {
-			helpView = m.help.View(sidebarAreaKeys)
-		} else if m.sidebar.IsScopesSectionActive() {
-			helpView = m.help.View(sidebarScopesKeys)
-		} else {
-			helpView = m.help.View(sidebarKeys)
-		}
-	case m.focusArea == FocusDetail:
-		switch m.detailPane.ViewMode() {
-		case DetailViewNotes:
-			helpView = m.help.View(detailNotesKeys)
-		default:
-			helpView = m.help.View(detailDataKeys)
-		}
+	case m.helpModal.Active():
+		helpView = m.help.View(helpModalKeys)
 	default:
-		if m.content.ViewMode() == ContentViewNotes {
-			helpView = m.help.View(contentNotesKeys)
-		} else {
-			helpView = m.help.View(contentKeys)
-		}
+		helpView = m.help.View(m.currentHelpKeys())
 	}
 	helpView = lipgloss.PlaceHorizontal(m.width, lipgloss.Center, helpView)
 
@@ -1967,6 +1965,9 @@ func (m Model) View() string {
 	if m.createNoteModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.createNoteModal.View(), helpView)
 	}
+	if m.helpModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.helpModal.View(), helpView)
+	}
 	// Render sidebar and content side by side (gap can be 0 for tight layouts)
 	contentView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.content.View())
 	var mainView string
@@ -1981,4 +1982,37 @@ func (m Model) View() string {
 
 	// Combine main view with help bar at the bottom
 	return lipgloss.JoinVertical(lipgloss.Left, mainView, helpView)
+}
+
+// currentHelpKeys returns the help keymap for the current context.
+func (m Model) currentHelpKeys() help.KeyMap {
+	switch {
+	case m.focusArea == FocusSidebar:
+		if m.getSelectedProject() != nil {
+			return sidebarProjectKeys
+		} else if m.sidebar.SelectedItem().Type == "area" {
+			return sidebarAreaKeys
+		} else if m.sidebar.IsScopesSectionActive() {
+			return sidebarScopesKeys
+		}
+		return sidebarKeys
+	case m.focusArea == FocusDetail:
+		switch m.detailPane.ViewMode() {
+		case DetailViewNotes:
+			return detailNotesKeys
+		default:
+			return detailDataKeys
+		}
+	default:
+		if m.content.ViewMode() == ContentViewNotes {
+			return contentNotesKeys
+		}
+		return contentKeys
+	}
+}
+
+// currentHelpBindings returns the key bindings for the current context.
+func (m Model) currentHelpBindings() []key.Binding {
+	km := m.currentHelpKeys()
+	return km.ShortHelp()
 }

@@ -26,6 +26,7 @@ type keyMap struct {
 	AISync       key.Binding
 	NextView     key.Binding
 	PrevView     key.Binding
+	Help         key.Binding
 	Quit         key.Binding
 }
 
@@ -243,6 +244,17 @@ func (k createNoteKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{keys.Enter, keys.Escape}}
 }
 
+// helpModalKeyMap provides help bindings for the help modal
+type helpModalKeyMap struct{}
+
+func (k helpModalKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Escape}
+}
+
+func (k helpModalKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
 // createProjectKeyMap provides help bindings for create project modal
 type createProjectKeyMap struct{}
 
@@ -300,6 +312,7 @@ var (
 	confirmKeys        = confirmKeyMap{}
 	createAreaKeys     = createAreaKeyMap{}
 	createNoteKeys     = createNoteKeyMap{}
+	helpModalKeys      = helpModalKeyMap{}
 	createProjectKeys  = createProjectKeyMap{}
 )
 
@@ -395,6 +408,10 @@ var keys = keyMap{
 	PrevView: key.NewBinding(
 		key.WithKeys("ctrl+k"),
 		key.WithHelp("ctrl+k", "prev view"),
+	),
+	Help: key.NewBinding(
+		key.WithKeys("?"),
+		key.WithHelp("?", "help"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
