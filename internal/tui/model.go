@@ -356,7 +356,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.openDetailFieldModal()
 			}
 
-		case key.Matches(msg, keys.Escape), key.Matches(msg, keys.FocusSidebar):
+		case key.Matches(msg, keys.Escape):
 			if m.focusArea == FocusDetail {
 				// Close detail pane, return to content
 				m.focusArea = FocusContent
@@ -365,6 +365,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.content = m.content.SetShowSelection(false)
 				m.content = m.content.SetFocused(true)
 				m = m.recalculateLayout()
+				return m, nil
+			}
+			if m.focusArea == FocusContent {
+				m.focusArea = FocusSidebar
+				m.sidebar = m.sidebar.SetFocused(true)
+				m.content = m.content.SetShowSelection(false)
+				m.content = m.content.SetFocused(false)
+				m.detailVisible = false
+				m = m.recalculateLayout()
+				return m, nil
+			}
+
+		case key.Matches(msg, keys.FocusSidebar):
+			if m.focusArea == FocusDetail {
+				if m.detailPane.ViewMode() == DetailViewData {
+					// At leftmost view — exit back to content
+					m.focusArea = FocusContent
+					m.detailPane = m.detailPane.SetFocused(false)
+					m.detailVisible = false
+					m.content = m.content.SetShowSelection(false)
+					m.content = m.content.SetFocused(true)
+					m = m.recalculateLayout()
+					return m, nil
+				}
+				m.detailPane = m.detailPane.PrevViewMode()
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
@@ -387,6 +412,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusArea == FocusContent {
 				// l from content opens detail pane
 				return m.openDetailPane()
+			}
+			if m.focusArea == FocusDetail {
+				if m.detailPane.ViewMode() != DetailViewNotes {
+					m.detailPane = m.detailPane.NextViewMode()
+				}
+				return m, nil
 			}
 
 		case key.Matches(msg, keys.Rename):
@@ -550,9 +581,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.AISync):
 			var targetTask *task.Task
-			if m.focusArea == FocusContent {
+			switch m.focusArea {
+			case FocusContent:
 				targetTask = m.content.SelectedTask()
-			} else if m.focusArea == FocusDetail {
+			case FocusDetail:
 				targetTask = m.detailPane.Task()
 			}
 			if targetTask != nil {
