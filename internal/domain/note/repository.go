@@ -170,6 +170,28 @@ func (r *Repository) Create(et EntityType, entityUUID, title, body string) (*Not
 	return &n, nil
 }
 
+// HasNotesByUUIDs checks which entity UUIDs have at least one note file.
+func (r *Repository) HasNotesByUUIDs(et EntityType, uuids []string) (map[string]bool, error) {
+	result := make(map[string]bool)
+	for _, uuid := range uuids {
+		dir := r.EntityDir(et, uuid)
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return nil, err
+		}
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+				result[uuid] = true
+				break
+			}
+		}
+	}
+	return result, nil
+}
+
 // Search scans notes for the given (case-insensitive) query substring.
 //
 // If et is empty, the entire notes tree is searched. Otherwise only notes

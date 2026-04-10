@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/devbydaniel/tt/internal/domain/comment"
+	"github.com/devbydaniel/tt/internal/domain/note"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
@@ -14,6 +15,8 @@ type DetailViewMode int
 const (
 	DetailViewData     DetailViewMode = iota // task fields
 	DetailViewComments                       // full comment list
+	DetailViewNotes                          // notes list
+	detailViewCount                          // sentinel for wrapping
 )
 
 // DetailField represents which field is currently focused in the detail pane
@@ -33,6 +36,8 @@ const (
 type DetailPane struct {
 	task         *task.Task
 	comments     []comment.Comment
+	notes        []note.Note
+	selectedNote int
 	focusedField DetailField
 	viewMode     DetailViewMode
 	width        int
@@ -62,6 +67,8 @@ func (d DetailPane) SetSize(width, height int) DetailPane {
 func (d DetailPane) SetTask(t *task.Task) DetailPane {
 	d.task = t
 	d.comments = nil
+	d.notes = nil
+	d.selectedNote = 0
 	d.focusedField = DetailFieldTitle
 	d.viewMode = DetailViewData
 	return d
@@ -72,13 +79,15 @@ func (d DetailPane) ViewMode() DetailViewMode {
 	return d.viewMode
 }
 
-// ToggleViewMode switches between data and comments views
-func (d DetailPane) ToggleViewMode() DetailPane {
-	if d.viewMode == DetailViewData {
-		d.viewMode = DetailViewComments
-	} else {
-		d.viewMode = DetailViewData
-	}
+// NextViewMode cycles forward through view modes (Data → Comments → Notes → Data)
+func (d DetailPane) NextViewMode() DetailPane {
+	d.viewMode = (d.viewMode + 1) % detailViewCount
+	return d
+}
+
+// PrevViewMode cycles backward through view modes (Data → Notes → Comments → Data)
+func (d DetailPane) PrevViewMode() DetailPane {
+	d.viewMode = (d.viewMode - 1 + detailViewCount) % detailViewCount
 	return d
 }
 
@@ -86,6 +95,37 @@ func (d DetailPane) ToggleViewMode() DetailPane {
 func (d DetailPane) SetComments(comments []comment.Comment) DetailPane {
 	d.comments = comments
 	return d
+}
+
+// SetNotes sets the notes to display
+func (d DetailPane) SetNotes(notes []note.Note) DetailPane {
+	d.notes = notes
+	d.selectedNote = 0
+	return d
+}
+
+// NextNote moves to the next note in the list
+func (d DetailPane) NextNote() DetailPane {
+	if len(d.notes) > 0 {
+		d.selectedNote = (d.selectedNote + 1) % len(d.notes)
+	}
+	return d
+}
+
+// PrevNote moves to the previous note in the list
+func (d DetailPane) PrevNote() DetailPane {
+	if len(d.notes) > 0 {
+		d.selectedNote = (d.selectedNote - 1 + len(d.notes)) % len(d.notes)
+	}
+	return d
+}
+
+// SelectedNote returns the currently selected note, or nil if none
+func (d DetailPane) SelectedNote() *note.Note {
+	if len(d.notes) == 0 {
+		return nil
+	}
+	return &d.notes[d.selectedNote]
 }
 
 // SetFocused sets whether the detail pane has focus
@@ -111,8 +151,8 @@ func (d DetailPane) FocusedField() DetailField {
 
 // NextField moves to the next field
 func (d DetailPane) NextField() DetailPane {
-	if d.viewMode == DetailViewComments {
-		return d // no field navigation in comments view
+	if d.viewMode != DetailViewData {
+		return d // no field navigation outside data view
 	}
 	d.focusedField = (d.focusedField + 1) % detailFieldCount
 	return d
@@ -120,8 +160,8 @@ func (d DetailPane) NextField() DetailPane {
 
 // PrevField moves to the previous field
 func (d DetailPane) PrevField() DetailPane {
-	if d.viewMode == DetailViewComments {
-		return d // no field navigation in comments view
+	if d.viewMode != DetailViewData {
+		return d // no field navigation outside data view
 	}
 	d.focusedField = (d.focusedField - 1 + detailFieldCount) % detailFieldCount
 	return d
@@ -135,17 +175,25 @@ func (d DetailPane) View() string {
 
 	// View indicator in the title
 	theme := d.styles.Theme
-	var title string
-	if d.viewMode == DetailViewData {
-		title = theme.Accent.Render("Data") + theme.Muted.Render(" · Comments")
-	} else {
-		title = theme.Muted.Render("Data · ") + theme.Accent.Render("Comments")
+	labels := [3]string{"Data", "Comments", "Notes"}
+	var parts [3]string
+	for i, label := range labels {
+		if DetailViewMode(i) == d.viewMode {
+			parts[i] = theme.Accent.Render(label)
+		} else {
+			parts[i] = theme.Muted.Render(label)
+		}
 	}
+	sep := theme.Muted.Render(" · ")
+	title := parts[0] + sep + parts[1] + sep + parts[2]
 
 	var content string
-	if d.viewMode == DetailViewComments {
+	switch d.viewMode {
+	case DetailViewComments:
 		content = d.buildCommentsView()
-	} else {
+	case DetailViewNotes:
+		content = d.buildNotesView()
+	default:
 		content = d.buildContent()
 	}
 
@@ -315,6 +363,40 @@ func (d DetailPane) renderField(field DetailField, label, value string) string {
 	content := fmt.Sprintf("%s%s\n    %s", prefix, labelStr, valueStr)
 
 	return content
+}
+
+// buildNotesView renders the notes list with selection indicator
+func (d DetailPane) buildNotesView() string {
+	theme := d.styles.Theme
+
+	if len(d.notes) == 0 {
+		return theme.Muted.Render("  No notes yet.")
+	}
+
+	maxWidth := d.width - 8
+	if maxWidth < 10 {
+		maxWidth = 10
+	}
+
+	var lines []string
+	for i, n := range d.notes {
+		prefix := "  "
+		if d.focused && i == d.selectedNote {
+			prefix = d.styles.SelectedItem.Render("> ")
+		}
+		date := n.Date.Format("Jan 2, 2006")
+		entry := date + "  " + n.Title
+		if len(entry) > maxWidth {
+			entry = entry[:maxWidth-3] + "..."
+		}
+		if d.focused && i == d.selectedNote {
+			lines = append(lines, prefix+theme.Accent.Render(entry))
+		} else {
+			lines = append(lines, prefix+entry)
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // HasTask returns true if a task is set

@@ -450,6 +450,12 @@ func (c Content) renderTaskRow(t *task.Task, index int) string {
 	if len(t.Tags) > 0 {
 		extras = append(extras, theme.Muted.Render(c.formatTags(t.Tags)))
 	}
+	if t.HasComments {
+		extras = append(extras, theme.Muted.Render(theme.Icons.Comment))
+	}
+	if t.HasNotes {
+		extras = append(extras, theme.Muted.Render(theme.Icons.Note))
+	}
 
 	// Build row
 	parts := []string{prefix + id}
@@ -518,6 +524,12 @@ func (c Content) renderProjectHeaderLine(t *task.Task, index int) string {
 	}
 	if len(t.Tags) > 0 {
 		parts = append(parts, theme.Muted.Render(c.formatTags(t.Tags)))
+	}
+	if t.HasComments {
+		parts = append(parts, theme.Muted.Render(theme.Icons.Comment))
+	}
+	if t.HasNotes {
+		parts = append(parts, theme.Muted.Render(theme.Icons.Note))
 	}
 
 	row := strings.Join(parts, "  ")

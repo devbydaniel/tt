@@ -1,6 +1,7 @@
 package comment
 
 import (
+	"strings"
 	"time"
 
 	"github.com/devbydaniel/tt/internal/database"
@@ -59,6 +60,37 @@ func (r *Repository) ListByTask(taskID int64) ([]Comment, error) {
 	}
 
 	return comments, rows.Err()
+}
+
+// HasCommentsByTaskIDs returns a set of task IDs that have at least one comment.
+func (r *Repository) HasCommentsByTaskIDs(taskIDs []int64) (map[int64]bool, error) {
+	if len(taskIDs) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(taskIDs))
+	args := make([]interface{}, len(taskIDs))
+	for i, id := range taskIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := `SELECT DISTINCT task_id FROM comments WHERE task_id IN (` + strings.Join(placeholders, ",") + `)`
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int64]bool)
+	for rows.Next() {
+		var taskID int64
+		if err := rows.Scan(&taskID); err != nil {
+			return nil, err
+		}
+		result[taskID] = true
+	}
+	return result, rows.Err()
 }
 
 func (r *Repository) Delete(id int64) error {

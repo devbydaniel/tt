@@ -102,6 +102,9 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				if err != nil {
 					return err
 				}
+				if err := deps.App.EnrichIndicators.Execute(tasks); err != nil {
+					return err
+				}
 				return output.WriteJSON(os.Stdout, tasks)
 			}
 
@@ -130,6 +133,9 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 						return err
 					}
 					if len(tasks) > 0 {
+						if err := deps.App.EnrichIndicators.Execute(tasks); err != nil {
+							return err
+						}
 						fmt.Fprintln(os.Stdout, deps.Theme.Header.Render(sched.name))
 						formatter.TaskList(tasks)
 					}
@@ -147,6 +153,9 @@ func NewListCmd(deps *Dependencies) *cobra.Command {
 				Schedule:    schedule,
 			})
 			if err != nil {
+				return err
+			}
+			if err := deps.App.EnrichIndicators.Execute(tasks); err != nil {
 				return err
 			}
 			formatter.GroupedTaskList(tasks, groupBy)

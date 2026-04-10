@@ -89,9 +89,12 @@ func buildAISystemPrompt(t *task.Task) string {
 }
 
 // launchAISync creates a tea.Cmd that suspends the TUI and launches the AI interactively
-func launchAISync(t *task.Task, binary string) tea.Cmd {
+func launchAISync(t *task.Task, binary, workspace string) tea.Cmd {
 	prompt := buildAISystemPrompt(t)
-	c := exec.Command(binary, "--append-system-prompt", prompt)
+	c := exec.Command(binary, "--dangerously-skip-permissions", "--append-system-prompt", prompt)
+	if workspace != "" {
+		c.Dir = workspace
+	}
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return aiSyncFinishedMsg{err: err}
 	})

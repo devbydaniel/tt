@@ -154,6 +154,7 @@ func (k detailDataKeyMap) ShortHelp() []key.Binding {
 		keys.Down,
 		keys.Enter,
 		keys.NextView,
+		keys.AISync,
 		keys.Escape,
 	}
 }
@@ -169,11 +170,31 @@ func (k detailCommentsKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		keys.AddComment,
 		keys.PrevView,
+		keys.AISync,
 		keys.Escape,
 	}
 }
 
 func (k detailCommentsKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
+// detailNotesKeyMap provides help bindings when detail pane notes view is focused
+type detailNotesKeyMap struct{}
+
+func (k detailNotesKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		keys.Up,
+		keys.Down,
+		keys.Enter,
+		keys.NextView,
+		keys.PrevView,
+		keys.AISync,
+		keys.Escape,
+	}
+}
+
+func (k detailNotesKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
@@ -281,6 +302,7 @@ var (
 	addKeys            = addKeyMap{}
 	detailDataKeys     = detailDataKeyMap{}
 	detailCommentsKeys = detailCommentsKeyMap{}
+	detailNotesKeys    = detailNotesKeyMap{}
 	commentKeys        = commentKeyMap{}
 	descriptionKeys    = descriptionKeyMap{}
 	confirmKeys        = confirmKeyMap{}

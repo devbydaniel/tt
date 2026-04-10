@@ -74,6 +74,9 @@ type App struct {
 	// Comment use cases
 	AddComment   *commentusecases.AddComment
 	ListComments *commentusecases.ListComments
+
+	// Cross-domain enrichment
+	EnrichIndicators *taskusecases.EnrichIndicators
 }
 
 // SyncConfig holds sync configuration.
@@ -403,5 +406,11 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig, notesDir string)
 			TaskLookup: getTask,
 		},
 		ListComments: &commentusecases.ListComments{Repo: commentRepo},
+
+		// Cross-domain enrichment
+		EnrichIndicators: &taskusecases.EnrichIndicators{
+			CommentChecker: commentRepo,
+			NoteChecker:    noteRepo,
+		},
 	}
 }

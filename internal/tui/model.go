@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/comment"
 	commentusecases "github.com/devbydaniel/tt/internal/domain/comment/usecases"
+	"github.com/devbydaniel/tt/internal/domain/note"
+	noteusecases "github.com/devbydaniel/tt/internal/domain/note/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	taskusecases "github.com/devbydaniel/tt/internal/domain/task/usecases"
 	"github.com/devbydaniel/tt/internal/output"
@@ -195,6 +199,9 @@ func (m Model) loadData() tea.Msg {
 	if err != nil {
 		return loadDataMsg{err: err}
 	}
+	if err := m.app.EnrichIndicators.Execute(tasks); err != nil {
+		return loadDataMsg{err: err}
+	}
 
 	return loadDataMsg{
 		areas:    areas,
@@ -338,6 +345,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.openDetailPane()
 			}
 			if m.focusArea == FocusDetail {
+				if m.detailPane.ViewMode() == DetailViewNotes {
+					if n := m.detailPane.SelectedNote(); n != nil {
+						t := m.detailPane.Task()
+						return m, m.openNoteInEditor(n.Path, t.ID, t.UUID)
+					}
+					return m, nil
+				}
 				// Open modal for focused field
 				return m.openDetailFieldModal()
 			}
@@ -514,9 +528,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case key.Matches(msg, keys.NextView), key.Matches(msg, keys.PrevView):
+		case key.Matches(msg, keys.NextView):
 			if m.focusArea == FocusDetail {
-				m.detailPane = m.detailPane.ToggleViewMode()
+				m.detailPane = m.detailPane.NextViewMode()
+				return m, nil
+			}
+		case key.Matches(msg, keys.PrevView):
+			if m.focusArea == FocusDetail {
+				m.detailPane = m.detailPane.PrevViewMode()
 				return m, nil
 			}
 
@@ -530,15 +549,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.AISync):
+			var targetTask *task.Task
 			if m.focusArea == FocusContent {
-				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
-					binary, err := findAIBinary(&m.config.AI)
-					if err != nil {
-						m.err = err
-						return m, nil
-					}
-					return m, launchAISync(selectedTask, binary)
+				targetTask = m.content.SelectedTask()
+			} else if m.focusArea == FocusDetail {
+				targetTask = m.detailPane.Task()
+			}
+			if targetTask != nil {
+				binary, err := findAIBinary(&m.config.AI)
+				if err != nil {
+					m.err = err
+					return m, nil
 				}
+				return m, launchAISync(targetTask, binary, m.config.AI.Workspace)
 			}
 
 		case key.Matches(msg, keys.Delete):
@@ -583,7 +606,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.Up):
 			if m.focusArea == FocusDetail {
-				m.detailPane = m.detailPane.PrevField()
+				if m.detailPane.ViewMode() == DetailViewNotes {
+					m.detailPane = m.detailPane.PrevNote()
+				} else {
+					m.detailPane = m.detailPane.PrevField()
+				}
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
@@ -595,7 +622,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.Down):
 			if m.focusArea == FocusDetail {
-				m.detailPane = m.detailPane.NextField()
+				if m.detailPane.ViewMode() == DetailViewNotes {
+					m.detailPane = m.detailPane.NextNote()
+				} else {
+					m.detailPane = m.detailPane.NextField()
+				}
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
@@ -912,6 +943,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detailPane = m.detailPane.SetComments(msg.comments)
 		}
 		return m, nil
+
+	case notesLoadedMsg:
+		if msg.err != nil {
+			return m, nil // silently ignore note load errors
+		}
+		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.taskID {
+			m.detailPane = m.detailPane.SetNotes(msg.notes)
+		}
+		return m, nil
+
+	case noteEditorFinishedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		// Reload notes after editor closes (user may have edited/saved)
+		return m, m.loadNotes(msg.taskUUID, msg.taskID)
 	}
 
 	return m, nil
@@ -1089,6 +1137,9 @@ func (m Model) loadTasksForSelection() tea.Msg {
 	if err != nil {
 		return tasksLoadedMsg{err: err}
 	}
+	if err := m.app.EnrichIndicators.Execute(tasks); err != nil {
+		return tasksLoadedMsg{err: err}
+	}
 
 	return tasksLoadedMsg{tasks: tasks, title: title, groupBy: groupBy, hideScope: hideScope}
 }
@@ -1132,6 +1183,9 @@ func (m Model) loadScheduleGroups(item SidebarItem, title string, sortOpts []tas
 
 		tasks, err := m.app.ListTasks.Execute(opts)
 		if err != nil {
+			return scheduleTasksLoadedMsg{err: err}
+		}
+		if err := m.app.EnrichIndicators.Execute(tasks); err != nil {
 			return scheduleTasksLoadedMsg{err: err}
 		}
 		*sched.target = tasks
@@ -1355,7 +1409,10 @@ func (m Model) openDetailPane() (tea.Model, tea.Cmd) {
 	// Recalculate layout for three-column mode
 	m = m.recalculateLayout()
 
-	return m, m.loadComments(selectedTask.ID)
+	return m, tea.Batch(
+		m.loadComments(selectedTask.ID),
+		m.loadNotes(selectedTask.UUID, selectedTask.ID),
+	)
 }
 
 // recalculateLayout recalculates component sizes based on current state
@@ -1501,6 +1558,9 @@ func (m Model) loadDataAfterTagUpdate() tea.Msg {
 	if err != nil {
 		return loadDataMsg{err: err}
 	}
+	if err := m.app.EnrichIndicators.Execute(tasks); err != nil {
+		return loadDataMsg{err: err}
+	}
 
 	// Return combined update
 	return tagsAndTasksUpdatedMsg{
@@ -1551,6 +1611,47 @@ func (m Model) loadComments(taskID int64) tea.Cmd {
 		comments, err := m.app.ListComments.Execute(taskID)
 		return commentsLoadedMsg{taskID: taskID, comments: comments, err: err}
 	}
+}
+
+// notesLoadedMsg carries loaded notes for the detail pane
+type notesLoadedMsg struct {
+	taskID int64
+	notes  []note.Note
+	err    error
+}
+
+// noteEditorFinishedMsg is sent when the editor closes after editing a note
+type noteEditorFinishedMsg struct {
+	taskID   int64
+	taskUUID string
+	err      error
+}
+
+// loadNotes fetches notes for a task
+func (m Model) loadNotes(taskUUID string, taskID int64) tea.Cmd {
+	return func() tea.Msg {
+		notes, err := m.app.ListNotes.Execute(noteusecases.ListOptions{
+			EntityType: note.EntityTask,
+			EntityUUID: taskUUID,
+		})
+		return notesLoadedMsg{taskID: taskID, notes: notes, err: err}
+	}
+}
+
+// openNoteInEditor launches $EDITOR for the given note path
+func (m Model) openNoteInEditor(path string, taskID int64, taskUUID string) tea.Cmd {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		editor = "vi"
+	}
+	fields := strings.Fields(editor)
+	c := exec.Command(fields[0], append(fields[1:], path)...)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return noteEditorFinishedMsg{taskID: taskID, taskUUID: taskUUID, err: err}
+	})
 }
 
 // addComment creates a comment and reloads the comment list
@@ -1617,9 +1718,12 @@ func (m Model) View() string {
 			helpView = m.help.View(sidebarKeys)
 		}
 	case m.focusArea == FocusDetail:
-		if m.detailPane.ViewMode() == DetailViewComments {
+		switch m.detailPane.ViewMode() {
+		case DetailViewComments:
 			helpView = m.help.View(detailCommentsKeys)
-		} else {
+		case DetailViewNotes:
+			helpView = m.help.View(detailNotesKeys)
+		default:
 			helpView = m.help.View(detailDataKeys)
 		}
 	default:

@@ -25,6 +25,8 @@ type Icons struct {
 	Due     string
 	Date    string
 	Done    string
+	Comment string
+	Note    string
 }
 
 // themeColors holds the raw color values for a theme preset
@@ -141,6 +143,8 @@ func DefaultTheme() *Theme {
 			Due:     "⚑",
 			Date:    "›",
 			Done:    "✓",
+			Comment: "[c]",
+			Note:    "[n]",
 		},
 	}
 }
@@ -203,6 +207,12 @@ func NewTheme(cfg *config.ThemeConfig) *Theme {
 	}
 	if cfg.Icons.Done != "" {
 		theme.Icons.Done = cfg.Icons.Done
+	}
+	if cfg.Icons.Comment != "" {
+		theme.Icons.Comment = cfg.Icons.Comment
+	}
+	if cfg.Icons.Note != "" {
+		theme.Icons.Note = cfg.Icons.Note
 	}
 
 	return theme

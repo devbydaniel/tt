@@ -23,8 +23,9 @@ type SyncConfig struct {
 
 // AIConfig holds configuration for AI assistant integration
 type AIConfig struct {
-	Provider string `toml:"provider"` // AI provider name (e.g., "claude")
-	Binary   string `toml:"binary"`   // binary name or path (e.g., "claude")
+	Provider  string `toml:"provider"`  // AI provider name (e.g., "claude")
+	Binary    string `toml:"binary"`    // binary name or path (e.g., "claude")
+	Workspace string `toml:"workspace"` // working directory for AI binary (empty = inherit cwd)
 }
 
 type Config struct {
@@ -69,6 +70,8 @@ type IconConfig struct {
 	Due     string `toml:"due"`     // indicator for due/overdue tasks (default: ⚑)
 	Date    string `toml:"date"`    // prefix for planned dates (default: 📅)
 	Done    string `toml:"done"`    // indicator for completed tasks (default: ✓)
+	Comment string `toml:"comment"` // indicator for tasks with comments (default: 💬)
+	Note    string `toml:"note"`    // indicator for tasks with notes (default: 📝)
 }
 
 // GetSort returns the sort setting for a list view.
@@ -329,5 +332,8 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if cfg.AI.Binary == "" {
 		cfg.AI.Binary = "claude"
+	}
+	if cfg.AI.Workspace != "" {
+		cfg.AI.Workspace = expandTilde(cfg.AI.Workspace)
 	}
 }
