@@ -170,6 +170,16 @@ func (r *Repository) Create(et EntityType, entityUUID, title, body string) (*Not
 	return &n, nil
 }
 
+// Delete removes a note file from disk.
+func (r *Repository) Delete(path string) error {
+	// Sanity check: the path must live under our root directory.
+	rel, err := filepath.Rel(r.root, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return fmt.Errorf("path %q is outside notes directory", path)
+	}
+	return os.Remove(path)
+}
+
 // HasNotesByUUIDs checks which entity UUIDs have at least one note file.
 func (r *Repository) HasNotesByUUIDs(et EntityType, uuids []string) (map[string]bool, error) {
 	result := make(map[string]bool)

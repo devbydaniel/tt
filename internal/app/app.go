@@ -67,6 +67,7 @@ type App struct {
 	// Note use cases (filesystem-backed, no DB)
 	ListNotes   *noteusecases.ListNotes
 	CreateNote  *noteusecases.CreateNote
+	DeleteNote  *noteusecases.DeleteNote
 	SearchNotes *noteusecases.SearchNotes
 
 	// Cross-domain enrichment
@@ -391,6 +392,7 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig, notesDir string)
 		// Notes
 		ListNotes:   &noteusecases.ListNotes{Repo: noteRepo},
 		CreateNote:  &noteusecases.CreateNote{Repo: noteRepo},
+		DeleteNote:  &noteusecases.DeleteNote{Repo: noteRepo},
 		SearchNotes: &noteusecases.SearchNotes{Repo: noteRepo},
 
 		// Cross-domain enrichment

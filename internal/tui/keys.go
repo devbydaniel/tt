@@ -170,6 +170,8 @@ func (k detailNotesKeyMap) ShortHelp() []key.Binding {
 		keys.Up,
 		keys.Down,
 		keys.Enter,
+		keys.Add,
+		keys.Delete,
 		keys.Tab,
 		keys.AISync,
 		keys.Escape,
@@ -184,7 +186,7 @@ func (k detailNotesKeyMap) FullHelp() [][]key.Binding {
 type contentNotesKeyMap struct{}
 
 func (k contentNotesKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.Tab, keys.FocusSidebar, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.Add, keys.Delete, keys.Tab, keys.FocusSidebar, keys.Quit}
 }
 
 func (k contentNotesKeyMap) FullHelp() [][]key.Binding {
@@ -225,6 +227,17 @@ func (k createAreaKeyMap) ShortHelp() []key.Binding {
 }
 
 func (k createAreaKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{keys.Enter, keys.Escape}}
+}
+
+// createNoteKeyMap provides help bindings for create note modal
+type createNoteKeyMap struct{}
+
+func (k createNoteKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Enter, keys.Escape}
+}
+
+func (k createNoteKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{keys.Enter, keys.Escape}}
 }
 
@@ -284,6 +297,7 @@ var (
 	descriptionKeys = descriptionKeyMap{}
 	confirmKeys        = confirmKeyMap{}
 	createAreaKeys     = createAreaKeyMap{}
+	createNoteKeys     = createNoteKeyMap{}
 	createProjectKeys  = createProjectKeyMap{}
 )
 

@@ -60,6 +60,7 @@ type Model struct {
 	completeModal      CompleteModal
 	createProjectModal CreateProjectModal
 	createAreaModal    CreateAreaModal
+	createNoteModal    CreateNoteModal
 
 	help               help.Model
 	focusArea          FocusArea
@@ -102,6 +103,7 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 		completeModal:      NewCompleteModal(styles),
 		createProjectModal: NewCreateProjectModal(styles),
 		createAreaModal:    NewCreateAreaModal(styles),
+		createNoteModal:    NewCreateNoteModal(styles),
 
 		help:               helpModel,
 	}
@@ -315,6 +317,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Route keys to create note modal when active
+		if m.createNoteModal.Active() {
+			var result *CreateNoteResult
+			m.createNoteModal, result = m.createNoteModal.Update(msg)
+			if result != nil && !result.Canceled {
+				return m, m.createAndOpenNote(result)
+			}
+			return m, nil
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -494,6 +506,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.Add):
+			// In content notes view, open create note modal for scope
+			if m.focusArea == FocusContent && m.content.ViewMode() == ContentViewNotes {
+				entityType, entityUUID := m.resolveScopeEntity()
+				if entityUUID != "" {
+					m.createNoteModal = m.createNoteModal.SetSize(m.width, m.height-1)
+					m.createNoteModal = m.createNoteModal.Open(entityType, entityUUID, 0)
+					return m, nil
+				}
+			}
+			// In detail notes view, open create note modal for task
+			if m.focusArea == FocusDetail && m.detailPane.ViewMode() == DetailViewNotes {
+				if t := m.detailPane.Task(); t != nil {
+					entityType := note.EntityTask
+					if t.TaskType == task.TaskTypeProject {
+						entityType = note.EntityProject
+					}
+					m.createNoteModal = m.createNoteModal.SetSize(m.width, m.height-1)
+					m.createNoteModal = m.createNoteModal.Open(entityType, t.UUID, t.ID)
+					return m, nil
+				}
+			}
 			// If sidebar is focused and scopes section is active, open create project modal
 			if m.focusArea == FocusSidebar && m.sidebar.IsScopesSectionActive() {
 				m.createProjectModal = m.createProjectModal.SetSize(m.width, m.height-1)
@@ -562,6 +595,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.Delete):
+			// In content notes view, delete the selected note
+			if m.focusArea == FocusContent && m.content.ViewMode() == ContentViewNotes {
+				if n := m.content.SelectedNote(); n != nil {
+					m.confirmModal = m.confirmModal.SetSize(m.width, m.height-1)
+					m.confirmModal = m.confirmModal.OpenForNote(n.Title, n.Path)
+					return m, nil
+				}
+			}
+			// In detail notes view, delete the selected note
+			if m.focusArea == FocusDetail && m.detailPane.ViewMode() == DetailViewNotes {
+				if n := m.detailPane.SelectedNote(); n != nil {
+					m.confirmModal = m.confirmModal.SetSize(m.width, m.height-1)
+					m.confirmModal = m.confirmModal.OpenForNote(n.Title, n.Path)
+					return m, nil
+				}
+			}
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
 					m.confirmModal = m.confirmModal.SetSize(m.width, m.height-1)
@@ -940,7 +989,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.content = m.content.SetFocused(true)
 			m = m.recalculateLayout()
 		}
-		// Reload data - for areas/projects reload everything, for tasks just reload task list
+		// Reload data based on what was deleted
+		if msg.target == DeleteTargetNote {
+			// Reload notes for the current view
+			if m.focusArea == FocusDetail || (m.detailVisible && m.detailPane.Task() != nil) {
+				t := m.detailPane.Task()
+				return m, m.loadNotes(t.UUID, t.ID)
+			}
+			return m, m.loadScopeNotes()
+		}
 		if msg.target == DeleteTargetArea || msg.target == DeleteTargetProject {
 			return m, m.loadData
 		}
@@ -990,6 +1047,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, m.loadScopeNotes()
+
+	case noteCreatedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		if msg.taskID != 0 {
+			return m, m.openNoteInEditor(msg.note.Path, msg.taskID, msg.entityUUID)
+		}
+		return m, m.openScopeNoteInEditor(msg.note.Path)
 	}
 
 	return m, nil
@@ -1412,6 +1479,8 @@ func (m Model) deleteItem(result *ConfirmResult) tea.Cmd {
 			_, err = m.app.DeleteTasks.Execute([]int64{result.TargetID})
 		case DeleteTargetArea:
 			_, err = m.app.DeleteArea.Execute(result.TargetName)
+		case DeleteTargetNote:
+			err = m.app.DeleteNote.Execute(result.TargetPath)
 		}
 		return itemDeletedMsg{
 			target:     result.Target,
@@ -1661,33 +1730,29 @@ type scopeNoteEditorFinishedMsg struct {
 	err error
 }
 
-// loadScopeNotes fetches notes for the selected project or area
-func (m Model) loadScopeNotes() tea.Cmd {
+// resolveScopeEntity returns the entity type and UUID for the selected sidebar scope
+func (m Model) resolveScopeEntity() (note.EntityType, string) {
 	item := m.sidebar.SelectedItem()
-	var entityType note.EntityType
-	var entityUUID string
-
 	switch item.Type {
 	case "project":
-		entityType = note.EntityProject
 		for _, p := range m.projects {
 			if p.Title == item.Key {
-				entityUUID = p.UUID
-				break
+				return note.EntityProject, p.UUID
 			}
 		}
 	case "area":
-		entityType = note.EntityArea
 		for _, a := range m.areas {
 			if a.Name == item.Key {
-				entityUUID = a.UUID
-				break
+				return note.EntityArea, a.UUID
 			}
 		}
-	default:
-		return nil
 	}
+	return "", ""
+}
 
+// loadScopeNotes fetches notes for the selected project or area
+func (m Model) loadScopeNotes() tea.Cmd {
+	entityType, entityUUID := m.resolveScopeEntity()
 	if entityUUID == "" {
 		return nil
 	}
@@ -1698,6 +1763,31 @@ func (m Model) loadScopeNotes() tea.Cmd {
 			EntityUUID: entityUUID,
 		})
 		return scopeNotesLoadedMsg{notes: notes, err: err}
+	}
+}
+
+// noteCreatedMsg is sent after a note is created from the modal
+type noteCreatedMsg struct {
+	note       *note.Note
+	taskID     int64
+	entityUUID string
+	err        error
+}
+
+// createAndOpenNote creates a note and then opens it in the editor
+func (m Model) createAndOpenNote(result *CreateNoteResult) tea.Cmd {
+	return func() tea.Msg {
+		created, err := m.app.CreateNote.Execute(noteusecases.CreateOptions{
+			EntityType: result.EntityType,
+			EntityUUID: result.EntityUUID,
+			Title:      result.Title,
+		})
+		return noteCreatedMsg{
+			note:       created,
+			taskID:     result.TaskID,
+			entityUUID: result.EntityUUID,
+			err:        err,
+		}
 	}
 }
 
@@ -1774,6 +1864,8 @@ func (m Model) View() string {
 		helpView = m.help.View(createProjectKeys)
 	case m.createAreaModal.Active():
 		helpView = m.help.View(createAreaKeys)
+	case m.createNoteModal.Active():
+		helpView = m.help.View(createNoteKeys)
 	case m.focusArea == FocusSidebar:
 		if m.getSelectedProject() != nil {
 			helpView = m.help.View(sidebarProjectKeys)
@@ -1830,6 +1922,9 @@ func (m Model) View() string {
 	}
 	if m.createAreaModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.createAreaModal.View(), helpView)
+	}
+	if m.createNoteModal.Active() {
+		return lipgloss.JoinVertical(lipgloss.Left, m.createNoteModal.View(), helpView)
 	}
 	// Render sidebar and content side by side (gap can be 0 for tight layouts)
 	contentView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.content.View())

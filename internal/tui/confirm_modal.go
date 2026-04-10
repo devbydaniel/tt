@@ -12,6 +12,7 @@ const (
 	DeleteTargetTask DeleteTarget = iota
 	DeleteTargetProject
 	DeleteTargetArea
+	DeleteTargetNote
 )
 
 // ConfirmModal handles delete confirmation
@@ -20,6 +21,7 @@ type ConfirmModal struct {
 	target     DeleteTarget
 	targetID   int64  // Task/Project ID (for tasks and projects)
 	targetName string // Display name for confirmation message
+	targetPath string // File path (for notes)
 	styles     *Styles
 	width      int
 	height     int
@@ -31,6 +33,7 @@ type ConfirmResult struct {
 	Target     DeleteTarget
 	TargetID   int64
 	TargetName string
+	TargetPath string // File path (for notes)
 }
 
 // NewConfirmModal creates a new confirmation modal
@@ -67,6 +70,16 @@ func (m ConfirmModal) OpenForArea(name string) ConfirmModal {
 	return m
 }
 
+// OpenForNote shows the modal for deleting a note
+func (m ConfirmModal) OpenForNote(title, path string) ConfirmModal {
+	m.active = true
+	m.target = DeleteTargetNote
+	m.targetID = 0
+	m.targetName = title
+	m.targetPath = path
+	return m
+}
+
 // Close hides the modal
 func (m ConfirmModal) Close() ConfirmModal {
 	m.active = false
@@ -99,6 +112,7 @@ func (m ConfirmModal) Update(msg tea.Msg) (ConfirmModal, *ConfirmResult) {
 				Target:     m.target,
 				TargetID:   m.targetID,
 				TargetName: m.targetName,
+				TargetPath: m.targetPath,
 			}
 			m = m.Close()
 			return m, result
@@ -126,6 +140,9 @@ func (m ConfirmModal) View() string {
 	case DeleteTargetArea:
 		title = "Delete Area"
 		itemType = "area"
+	case DeleteTargetNote:
+		title = "Delete Note"
+		itemType = "note"
 	}
 
 	titleLine := m.styles.ModalTitle.Render(title)
