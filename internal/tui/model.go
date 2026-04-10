@@ -1986,8 +1986,8 @@ func (m Model) View() string {
 
 // currentHelpKeys returns the help keymap for the current context.
 func (m Model) currentHelpKeys() help.KeyMap {
-	switch {
-	case m.focusArea == FocusSidebar:
+	switch m.focusArea {
+	case FocusSidebar:
 		if m.getSelectedProject() != nil {
 			return sidebarProjectKeys
 		} else if m.sidebar.SelectedItem().Type == "area" {
@@ -1996,7 +1996,7 @@ func (m Model) currentHelpKeys() help.KeyMap {
 			return sidebarScopesKeys
 		}
 		return sidebarKeys
-	case m.focusArea == FocusDetail:
+	case FocusDetail:
 		switch m.detailPane.ViewMode() {
 		case DetailViewNotes:
 			return detailNotesKeys
