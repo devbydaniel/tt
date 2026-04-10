@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/devbydaniel/tt/config"
+	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
@@ -57,9 +58,67 @@ func buildAISystemPrompt(t *task.Task) string {
 	return b.String()
 }
 
+// buildProjectAISystemPrompt constructs the system prompt for a project
+func buildProjectAISystemPrompt(p *task.Task) string {
+	var b strings.Builder
+
+	b.WriteString("You have been activated through the TT Task Management CLI.\n\n")
+	fmt.Fprintf(&b, "Context: Project #%d — %s\n", p.ID, p.Title)
+
+	if p.Description != nil && *p.Description != "" {
+		fmt.Fprintf(&b, "Description: %s\n", *p.Description)
+	}
+	fmt.Fprintf(&b, "Status: %s | State: %s\n", p.Status, p.State)
+	if p.AreaName != nil {
+		fmt.Fprintf(&b, "Area: %s\n", *p.AreaName)
+	}
+	if p.PlannedDate != nil {
+		fmt.Fprintf(&b, "Planned: %s\n", p.PlannedDate.Format("Jan 2, 2006"))
+	}
+	if p.DueDate != nil {
+		fmt.Fprintf(&b, "Due: %s\n", p.DueDate.Format("Jan 2, 2006"))
+	}
+	if len(p.Tags) > 0 {
+		fmt.Fprintf(&b, "Tags: %s\n", strings.Join(p.Tags, ", "))
+	}
+
+	b.WriteString("\nUse `tt --help` and `tt <command> --help` to discover available CLI commands for interacting with tasks, projects, areas, notes, and more.\n")
+
+	return b.String()
+}
+
+// buildAreaAISystemPrompt constructs the system prompt for an area
+func buildAreaAISystemPrompt(a *area.Area) string {
+	var b strings.Builder
+
+	b.WriteString("You have been activated through the TT Task Management CLI.\n\n")
+	fmt.Fprintf(&b, "Context: Area — %s\n", a.Name)
+
+	b.WriteString("\nUse `tt --help` and `tt <command> --help` to discover available CLI commands for interacting with tasks, projects, areas, notes, and more.\n")
+
+	return b.String()
+}
+
 // launchAISync creates a tea.Cmd that suspends the TUI and launches the AI interactively
 func launchAISync(t *task.Task, binary, workspace string) tea.Cmd {
 	prompt := buildAISystemPrompt(t)
+	return launchAISyncWithPrompt(prompt, binary, workspace)
+}
+
+// launchAISyncForProject launches AI with project context
+func launchAISyncForProject(p *task.Task, binary, workspace string) tea.Cmd {
+	prompt := buildProjectAISystemPrompt(p)
+	return launchAISyncWithPrompt(prompt, binary, workspace)
+}
+
+// launchAISyncForArea launches AI with area context
+func launchAISyncForArea(a *area.Area, binary, workspace string) tea.Cmd {
+	prompt := buildAreaAISystemPrompt(a)
+	return launchAISyncWithPrompt(prompt, binary, workspace)
+}
+
+// launchAISyncWithPrompt creates a tea.Cmd that suspends the TUI and launches the AI with the given prompt
+func launchAISyncWithPrompt(prompt, binary, workspace string) tea.Cmd {
 	c := exec.Command(binary, "--dangerously-skip-permissions", "--append-system-prompt", prompt)
 	if workspace != "" {
 		c.Dir = workspace

@@ -615,6 +615,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				targetTask = m.content.SelectedTask()
 			case FocusDetail:
 				targetTask = m.detailPane.Task()
+			case FocusSidebar:
+				binary, err := findAIBinary(&m.config.AI)
+				if err != nil {
+					m.err = err
+					return m, nil
+				}
+				if proj := m.getSelectedProject(); proj != nil {
+					return m, launchAISyncForProject(proj, binary, m.config.AI.Workspace)
+				}
+				if item := m.sidebar.SelectedItem(); item.Type == "area" {
+					for i := range m.areas {
+						if m.areas[i].Name == item.Key {
+							return m, launchAISyncForArea(&m.areas[i], binary, m.config.AI.Workspace)
+						}
+					}
+				}
 			}
 			if targetTask != nil {
 				binary, err := findAIBinary(&m.config.AI)
