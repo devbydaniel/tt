@@ -9,8 +9,17 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 
 	"github.com/devbydaniel/tt/internal/dateutil"
+	"github.com/devbydaniel/tt/internal/domain/note"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/recurparse"
+)
+
+// ContentViewMode controls which view is shown in the content panel
+type ContentViewMode int
+
+const (
+	ContentViewTasks ContentViewMode = iota // task list (default)
+	ContentViewNotes                        // scope notes list
 )
 
 // Content displays the task list in the right panel
@@ -29,6 +38,10 @@ type Content struct {
 	focused       bool // whether content panel has focus
 	showSelection bool // whether to show selection indicator (even when not focused)
 	selectedIndex int  // index into displayTasks (-1 = none)
+
+	viewMode     ContentViewMode // tasks vs notes view
+	scopeNotes   []note.Note     // notes for the selected project/area
+	selectedNote int             // index into scopeNotes
 }
 
 // NewContent creates a new content panel
@@ -59,7 +72,7 @@ func (c Content) SetSize(width, height int) Content {
 
 	if !c.ready {
 		c.viewport = viewport.New(contentWidth, contentHeight)
-		c.viewport.SetContent(c.buildTaskList())
+		c.viewport.SetContent(c.buildCurrentView())
 		c.ready = true
 	} else {
 		c.viewport.Width = contentWidth
@@ -323,10 +336,18 @@ func (c Content) View() string {
 	if c.ready {
 		content = c.viewport.View()
 	} else {
-		content = c.buildTaskList()
+		content = c.buildCurrentView()
 	}
 
-	return c.card.Render(c.title, content, c.width, c.height, c.focused)
+	title := c.title
+	switch c.viewMode {
+	case ContentViewTasks:
+		title = c.title + " · Tasks"
+	case ContentViewNotes:
+		title = c.title + " · Notes"
+	}
+
+	return c.card.Render(title, content, c.width, c.height, c.focused)
 }
 
 // ScrollUp scrolls the content up
@@ -600,7 +621,7 @@ func (c Content) isDueOrOverdue(t *task.Task) bool {
 // SetFocused sets whether the content panel has focus
 func (c Content) SetFocused(focused bool) Content {
 	c.focused = focused
-	if focused && len(c.displayTasks) > 0 {
+	if focused && c.viewMode == ContentViewTasks && len(c.displayTasks) > 0 {
 		if c.selectedIndex < 0 {
 			c.selectedIndex = 0
 		}
@@ -608,7 +629,7 @@ func (c Content) SetFocused(focused bool) Content {
 		c.selectedIndex = -1
 	}
 	if c.ready {
-		c.viewport.SetContent(c.buildTaskList())
+		c.viewport.SetContent(c.buildCurrentView())
 	}
 	return c
 }
@@ -617,7 +638,7 @@ func (c Content) SetFocused(focused bool) Content {
 func (c Content) SetShowSelection(show bool) Content {
 	c.showSelection = show
 	if c.ready {
-		c.viewport.SetContent(c.buildTaskList())
+		c.viewport.SetContent(c.buildCurrentView())
 	}
 	return c
 }
@@ -627,7 +648,7 @@ func (c Content) MoveUp() Content {
 	if c.selectedIndex > 0 {
 		c.selectedIndex--
 		if c.ready {
-			c.viewport.SetContent(c.buildTaskList())
+			c.viewport.SetContent(c.buildCurrentView())
 			c = c.ensureSelectionVisible()
 		}
 	}
@@ -639,7 +660,7 @@ func (c Content) MoveDown() Content {
 	if c.selectedIndex < len(c.displayTasks)-1 {
 		c.selectedIndex++
 		if c.ready {
-			c.viewport.SetContent(c.buildTaskList())
+			c.viewport.SetContent(c.buildCurrentView())
 			c = c.ensureSelectionVisible()
 		}
 	}
@@ -747,9 +768,10 @@ func (c Content) ensureSelectionVisible() Content {
 	return c
 }
 
-// SelectedTask returns the currently selected task, or nil if none
+// SelectedTask returns the currently selected task, or nil if none.
+// Returns nil when in notes view mode to guard task-specific actions.
 func (c Content) SelectedTask() *task.Task {
-	if !c.focused || c.selectedIndex < 0 || c.selectedIndex >= len(c.displayTasks) {
+	if c.viewMode != ContentViewTasks || !c.focused || c.selectedIndex < 0 || c.selectedIndex >= len(c.displayTasks) {
 		return nil
 	}
 	return &c.displayTasks[c.selectedIndex]
@@ -791,7 +813,7 @@ func (c Content) UpdateTaskStatus(taskID int64, done bool) Content {
 		}
 	}
 	if c.ready {
-		c.viewport.SetContent(c.buildTaskList())
+		c.viewport.SetContent(c.buildCurrentView())
 	}
 	return c
 }
@@ -884,4 +906,130 @@ func (c Content) orderByDate(tasks []task.Task) []task.Task {
 		result = append(result, dateGroups[category]...)
 	}
 	return result
+}
+
+// ViewMode returns the current content view mode
+func (c Content) ViewMode() ContentViewMode {
+	return c.viewMode
+}
+
+// ToggleViewMode flips between Tasks and Notes view
+func (c Content) ToggleViewMode() Content {
+	if c.viewMode == ContentViewTasks {
+		c.viewMode = ContentViewNotes
+	} else {
+		c.viewMode = ContentViewTasks
+	}
+	if c.ready {
+		c.viewport.SetContent(c.buildCurrentView())
+	}
+	return c
+}
+
+// ResetViewMode resets to Tasks view
+func (c Content) ResetViewMode() Content {
+	c.viewMode = ContentViewTasks
+	c.scopeNotes = nil
+	c.selectedNote = 0
+	return c
+}
+
+// SetScopeNotes sets the notes for the selected project/area
+func (c Content) SetScopeNotes(notes []note.Note) Content {
+	c.scopeNotes = notes
+	c.selectedNote = 0
+	if c.ready && c.viewMode == ContentViewNotes {
+		c.viewport.SetContent(c.buildCurrentView())
+	}
+	return c
+}
+
+// NoteUp moves selection up in the notes list
+func (c Content) NoteUp() Content {
+	if c.selectedNote > 0 {
+		c.selectedNote--
+		if c.ready {
+			c.viewport.SetContent(c.buildCurrentView())
+			c = c.ensureNoteVisible()
+		}
+	}
+	return c
+}
+
+// NoteDown moves selection down in the notes list
+func (c Content) NoteDown() Content {
+	if c.selectedNote < len(c.scopeNotes)-1 {
+		c.selectedNote++
+		if c.ready {
+			c.viewport.SetContent(c.buildCurrentView())
+			c = c.ensureNoteVisible()
+		}
+	}
+	return c
+}
+
+// SelectedNote returns the currently selected note, or nil if none
+func (c Content) SelectedNote() *note.Note {
+	if c.viewMode != ContentViewNotes || len(c.scopeNotes) == 0 || c.selectedNote < 0 || c.selectedNote >= len(c.scopeNotes) {
+		return nil
+	}
+	return &c.scopeNotes[c.selectedNote]
+}
+
+// ensureNoteVisible scrolls viewport to keep selected note visible
+func (c Content) ensureNoteVisible() Content {
+	if !c.ready || c.selectedNote < 0 {
+		return c
+	}
+	line := c.selectedNote
+	yOffset := c.viewport.YOffset
+	height := c.viewport.Height
+	if line < yOffset {
+		c.viewport.SetYOffset(line)
+	} else if line >= yOffset+height {
+		c.viewport.SetYOffset(line - height + 1)
+	}
+	return c
+}
+
+// buildCurrentView renders the appropriate view based on viewMode
+func (c Content) buildCurrentView() string {
+	if c.viewMode == ContentViewNotes {
+		return c.buildNotesList()
+	}
+	return c.buildTaskList()
+}
+
+// buildNotesList renders scope notes in the content panel
+func (c Content) buildNotesList() string {
+	theme := c.styles.Theme
+
+	if len(c.scopeNotes) == 0 {
+		return theme.Muted.Render("No notes yet.")
+	}
+
+	maxWidth := c.width - 8
+	if maxWidth < 10 {
+		maxWidth = 10
+	}
+
+	var lines []string
+	for i, n := range c.scopeNotes {
+		prefix := "  "
+		if c.focused && i == c.selectedNote {
+			prefix = c.styles.SelectedItem.Render("> ")
+		}
+		date := n.Date.Format("Jan 2, 2006")
+		entry := date + "  " + n.Title
+		if len(entry) > maxWidth {
+			entry = entry[:maxWidth-3] + "..."
+		}
+		if c.focused && i == c.selectedNote {
+			lines = append(lines, prefix+theme.Accent.Render(entry))
+		} else {
+			lines = append(lines, prefix+entry)
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }

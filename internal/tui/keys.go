@@ -152,7 +152,7 @@ func (k detailDataKeyMap) ShortHelp() []key.Binding {
 		keys.Up,
 		keys.Down,
 		keys.Enter,
-		keys.NextView,
+		keys.Tab,
 		keys.AISync,
 		keys.Escape,
 	}
@@ -170,14 +170,24 @@ func (k detailNotesKeyMap) ShortHelp() []key.Binding {
 		keys.Up,
 		keys.Down,
 		keys.Enter,
-		keys.NextView,
-		keys.PrevView,
+		keys.Tab,
 		keys.AISync,
 		keys.Escape,
 	}
 }
 
 func (k detailNotesKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
+// contentNotesKeyMap provides help bindings when content panel shows scope notes
+type contentNotesKeyMap struct{}
+
+func (k contentNotesKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.Tab, keys.FocusSidebar, keys.Quit}
+}
+
+func (k contentNotesKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
@@ -262,6 +272,7 @@ var (
 	sidebarAreaKeys    = sidebarAreaKeyMap{}
 	sidebarScopesKeys  = sidebarScopesKeyMap{}
 	contentKeys        = contentKeyMap{}
+	contentNotesKeys   = contentNotesKeyMap{}
 	renameKeys         = renameKeyMap{}
 	moveKeys           = moveKeyMap{}
 	tagKeys            = tagKeyMap{}
@@ -287,11 +298,11 @@ var keys = keyMap{
 	),
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
-		key.WithHelp("tab", "next section"),
+		key.WithHelp("tab", "toggle view"),
 	),
 	ShiftTab: key.NewBinding(
 		key.WithKeys("shift+tab"),
-		key.WithHelp("shift+tab", "prev section"),
+		key.WithHelp("shift+tab", "toggle view"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),

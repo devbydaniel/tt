@@ -327,6 +327,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
+				if m.content.ViewMode() == ContentViewNotes {
+					if n := m.content.SelectedNote(); n != nil {
+						return m, m.openScopeNoteInEditor(n.Path)
+					}
+					return m, nil
+				}
 				// Enter from content opens detail pane
 				return m.openDetailPane()
 			}
@@ -365,17 +371,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.FocusSidebar):
 			if m.focusArea == FocusDetail {
-				if m.detailPane.ViewMode() == DetailViewData {
-					// At leftmost view — exit back to content
-					m.focusArea = FocusContent
-					m.detailPane = m.detailPane.SetFocused(false)
-					m.detailVisible = false
-					m.content = m.content.SetShowSelection(false)
-					m.content = m.content.SetFocused(true)
-					m = m.recalculateLayout()
-					return m, nil
-				}
-				m.detailPane = m.detailPane.PrevViewMode()
+				// Always close detail pane and return to content
+				m.focusArea = FocusContent
+				m.detailPane = m.detailPane.SetFocused(false)
+				m.detailVisible = false
+				m.content = m.content.SetShowSelection(false)
+				m.content = m.content.SetFocused(true)
+				m = m.recalculateLayout()
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
@@ -396,12 +398,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
-				// l from content opens detail pane
-				return m.openDetailPane()
-			}
-			if m.focusArea == FocusDetail {
-				if m.detailPane.ViewMode() != DetailViewNotes {
-					m.detailPane = m.detailPane.NextViewMode()
+				// l from content opens detail pane (only in tasks view)
+				if m.content.ViewMode() == ContentViewTasks {
+					return m.openDetailPane()
 				}
 				return m, nil
 			}
@@ -545,17 +544,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case key.Matches(msg, keys.NextView):
-			if m.focusArea == FocusDetail {
-				m.detailPane = m.detailPane.NextViewMode()
-				return m, nil
-			}
-		case key.Matches(msg, keys.PrevView):
-			if m.focusArea == FocusDetail {
-				m.detailPane = m.detailPane.PrevViewMode()
-				return m, nil
-			}
-
 		case key.Matches(msg, keys.AISync):
 			var targetTask *task.Task
 			switch m.focusArea {
@@ -599,7 +587,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.Tab):
 			if m.focusArea == FocusDetail {
-				m.detailPane = m.detailPane.NextField()
+				m.detailPane = m.detailPane.NextViewMode()
+				return m, nil
+			}
+			if m.focusArea == FocusContent {
+				if !m.hasScopeSelected() {
+					return m, nil
+				}
+				m.content = m.content.ToggleViewMode()
+				if m.content.ViewMode() == ContentViewNotes {
+					return m, m.loadScopeNotes()
+				}
 				return m, nil
 			}
 			m.sidebar = m.sidebar.NextSection()
@@ -607,7 +605,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.ShiftTab):
 			if m.focusArea == FocusDetail {
-				m.detailPane = m.detailPane.PrevField()
+				m.detailPane = m.detailPane.PrevViewMode()
+				return m, nil
+			}
+			if m.focusArea == FocusContent {
+				if !m.hasScopeSelected() {
+					return m, nil
+				}
+				m.content = m.content.ToggleViewMode()
+				if m.content.ViewMode() == ContentViewNotes {
+					return m, m.loadScopeNotes()
+				}
 				return m, nil
 			}
 			m.sidebar = m.sidebar.PrevSection()
@@ -623,7 +631,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
-				m.content = m.content.MoveUp()
+				if m.content.ViewMode() == ContentViewNotes {
+					m.content = m.content.NoteUp()
+				} else {
+					m.content = m.content.MoveUp()
+				}
 				return m, nil
 			}
 			m.sidebar = m.sidebar.MoveUp()
@@ -639,7 +651,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
-				m.content = m.content.MoveDown()
+				if m.content.ViewMode() == ContentViewNotes {
+					m.content = m.content.NoteDown()
+				} else {
+					m.content = m.content.MoveDown()
+				}
 				return m, nil
 			}
 			m.sidebar = m.sidebar.MoveDown()
@@ -759,6 +775,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		m.content = m.content.ResetViewMode()
 		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		return m, nil
 
@@ -767,6 +784,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		m.content = m.content.ResetViewMode()
 		m.content = m.content.SetScheduleGroups(msg.groups, msg.title, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		return m, nil
 
@@ -960,6 +978,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Reload notes after editor closes (user may have edited/saved)
 		return m, m.loadNotes(msg.taskUUID, msg.taskID)
+
+	case scopeNotesLoadedMsg:
+		if msg.err != nil {
+			return m, nil
+		}
+		m.content = m.content.SetScopeNotes(msg.notes)
+		return m, nil
+
+	case scopeNoteEditorFinishedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		return m, m.loadScopeNotes()
 	}
 
 	return m, nil
@@ -1620,6 +1652,79 @@ func (m Model) loadNotes(taskUUID string, taskID int64) tea.Cmd {
 	}
 }
 
+// scopeNotesLoadedMsg carries notes for the selected project/area
+type scopeNotesLoadedMsg struct {
+	notes []note.Note
+	err   error
+}
+
+// scopeNoteEditorFinishedMsg is sent when the editor closes after editing a scope note
+type scopeNoteEditorFinishedMsg struct {
+	err error
+}
+
+// loadScopeNotes fetches notes for the selected project or area
+func (m Model) loadScopeNotes() tea.Cmd {
+	item := m.sidebar.SelectedItem()
+	var entityType note.EntityType
+	var entityUUID string
+
+	switch item.Type {
+	case "project":
+		entityType = note.EntityProject
+		for _, p := range m.projects {
+			if p.Title == item.Key {
+				entityUUID = p.UUID
+				break
+			}
+		}
+	case "area":
+		entityType = note.EntityArea
+		for _, a := range m.areas {
+			if a.Name == item.Key {
+				entityUUID = a.UUID
+				break
+			}
+		}
+	default:
+		return nil
+	}
+
+	if entityUUID == "" {
+		return nil
+	}
+
+	return func() tea.Msg {
+		notes, err := m.app.ListNotes.Execute(noteusecases.ListOptions{
+			EntityType: entityType,
+			EntityUUID: entityUUID,
+		})
+		return scopeNotesLoadedMsg{notes: notes, err: err}
+	}
+}
+
+// openScopeNoteInEditor launches $EDITOR for a scope note
+func (m Model) openScopeNoteInEditor(path string) tea.Cmd {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		editor = "vi"
+	}
+	fields := strings.Fields(editor)
+	c := exec.Command(fields[0], append(fields[1:], path)...)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return scopeNoteEditorFinishedMsg{err: err}
+	})
+}
+
+// hasScopeSelected returns true if a project or area is selected in the sidebar
+func (m Model) hasScopeSelected() bool {
+	item := m.sidebar.SelectedItem()
+	return item.Type == "project" || item.Type == "area"
+}
+
 // openNoteInEditor launches $EDITOR for the given note path
 func (m Model) openNoteInEditor(path string, taskID int64, taskUUID string) tea.Cmd {
 	editor := os.Getenv("EDITOR")
@@ -1689,7 +1794,11 @@ func (m Model) View() string {
 			helpView = m.help.View(detailDataKeys)
 		}
 	default:
-		helpView = m.help.View(contentKeys)
+		if m.content.ViewMode() == ContentViewNotes {
+			helpView = m.help.View(contentNotesKeys)
+		} else {
+			helpView = m.help.View(contentKeys)
+		}
 	}
 	helpView = lipgloss.PlaceHorizontal(m.width, lipgloss.Center, helpView)
 
