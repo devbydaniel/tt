@@ -45,7 +45,7 @@ func NewRootCmd(deps *Dependencies) *cobra.Command {
 	rootCmd.AddCommand(NewTagCmd(deps))
 	rootCmd.AddCommand(NewSearchCmd(deps))
 	rootCmd.AddCommand(NewNotesCmd(deps))
-rootCmd.AddCommand(NewCompletionCmd())
+	rootCmd.AddCommand(NewCompletionCmd())
 
 	// Shorthand list commands
 	rootCmd.AddCommand(NewInboxCmd(deps))

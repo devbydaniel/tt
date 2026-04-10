@@ -64,7 +64,7 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
-// ignoreExit130 returns nil for exit code 130 (user cancelled fzf with Esc/Ctrl-C).
+// ignoreExit130 returns nil for exit code 130 (user canceled fzf with Esc/Ctrl-C).
 func ignoreExit130(err error) error {
 	if err == nil {
 		return nil

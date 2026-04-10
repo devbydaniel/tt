@@ -25,7 +25,7 @@ type Icons struct {
 	Due     string
 	Date    string
 	Done    string
-	Note string
+	Note    string
 }
 
 // themeColors holds the raw color values for a theme preset
@@ -142,7 +142,7 @@ func DefaultTheme() *Theme {
 			Due:     "⚑",
 			Date:    "›",
 			Done:    "✓",
-			Note: "[n]",
+			Note:    "[n]",
 		},
 	}
 }

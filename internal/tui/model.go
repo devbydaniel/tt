@@ -62,9 +62,9 @@ type Model struct {
 	createAreaModal    CreateAreaModal
 	createNoteModal    CreateNoteModal
 
-	help               help.Model
-	focusArea          FocusArea
-	detailVisible      bool // whether the detail pane is shown
+	help          help.Model
+	focusArea     FocusArea
+	detailVisible bool // whether the detail pane is shown
 
 	// Cached data
 	areas    []area.Area
@@ -105,7 +105,7 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 		createAreaModal:    NewCreateAreaModal(styles),
 		createNoteModal:    NewCreateNoteModal(styles),
 
-		help:               helpModel,
+		help: helpModel,
 	}
 }
 
@@ -1745,7 +1745,7 @@ type scopeNoteEditorFinishedMsg struct {
 }
 
 // resolveScopeEntity returns the entity type and UUID for the selected sidebar scope
-func (m Model) resolveScopeEntity() (note.EntityType, string) {
+func (m Model) resolveScopeEntity() (entityType note.EntityType, entityUUID string) {
 	item := m.sidebar.SelectedItem()
 	switch item.Type {
 	case "project":

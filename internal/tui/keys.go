@@ -23,10 +23,10 @@ type keyMap struct {
 	Someday      key.Binding
 	SearchNotes  key.Binding
 	Delete       key.Binding
-	AISync   key.Binding
-	NextView key.Binding
-	PrevView   key.Binding
-	Quit       key.Binding
+	AISync       key.Binding
+	NextView     key.Binding
+	PrevView     key.Binding
+	Quit         key.Binding
 }
 
 // sidebarKeyMap provides help bindings when sidebar is focused
@@ -295,8 +295,8 @@ var (
 	datePickerKeys     = datePickerKeyMap{}
 	addKeys            = addKeyMap{}
 	detailDataKeys     = detailDataKeyMap{}
-	detailNotesKeys = detailNotesKeyMap{}
-	descriptionKeys = descriptionKeyMap{}
+	detailNotesKeys    = detailNotesKeyMap{}
+	descriptionKeys    = descriptionKeyMap{}
 	confirmKeys        = confirmKeyMap{}
 	createAreaKeys     = createAreaKeyMap{}
 	createNoteKeys     = createNoteKeyMap{}
