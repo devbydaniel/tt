@@ -22,8 +22,11 @@ type keyMap struct {
 	Toggle       key.Binding
 	Someday      key.Binding
 	Delete       key.Binding
-	AISync  key.Binding
-	Quit    key.Binding
+	AISync     key.Binding
+	AddComment key.Binding
+	NextView   key.Binding
+	PrevView   key.Binding
+	Quit       key.Binding
 }
 
 // sidebarKeyMap provides help bindings when sidebar is focused
@@ -142,19 +145,50 @@ func (k addKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
-// detailKeyMap provides help bindings when detail pane is focused
-type detailKeyMap struct{}
+// detailDataKeyMap provides help bindings when detail pane data view is focused
+type detailDataKeyMap struct{}
 
-func (k detailKeyMap) ShortHelp() []key.Binding {
+func (k detailDataKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		keys.Up,
 		keys.Down,
 		keys.Enter,
+		keys.NextView,
 		keys.Escape,
 	}
 }
 
-func (k detailKeyMap) FullHelp() [][]key.Binding {
+func (k detailDataKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
+// detailCommentsKeyMap provides help bindings when detail pane comments view is focused
+type detailCommentsKeyMap struct{}
+
+func (k detailCommentsKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		keys.AddComment,
+		keys.PrevView,
+		keys.Escape,
+	}
+}
+
+func (k detailCommentsKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
+// commentKeyMap provides help bindings for comment modal
+type commentKeyMap struct{}
+
+func (k commentKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("ctrl+s", "save")),
+		key.NewBinding(key.WithKeys("alt+enter"), key.WithHelp("alt+enter", "save")),
+		keys.Escape,
+	}
+}
+
+func (k commentKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
@@ -245,7 +279,9 @@ var (
 	dateInputKeys      = dateInputKeyMap{}
 	datePickerKeys     = datePickerKeyMap{}
 	addKeys            = addKeyMap{}
-	detailKeys         = detailKeyMap{}
+	detailDataKeys     = detailDataKeyMap{}
+	detailCommentsKeys = detailCommentsKeyMap{}
+	commentKeys        = commentKeyMap{}
 	descriptionKeys    = descriptionKeyMap{}
 	confirmKeys        = confirmKeyMap{}
 	createAreaKeys     = createAreaKeyMap{}
@@ -330,8 +366,20 @@ var keys = keyMap{
 		key.WithHelp("bksp", "delete"),
 	),
 	AISync: key.NewBinding(
+		key.WithKeys("!"),
+		key.WithHelp("!", "ai chat"),
+	),
+	AddComment: key.NewBinding(
 		key.WithKeys("c"),
-		key.WithHelp("c", "ai chat"),
+		key.WithHelp("c", "comment"),
+	),
+	NextView: key.NewBinding(
+		key.WithKeys("ctrl+j"),
+		key.WithHelp("ctrl+j", "next view"),
+	),
+	PrevView: key.NewBinding(
+		key.WithKeys("ctrl+k"),
+		key.WithHelp("ctrl+k", "prev view"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),

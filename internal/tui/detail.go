@@ -8,6 +8,14 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
+// DetailViewMode controls which view is shown in the detail pane
+type DetailViewMode int
+
+const (
+	DetailViewData     DetailViewMode = iota // task fields
+	DetailViewComments                       // full comment list
+)
+
 // DetailField represents which field is currently focused in the detail pane
 type DetailField int
 
@@ -18,8 +26,7 @@ const (
 	DetailFieldPlanned
 	DetailFieldDue
 	DetailFieldTags
-	DetailFieldComments
-	detailFieldCount // sentinel for wrapping
+	detailFieldCount // sentinel for wrapping (comments removed from data view)
 )
 
 // DetailPane displays task details in a third column
@@ -27,6 +34,7 @@ type DetailPane struct {
 	task         *task.Task
 	comments     []comment.Comment
 	focusedField DetailField
+	viewMode     DetailViewMode
 	width        int
 	height       int
 	focused      bool
@@ -55,6 +63,22 @@ func (d DetailPane) SetTask(t *task.Task) DetailPane {
 	d.task = t
 	d.comments = nil
 	d.focusedField = DetailFieldTitle
+	d.viewMode = DetailViewData
+	return d
+}
+
+// ViewMode returns the current view mode
+func (d DetailPane) ViewMode() DetailViewMode {
+	return d.viewMode
+}
+
+// ToggleViewMode switches between data and comments views
+func (d DetailPane) ToggleViewMode() DetailPane {
+	if d.viewMode == DetailViewData {
+		d.viewMode = DetailViewComments
+	} else {
+		d.viewMode = DetailViewData
+	}
 	return d
 }
 
@@ -87,12 +111,18 @@ func (d DetailPane) FocusedField() DetailField {
 
 // NextField moves to the next field
 func (d DetailPane) NextField() DetailPane {
+	if d.viewMode == DetailViewComments {
+		return d // no field navigation in comments view
+	}
 	d.focusedField = (d.focusedField + 1) % detailFieldCount
 	return d
 }
 
 // PrevField moves to the previous field
 func (d DetailPane) PrevField() DetailPane {
+	if d.viewMode == DetailViewComments {
+		return d // no field navigation in comments view
+	}
 	d.focusedField = (d.focusedField - 1 + detailFieldCount) % detailFieldCount
 	return d
 }
@@ -103,8 +133,23 @@ func (d DetailPane) View() string {
 		return ""
 	}
 
-	content := d.buildContent()
-	return d.card.Render("Details", content, d.width, d.height, d.focused)
+	// View indicator in the title
+	theme := d.styles.Theme
+	var title string
+	if d.viewMode == DetailViewData {
+		title = theme.Accent.Render("Data") + theme.Muted.Render(" · Comments")
+	} else {
+		title = theme.Muted.Render("Data · ") + theme.Accent.Render("Comments")
+	}
+
+	var content string
+	if d.viewMode == DetailViewComments {
+		content = d.buildCommentsView()
+	} else {
+		content = d.buildContent()
+	}
+
+	return d.card.Render(title, content, d.width, d.height, d.focused)
 }
 
 // buildContent builds the detail pane content
@@ -164,38 +209,56 @@ func (d DetailPane) buildContent() string {
 	}
 	sections = append(sections, d.renderField(DetailFieldTags, "Tags", tags))
 
-	// Comments
-	commentsLabel := fmt.Sprintf("Comments (%d)", len(d.comments))
-	commentsValue := "None"
-	if len(d.comments) > 0 {
-		var lines []string
-		// Show last 3 comments
-		start := 0
-		if len(d.comments) > 3 {
-			start = len(d.comments) - 3
-			lines = append(lines, theme.Muted.Render(fmt.Sprintf("... %d earlier", start)))
-		}
-		for _, c := range d.comments[start:] {
-			header := theme.Muted.Render(fmt.Sprintf("%s @ %s", c.Author, c.CreatedAt.Format("Jan 2 15:04")))
-			body := c.Body
-			bodyMax := d.width - 10
-			if bodyMax < 10 {
-				bodyMax = 10
-			}
-			if len(body) > bodyMax {
-				body = body[:bodyMax-3] + "..."
-			}
-			// Truncate to first line if multiline
-			if idx := strings.Index(body, "\n"); idx != -1 {
-				body = body[:idx] + "..."
-			}
-			lines = append(lines, header+"\n    "+body)
-		}
-		commentsValue = strings.Join(lines, "\n    ")
-	}
-	sections = append(sections, d.renderField(DetailFieldComments, commentsLabel, commentsValue))
-
 	return strings.Join(sections, "\n\n")
+}
+
+// buildCommentsView renders the full comments list using available height
+func (d DetailPane) buildCommentsView() string {
+	theme := d.styles.Theme
+
+	if len(d.comments) == 0 {
+		return theme.Muted.Render("  No comments yet. Press c to add one.")
+	}
+
+	bodyMax := d.width - 8
+	if bodyMax < 10 {
+		bodyMax = 10
+	}
+
+	// Build each comment block
+	var blocks []string
+	for _, c := range d.comments {
+		header := "  " + theme.Muted.Render(fmt.Sprintf("%s @ %s", c.Author, c.CreatedAt.Format("Jan 2 15:04")))
+		// Wrap/truncate body lines
+		bodyLines := strings.Split(c.Body, "\n")
+		var rendered []string
+		for _, line := range bodyLines {
+			if len(line) > bodyMax {
+				line = line[:bodyMax-3] + "..."
+			}
+			rendered = append(rendered, "    "+line)
+		}
+		blocks = append(blocks, header+"\n"+strings.Join(rendered, "\n"))
+	}
+
+	// Calculate available lines (height minus border/padding ~4 lines)
+	availableLines := d.height - 4
+	if availableLines < 3 {
+		availableLines = 3
+	}
+
+	// Join all blocks and count lines
+	fullContent := strings.Join(blocks, "\n\n")
+	allLines := strings.Split(fullContent, "\n")
+
+	if len(allLines) <= availableLines {
+		return fullContent
+	}
+
+	// Bottom-anchor: show most recent comments that fit
+	visibleLines := allLines[len(allLines)-availableLines+1:]
+	earlier := fmt.Sprintf("  ... earlier comments above")
+	return theme.Muted.Render(earlier) + "\n" + strings.Join(visibleLines, "\n")
 }
 
 // renderField renders a single field with label and value
