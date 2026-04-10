@@ -14,8 +14,6 @@ import (
 	"github.com/devbydaniel/tt/config"
 	"github.com/devbydaniel/tt/internal/app"
 	"github.com/devbydaniel/tt/internal/domain/area"
-	"github.com/devbydaniel/tt/internal/domain/comment"
-	commentusecases "github.com/devbydaniel/tt/internal/domain/comment/usecases"
 	"github.com/devbydaniel/tt/internal/domain/note"
 	noteusecases "github.com/devbydaniel/tt/internal/domain/note/usecases"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -58,7 +56,6 @@ type Model struct {
 	addModal           AddModal
 	tagModal           TagModal
 	descriptionModal   DescriptionModal
-	commentModal       CommentModal
 	confirmModal       ConfirmModal
 	completeModal      CompleteModal
 	createProjectModal CreateProjectModal
@@ -101,7 +98,6 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 		addModal:           NewAddModal(styles),
 		tagModal:           NewTagModal(styles),
 		descriptionModal:   NewDescriptionModal(styles),
-		commentModal:       NewCommentModal(styles),
 		confirmModal:       NewConfirmModal(styles),
 		completeModal:      NewCompleteModal(styles),
 		createProjectModal: NewCreateProjectModal(styles),
@@ -275,16 +271,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.descriptionModal, result = m.descriptionModal.Update(msg)
 			if result != nil && !result.Canceled {
 				return m, m.setTaskDescription(result.TaskID, result.Description)
-			}
-			return m, nil
-		}
-
-		// Route keys to comment modal when active
-		if m.commentModal.Active() {
-			var result *CommentResult
-			m.commentModal, result = m.commentModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.addComment(result.TaskID, result.Body)
 			}
 			return m, nil
 		}
@@ -568,15 +554,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusArea == FocusDetail {
 				m.detailPane = m.detailPane.PrevViewMode()
 				return m, nil
-			}
-
-		case key.Matches(msg, keys.AddComment):
-			if m.focusArea == FocusDetail && m.detailPane.ViewMode() == DetailViewComments {
-				if t := m.detailPane.Task(); t != nil {
-					m.commentModal = m.commentModal.SetSize(m.width, m.height-1)
-					m.commentModal = m.commentModal.Open(t.ID)
-					return m, nil
-				}
 			}
 
 		case key.Matches(msg, keys.AISync):
@@ -966,15 +943,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, m.loadData
-
-	case commentsLoadedMsg:
-		if msg.err != nil {
-			return m, nil // silently ignore comment load errors
-		}
-		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.taskID {
-			m.detailPane = m.detailPane.SetComments(msg.comments)
-		}
-		return m, nil
 
 	case notesLoadedMsg:
 		if msg.err != nil {
@@ -1441,10 +1409,7 @@ func (m Model) openDetailPane() (tea.Model, tea.Cmd) {
 	// Recalculate layout for three-column mode
 	m = m.recalculateLayout()
 
-	return m, tea.Batch(
-		m.loadComments(selectedTask.ID),
-		m.loadNotes(selectedTask.UUID, selectedTask.ID),
-	)
+	return m, m.loadNotes(selectedTask.UUID, selectedTask.ID)
 }
 
 // recalculateLayout recalculates component sizes based on current state
@@ -1630,21 +1595,6 @@ type tagsAndTasksUpdatedMsg struct {
 	preserveIndex  int   // fallback index if task not found
 }
 
-// commentsLoadedMsg carries loaded comments for the detail pane
-type commentsLoadedMsg struct {
-	taskID   int64
-	comments []comment.Comment
-	err      error
-}
-
-// loadComments fetches comments for a task
-func (m Model) loadComments(taskID int64) tea.Cmd {
-	return func() tea.Msg {
-		comments, err := m.app.ListComments.Execute(taskID)
-		return commentsLoadedMsg{taskID: taskID, comments: comments, err: err}
-	}
-}
-
 // notesLoadedMsg carries loaded notes for the detail pane
 type notesLoadedMsg struct {
 	taskID int64
@@ -1686,22 +1636,6 @@ func (m Model) openNoteInEditor(path string, taskID int64, taskUUID string) tea.
 	})
 }
 
-// addComment creates a comment and reloads the comment list
-func (m Model) addComment(taskID int64, body string) tea.Cmd {
-	return func() tea.Msg {
-		_, err := m.app.AddComment.Execute(commentusecases.AddOptions{
-			TaskID: taskID,
-			Author: "user",
-			Body:   body,
-		})
-		if err != nil {
-			return commentsLoadedMsg{taskID: taskID, err: err}
-		}
-		comments, err := m.app.ListComments.Execute(taskID)
-		return commentsLoadedMsg{taskID: taskID, comments: comments, err: err}
-	}
-}
-
 // View implements tea.Model
 func (m Model) View() string {
 	if m.err != nil {
@@ -1731,8 +1665,6 @@ func (m Model) View() string {
 		helpView = m.help.View(tagKeys)
 	case m.descriptionModal.Active():
 		helpView = m.help.View(descriptionKeys)
-	case m.commentModal.Active():
-		helpView = m.help.View(commentKeys)
 	case m.confirmModal.Active():
 		helpView = m.help.View(confirmKeys)
 	case m.createProjectModal.Active():
@@ -1751,8 +1683,6 @@ func (m Model) View() string {
 		}
 	case m.focusArea == FocusDetail:
 		switch m.detailPane.ViewMode() {
-		case DetailViewComments:
-			helpView = m.help.View(detailCommentsKeys)
 		case DetailViewNotes:
 			helpView = m.help.View(detailNotesKeys)
 		default:
@@ -1781,9 +1711,6 @@ func (m Model) View() string {
 	}
 	if m.descriptionModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.descriptionModal.View(), helpView)
-	}
-	if m.commentModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.commentModal.View(), helpView)
 	}
 	if m.confirmModal.Active() {
 		return lipgloss.JoinVertical(lipgloss.Left, m.confirmModal.View(), helpView)

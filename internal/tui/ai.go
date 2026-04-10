@@ -79,8 +79,6 @@ func buildAISystemPrompt(t *task.Task) string {
 	b.WriteString("  tt list --json                        # list all tasks\n")
 	b.WriteString("  tt notes ls --task " + id + "             # list notes for this task\n")
 	b.WriteString("  tt notes add --task " + id + " --title \"...\" --body \"...\"  # add a note\n")
-	b.WriteString("  tt comment ls --task " + id + "           # list comments on this task\n")
-	b.WriteString("  tt comment add --task " + id + " \"...\"   # add a comment\n")
 	b.WriteString("  tt do " + id + "                          # mark task complete\n")
 	b.WriteString("  tt plan " + id + " <date>                 # set planned date\n")
 	b.WriteString("  tt due " + id + " <date>                  # set due date\n")

@@ -5,20 +5,14 @@ import (
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
 
-// CommentChecker checks which task IDs have comments.
-type CommentChecker interface {
-	HasCommentsByTaskIDs(taskIDs []int64) (map[int64]bool, error)
-}
-
 // NoteChecker checks which entity UUIDs have notes.
 type NoteChecker interface {
 	HasNotesByUUIDs(et note.EntityType, uuids []string) (map[string]bool, error)
 }
 
-// EnrichIndicators populates HasComments and HasNotes on a slice of tasks.
+// EnrichIndicators populates HasNotes on a slice of tasks.
 type EnrichIndicators struct {
-	CommentChecker CommentChecker
-	NoteChecker    NoteChecker
+	NoteChecker NoteChecker
 }
 
 func (e *EnrichIndicators) Execute(tasks []task.Task) error {
@@ -26,22 +20,9 @@ func (e *EnrichIndicators) Execute(tasks []task.Task) error {
 		return nil
 	}
 
-	ids := make([]int64, len(tasks))
 	uuids := make([]string, len(tasks))
 	for i := range tasks {
-		ids[i] = tasks[i].ID
 		uuids[i] = tasks[i].UUID
-	}
-
-	// Batch check comments
-	if e.CommentChecker != nil {
-		commentMap, err := e.CommentChecker.HasCommentsByTaskIDs(ids)
-		if err != nil {
-			return err
-		}
-		for i := range tasks {
-			tasks[i].HasComments = commentMap[tasks[i].ID]
-		}
 	}
 
 	// Batch check notes — split by entity type

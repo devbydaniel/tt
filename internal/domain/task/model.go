@@ -164,8 +164,7 @@ type Task struct {
 	// Display fields (populated by queries with JOINs, not persisted)
 	ParentName  *string `json:"parentName,omitempty"`
 	AreaName    *string `json:"areaName,omitempty"`
-	HasComments bool    `json:"hasComments,omitempty"`
-	HasNotes    bool    `json:"hasNotes,omitempty"`
+	HasNotes bool `json:"hasNotes,omitempty"`
 }
 
 // IsProject returns true if this task is a project

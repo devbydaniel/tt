@@ -241,9 +241,6 @@ func (f *Formatter) renderTaskRows(tasks []task.Task, showScope bool, idWidth in
 		if len(t.Tags) > 0 {
 			display += " " + f.theme.Muted.Render(formatTagsForTable(t.Tags))
 		}
-		if t.HasComments {
-			display += " " + f.theme.Muted.Render(f.theme.Icons.Comment)
-		}
 		if t.HasNotes {
 			display += " " + f.theme.Muted.Render(f.theme.Icons.Note)
 		}
@@ -294,9 +291,6 @@ func (f *Formatter) renderProjectHeaderLine(p *task.Task) {
 	}
 	if len(p.Tags) > 0 {
 		parts = append(parts, f.theme.Muted.Render(formatTagsForTable(p.Tags)))
-	}
-	if p.HasComments {
-		parts = append(parts, f.theme.Muted.Render(f.theme.Icons.Comment))
 	}
 	if p.HasNotes {
 		parts = append(parts, f.theme.Muted.Render(f.theme.Icons.Note))

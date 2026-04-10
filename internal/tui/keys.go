@@ -22,9 +22,8 @@ type keyMap struct {
 	Toggle       key.Binding
 	Someday      key.Binding
 	Delete       key.Binding
-	AISync     key.Binding
-	AddComment key.Binding
-	NextView   key.Binding
+	AISync   key.Binding
+	NextView key.Binding
 	PrevView   key.Binding
 	Quit       key.Binding
 }
@@ -163,22 +162,6 @@ func (k detailDataKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
-// detailCommentsKeyMap provides help bindings when detail pane comments view is focused
-type detailCommentsKeyMap struct{}
-
-func (k detailCommentsKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{
-		keys.AddComment,
-		keys.PrevView,
-		keys.AISync,
-		keys.Escape,
-	}
-}
-
-func (k detailCommentsKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{k.ShortHelp()}
-}
-
 // detailNotesKeyMap provides help bindings when detail pane notes view is focused
 type detailNotesKeyMap struct{}
 
@@ -195,21 +178,6 @@ func (k detailNotesKeyMap) ShortHelp() []key.Binding {
 }
 
 func (k detailNotesKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{k.ShortHelp()}
-}
-
-// commentKeyMap provides help bindings for comment modal
-type commentKeyMap struct{}
-
-func (k commentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{
-		key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("ctrl+s", "save")),
-		key.NewBinding(key.WithKeys("alt+enter"), key.WithHelp("alt+enter", "save")),
-		keys.Escape,
-	}
-}
-
-func (k commentKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
@@ -301,10 +269,8 @@ var (
 	datePickerKeys     = datePickerKeyMap{}
 	addKeys            = addKeyMap{}
 	detailDataKeys     = detailDataKeyMap{}
-	detailCommentsKeys = detailCommentsKeyMap{}
-	detailNotesKeys    = detailNotesKeyMap{}
-	commentKeys        = commentKeyMap{}
-	descriptionKeys    = descriptionKeyMap{}
+	detailNotesKeys = detailNotesKeyMap{}
+	descriptionKeys = descriptionKeyMap{}
 	confirmKeys        = confirmKeyMap{}
 	createAreaKeys     = createAreaKeyMap{}
 	createProjectKeys  = createProjectKeyMap{}
@@ -390,10 +356,6 @@ var keys = keyMap{
 	AISync: key.NewBinding(
 		key.WithKeys("!"),
 		key.WithHelp("!", "ai chat"),
-	),
-	AddComment: key.NewBinding(
-		key.WithKeys("c"),
-		key.WithHelp("c", "comment"),
 	),
 	NextView: key.NewBinding(
 		key.WithKeys("ctrl+j"),

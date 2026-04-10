@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devbydaniel/tt/internal/domain/comment"
 	"github.com/devbydaniel/tt/internal/domain/note"
 	"github.com/devbydaniel/tt/internal/domain/task"
 )
@@ -13,10 +12,9 @@ import (
 type DetailViewMode int
 
 const (
-	DetailViewData     DetailViewMode = iota // task fields
-	DetailViewComments                       // full comment list
-	DetailViewNotes                          // notes list
-	detailViewCount                          // sentinel for wrapping
+	DetailViewData  DetailViewMode = iota // task fields
+	DetailViewNotes                       // notes list
+	detailViewCount                       // sentinel for wrapping
 )
 
 // DetailField represents which field is currently focused in the detail pane
@@ -35,7 +33,6 @@ const (
 // DetailPane displays task details in a third column
 type DetailPane struct {
 	task         *task.Task
-	comments     []comment.Comment
 	notes        []note.Note
 	selectedNote int
 	focusedField DetailField
@@ -66,7 +63,6 @@ func (d DetailPane) SetSize(width, height int) DetailPane {
 // SetTask sets the task to display
 func (d DetailPane) SetTask(t *task.Task) DetailPane {
 	d.task = t
-	d.comments = nil
 	d.notes = nil
 	d.selectedNote = 0
 	d.focusedField = DetailFieldTitle
@@ -88,12 +84,6 @@ func (d DetailPane) NextViewMode() DetailPane {
 // PrevViewMode cycles backward through view modes (Data → Notes → Comments → Data)
 func (d DetailPane) PrevViewMode() DetailPane {
 	d.viewMode = (d.viewMode - 1 + detailViewCount) % detailViewCount
-	return d
-}
-
-// SetComments sets the comments to display
-func (d DetailPane) SetComments(comments []comment.Comment) DetailPane {
-	d.comments = comments
 	return d
 }
 
@@ -175,8 +165,8 @@ func (d DetailPane) View() string {
 
 	// View indicator in the title
 	theme := d.styles.Theme
-	labels := [3]string{"Data", "Comments", "Notes"}
-	var parts [3]string
+	labels := [2]string{"Data", "Notes"}
+	var parts [2]string
 	for i, label := range labels {
 		if DetailViewMode(i) == d.viewMode {
 			parts[i] = theme.Accent.Render(label)
@@ -185,12 +175,10 @@ func (d DetailPane) View() string {
 		}
 	}
 	sep := theme.Muted.Render(" · ")
-	title := parts[0] + sep + parts[1] + sep + parts[2]
+	title := parts[0] + sep + parts[1]
 
 	var content string
 	switch d.viewMode {
-	case DetailViewComments:
-		content = d.buildCommentsView()
 	case DetailViewNotes:
 		content = d.buildNotesView()
 	default:
@@ -258,55 +246,6 @@ func (d DetailPane) buildContent() string {
 	sections = append(sections, d.renderField(DetailFieldTags, "Tags", tags))
 
 	return strings.Join(sections, "\n\n")
-}
-
-// buildCommentsView renders the full comments list using available height
-func (d DetailPane) buildCommentsView() string {
-	theme := d.styles.Theme
-
-	if len(d.comments) == 0 {
-		return theme.Muted.Render("  No comments yet. Press c to add one.")
-	}
-
-	bodyMax := d.width - 8
-	if bodyMax < 10 {
-		bodyMax = 10
-	}
-
-	// Build each comment block
-	var blocks []string
-	for _, c := range d.comments {
-		header := "  " + theme.Muted.Render(fmt.Sprintf("%s @ %s", c.Author, c.CreatedAt.Format("Jan 2 15:04")))
-		// Wrap/truncate body lines
-		bodyLines := strings.Split(c.Body, "\n")
-		var rendered []string
-		for _, line := range bodyLines {
-			if len(line) > bodyMax {
-				line = line[:bodyMax-3] + "..."
-			}
-			rendered = append(rendered, "    "+line)
-		}
-		blocks = append(blocks, header+"\n"+strings.Join(rendered, "\n"))
-	}
-
-	// Calculate available lines (height minus border/padding ~4 lines)
-	availableLines := d.height - 4
-	if availableLines < 3 {
-		availableLines = 3
-	}
-
-	// Join all blocks and count lines
-	fullContent := strings.Join(blocks, "\n\n")
-	allLines := strings.Split(fullContent, "\n")
-
-	if len(allLines) <= availableLines {
-		return fullContent
-	}
-
-	// Bottom-anchor: show most recent comments that fit
-	visibleLines := allLines[len(allLines)-availableLines+1:]
-	earlier := fmt.Sprintf("  ... earlier comments above")
-	return theme.Muted.Render(earlier) + "\n" + strings.Join(visibleLines, "\n")
 }
 
 // renderField renders a single field with label and value
