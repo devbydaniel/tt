@@ -142,7 +142,7 @@ func DefaultTheme() *Theme {
 			Due:     "⚑",
 			Date:    "›",
 			Done:    "✓",
-			Note:    "[n]",
+			Note:    "¶",
 		},
 	}
 }
