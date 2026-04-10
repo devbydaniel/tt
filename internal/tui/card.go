@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // Card renders a bordered box with a title and content
 type Card struct {
@@ -12,8 +16,9 @@ func NewCard(styles *Styles) *Card {
 	return &Card{styles: styles}
 }
 
-// Render creates a bordered card with title and content at fixed dimensions
-func (c *Card) Render(title, content string, width, height int, focused bool) string {
+// Render creates a bordered card with title and content at fixed dimensions.
+// If tabs is non-empty, the header shows heading left-aligned and tabs right-aligned.
+func (c *Card) Render(heading, tabs, content string, width, height int, focused bool) string {
 	// Select border style based on focus
 	borderStyle := c.styles.UnfocusedSection
 	if focused {
@@ -21,7 +26,20 @@ func (c *Card) Render(title, content string, width, height int, focused bool) st
 	}
 
 	// Render header
-	header := c.styles.Theme.Header.Bold(true).Render(title)
+	var header string
+	if tabs == "" {
+		header = c.styles.Theme.Header.Bold(true).Render(heading)
+	} else {
+		innerWidth := width - 4 // border(2) + padding(2)
+		styledHeading := c.styles.Theme.Header.Bold(true).Render(heading)
+		headingW := lipgloss.Width(styledHeading)
+		tabsW := lipgloss.Width(tabs)
+		gap := innerWidth - headingW - tabsW
+		if gap < 1 {
+			gap = 1
+		}
+		header = styledHeading + strings.Repeat(" ", gap) + tabs
+	}
 
 	// Combine header and content with blank line between
 	innerContent := header + "\n\n" + content

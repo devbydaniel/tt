@@ -146,7 +146,7 @@ func (s Sidebar) IsScopesSectionActive() bool {
 func (s Sidebar) View() string {
 	headers := []string{"Lists", "Scopes", "Tags"}
 	section := s.sections[s.activeSection]
-	return s.card.Render(headers[s.activeSection], section.View(), s.width, s.boxHeight, s.focused)
+	return s.card.Render(headers[s.activeSection], "", section.View(), s.width, s.boxHeight, s.focused)
 }
 
 // SidebarItem represents an item in the sidebar

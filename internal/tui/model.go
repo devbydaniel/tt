@@ -837,6 +837,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.content = m.content.ResetViewMode()
+		m.content = m.content.SetShowTabs(m.hasScopeSelected())
 		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		return m, nil
 
@@ -846,6 +847,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.content = m.content.ResetViewMode()
+		m.content = m.content.SetShowTabs(m.hasScopeSelected())
 		m.content = m.content.SetScheduleGroups(msg.groups, msg.title, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		return m, nil
 

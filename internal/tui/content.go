@@ -40,6 +40,7 @@ type Content struct {
 	selectedIndex int  // index into displayTasks (-1 = none)
 
 	viewMode     ContentViewMode // tasks vs notes view
+	showTabs     bool            // whether to show Tasks/Notes tab indicator
 	scopeNotes   []note.Note     // notes for the selected project/area
 	selectedNote int             // index into scopeNotes
 }
@@ -339,15 +340,23 @@ func (c Content) View() string {
 		content = c.buildCurrentView()
 	}
 
-	title := c.title
-	switch c.viewMode {
-	case ContentViewTasks:
-		title = c.title + " · Tasks"
-	case ContentViewNotes:
-		title = c.title + " · Notes"
+	// Build tab indicator (only for scope views that support notes)
+	var tabs string
+	if c.showTabs {
+		theme := c.styles.Theme
+		labels := [2]string{"Tasks", "Notes"}
+		var parts [2]string
+		for i, label := range labels {
+			if ContentViewMode(i) == c.viewMode {
+				parts[i] = theme.Accent.Render(label)
+			} else {
+				parts[i] = theme.Muted.Render(label)
+			}
+		}
+		tabs = parts[0] + theme.Muted.Render(" · ") + parts[1]
 	}
 
-	return c.card.Render(title, content, c.width, c.height, c.focused)
+	return c.card.Render(c.title, tabs, content, c.width, c.height, c.focused)
 }
 
 // ScrollUp scrolls the content up
@@ -929,8 +938,15 @@ func (c Content) ToggleViewMode() Content {
 // ResetViewMode resets to Tasks view
 func (c Content) ResetViewMode() Content {
 	c.viewMode = ContentViewTasks
+	c.showTabs = false
 	c.scopeNotes = nil
 	c.selectedNote = 0
+	return c
+}
+
+// SetShowTabs controls whether the Tasks/Notes tab indicator is shown
+func (c Content) SetShowTabs(show bool) Content {
+	c.showTabs = show
 	return c
 }
 

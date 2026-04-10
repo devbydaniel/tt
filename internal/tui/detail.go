@@ -163,7 +163,7 @@ func (d DetailPane) View() string {
 		return ""
 	}
 
-	// View indicator in the title
+	// Build tab indicator
 	theme := d.styles.Theme
 	labels := [2]string{"Data", "Notes"}
 	var parts [2]string
@@ -174,8 +174,7 @@ func (d DetailPane) View() string {
 			parts[i] = theme.Muted.Render(label)
 		}
 	}
-	sep := theme.Muted.Render(" · ")
-	title := parts[0] + sep + parts[1]
+	tabs := parts[0] + theme.Muted.Render(" · ") + parts[1]
 
 	var content string
 	switch d.viewMode {
@@ -185,7 +184,7 @@ func (d DetailPane) View() string {
 		content = d.buildContent()
 	}
 
-	return d.card.Render(title, content, d.width, d.height, d.focused)
+	return d.card.Render("Task", tabs, content, d.width, d.height, d.focused)
 }
 
 // buildContent builds the detail pane content
