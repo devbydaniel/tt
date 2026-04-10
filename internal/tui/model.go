@@ -566,6 +566,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.Someday):
+			// In notes views, 's' launches fzf note search
+			if m.focusArea == FocusContent && m.content.ViewMode() == ContentViewNotes {
+				entityType, entityUUID := m.resolveScopeEntity()
+				if entityUUID != "" {
+					notesDir := m.app.SearchNotes.Repo.EntityDir(entityType, entityUUID)
+					return m, launchNoteSearchScope(notesDir)
+				}
+			}
+			if m.focusArea == FocusDetail && m.detailPane.ViewMode() == DetailViewNotes {
+				if t := m.detailPane.Task(); t != nil {
+					notesDir := m.app.SearchNotes.Repo.EntityDir(note.EntityTask, t.UUID)
+					return m, launchNoteSearchTask(notesDir, t.ID, t.UUID)
+				}
+			}
 			if m.focusArea == FocusContent {
 				if selectedTask := m.content.SelectedTask(); selectedTask != nil {
 					return m, m.toggleTaskState(selectedTask.ID, selectedTask.State)

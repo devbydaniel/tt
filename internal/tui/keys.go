@@ -21,6 +21,7 @@ type keyMap struct {
 	AddArea      key.Binding
 	Toggle       key.Binding
 	Someday      key.Binding
+	SearchNotes  key.Binding
 	Delete       key.Binding
 	AISync   key.Binding
 	NextView key.Binding
@@ -171,6 +172,7 @@ func (k detailNotesKeyMap) ShortHelp() []key.Binding {
 		keys.Down,
 		keys.Enter,
 		keys.Add,
+		keys.SearchNotes,
 		keys.Delete,
 		keys.Tab,
 		keys.AISync,
@@ -186,7 +188,7 @@ func (k detailNotesKeyMap) FullHelp() [][]key.Binding {
 type contentNotesKeyMap struct{}
 
 func (k contentNotesKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.Add, keys.Delete, keys.Tab, keys.FocusSidebar, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.Add, keys.SearchNotes, keys.Delete, keys.Tab, keys.FocusSidebar, keys.Quit}
 }
 
 func (k contentNotesKeyMap) FullHelp() [][]key.Binding {
@@ -373,6 +375,10 @@ var keys = keyMap{
 	Someday: key.NewBinding(
 		key.WithKeys("s"),
 		key.WithHelp("s", "someday"),
+	),
+	SearchNotes: key.NewBinding(
+		key.WithKeys("s"),
+		key.WithHelp("s", "search"),
 	),
 	Delete: key.NewBinding(
 		key.WithKeys("backspace"),
