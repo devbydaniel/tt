@@ -62,8 +62,8 @@ func (s Sidebar) SetSize(width, height int) Sidebar {
 	s.width = width
 	s.height = height
 
-	// Divide height equally among boxes
-	s.boxHeight = height / len(s.sections)
+	// Each section gets full height (rendered one at a time)
+	s.boxHeight = height
 	if s.boxHeight < 5 {
 		s.boxHeight = 5
 	}
@@ -142,19 +142,11 @@ func (s Sidebar) IsScopesSectionActive() bool {
 	return s.activeSection == 1 // Scopes section is index 1
 }
 
-// View renders the sidebar as three stacked bordered boxes
+// View renders the sidebar showing the active section at full height
 func (s Sidebar) View() string {
 	headers := []string{"Lists", "Scopes", "Tags"}
-	var boxes []string
-
-	for i, section := range s.sections {
-		// Only highlight active section when sidebar has focus
-		focused := s.focused && i == s.activeSection
-		box := s.card.Render(headers[i], section.View(), s.width, s.boxHeight, focused)
-		boxes = append(boxes, box)
-	}
-
-	return lipgloss.JoinVertical(lipgloss.Left, boxes...)
+	section := s.sections[s.activeSection]
+	return s.card.Render(headers[s.activeSection], section.View(), s.width, s.boxHeight, s.focused)
 }
 
 // SidebarItem represents an item in the sidebar

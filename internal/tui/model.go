@@ -741,9 +741,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			contentWidth = 1
 		}
 
-		// Calculate sidebar height that's evenly divisible by 3 (number of sections)
-		// This ensures all columns end at the same row
-		sidebarHeight := (availableHeight / 3) * 3
+		sidebarHeight := availableHeight
 
 		m.sidebar = m.sidebar.SetSize(sidebarWidth, sidebarHeight)
 		m.content = m.content.SetSize(contentWidth, sidebarHeight)

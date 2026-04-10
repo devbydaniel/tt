@@ -43,11 +43,11 @@ func (k sidebarKeyMap) FullHelp() [][]key.Binding {
 type sidebarProjectKeyMap struct{}
 
 func (k sidebarProjectKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Tab, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarProjectKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Tab, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Someday, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
 }
 
 // contentKeyMap provides help bindings when content is focused
@@ -248,22 +248,22 @@ func (k createProjectKeyMap) FullHelp() [][]key.Binding {
 type sidebarAreaKeyMap struct{}
 
 func (k sidebarAreaKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Rename, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Tab, keys.Rename, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarAreaKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.Rename, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Tab, keys.Rename, keys.Delete, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
 }
 
 // sidebarScopesKeyMap provides help bindings when scopes section is focused (no item selected)
 type sidebarScopesKeyMap struct{}
 
 func (k sidebarScopesKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Tab, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}
 }
 
 func (k sidebarScopesKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{keys.Up, keys.Down, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
+	return [][]key.Binding{{keys.Up, keys.Down, keys.Tab, keys.AddProject, keys.AddArea, keys.FocusContent, keys.Quit}}
 }
 
 var (
