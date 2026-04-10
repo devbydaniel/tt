@@ -1019,15 +1019,16 @@ func (c Content) buildNotesList() string {
 		if c.focused && i == c.selectedNote {
 			prefix = c.styles.SelectedItem.Render("> ")
 		}
-		date := n.Date.Format("Jan 2, 2006")
-		entry := date + "  " + n.Title
-		if len(entry) > maxWidth {
-			entry = entry[:maxWidth-3] + "..."
+		date := n.Date.Format("Jan 2")
+		title := n.Title
+		fullLen := len(date) + 2 + len(title)
+		if fullLen > maxWidth {
+			title = title[:max(0, maxWidth-len(date)-5)] + "..."
 		}
 		if c.focused && i == c.selectedNote {
-			lines = append(lines, prefix+theme.Accent.Render(entry))
+			lines = append(lines, prefix+theme.Accent.Render(date)+"  "+theme.Accent.Render(title))
 		} else {
-			lines = append(lines, prefix+entry)
+			lines = append(lines, prefix+theme.Muted.Render(date)+"  "+title)
 		}
 	}
 
