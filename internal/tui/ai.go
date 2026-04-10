@@ -28,60 +28,31 @@ func findAIBinary(cfg *config.AIConfig) (string, error) {
 func buildAISystemPrompt(t *task.Task) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "You were launched from the tt task manager in the context of task #%d: %q.\n\n", t.ID, t.Title)
+	b.WriteString("You have been activated through the TT Task Management CLI.\n\n")
+	fmt.Fprintf(&b, "Context: Task #%d — %s\n", t.ID, t.Title)
 
-	// Task details
-	b.WriteString("Task details:\n")
-	fmt.Fprintf(&b, "- Status: %s\n", t.Status)
-	fmt.Fprintf(&b, "- State: %s\n", t.State)
-
+	// Only include non-empty details
 	if t.Description != nil && *t.Description != "" {
-		fmt.Fprintf(&b, "- Description: %s\n", *t.Description)
-	} else {
-		b.WriteString("- Description: None\n")
+		fmt.Fprintf(&b, "Description: %s\n", *t.Description)
 	}
-
+	fmt.Fprintf(&b, "Status: %s | State: %s\n", t.Status, t.State)
 	if t.ParentName != nil {
-		fmt.Fprintf(&b, "- Project: %s\n", *t.ParentName)
-	} else {
-		b.WriteString("- Project: None\n")
+		fmt.Fprintf(&b, "Project: %s\n", *t.ParentName)
 	}
-
 	if t.AreaName != nil {
-		fmt.Fprintf(&b, "- Area: %s\n", *t.AreaName)
-	} else {
-		b.WriteString("- Area: None\n")
+		fmt.Fprintf(&b, "Area: %s\n", *t.AreaName)
 	}
-
 	if t.PlannedDate != nil {
-		fmt.Fprintf(&b, "- Planned: %s\n", t.PlannedDate.Format("Jan 2, 2006"))
-	} else {
-		b.WriteString("- Planned: None\n")
+		fmt.Fprintf(&b, "Planned: %s\n", t.PlannedDate.Format("Jan 2, 2006"))
 	}
-
 	if t.DueDate != nil {
-		fmt.Fprintf(&b, "- Due: %s\n", t.DueDate.Format("Jan 2, 2006"))
-	} else {
-		b.WriteString("- Due: None\n")
+		fmt.Fprintf(&b, "Due: %s\n", t.DueDate.Format("Jan 2, 2006"))
 	}
-
 	if len(t.Tags) > 0 {
-		fmt.Fprintf(&b, "- Tags: %s\n", strings.Join(t.Tags, ", "))
-	} else {
-		b.WriteString("- Tags: None\n")
+		fmt.Fprintf(&b, "Tags: %s\n", strings.Join(t.Tags, ", "))
 	}
 
-	// CLI reference
-	id := fmt.Sprintf("%d", t.ID)
-	b.WriteString("\nYou can use the tt CLI to interact with the task system:\n")
-	b.WriteString("  tt edit " + id + " --title \"...\"        # update task title\n")
-	b.WriteString("  tt edit " + id + " --description \"...\"  # update description\n")
-	b.WriteString("  tt list --json                        # list all tasks\n")
-	b.WriteString("  tt notes ls --task " + id + "             # list notes for this task\n")
-	b.WriteString("  tt notes add --task " + id + " --title \"...\" --body \"...\"  # add a note\n")
-	b.WriteString("  tt do " + id + "                          # mark task complete\n")
-	b.WriteString("  tt plan " + id + " <date>                 # set planned date\n")
-	b.WriteString("  tt due " + id + " <date>                  # set due date\n")
+	b.WriteString("\nUse `tt --help` and `tt <command> --help` to discover available CLI commands for interacting with tasks, projects, areas, notes, and more.\n")
 
 	return b.String()
 }
