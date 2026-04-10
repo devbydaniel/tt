@@ -839,6 +839,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.content = m.content.ResetViewMode()
 		m.content = m.content.SetShowTabs(m.hasScopeSelected())
 		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
+		if msg.scopeNotes != nil {
+			m.content = m.content.SetScopeNotes(msg.scopeNotes)
+		}
 		return m, nil
 
 	case scheduleTasksLoadedMsg:
@@ -849,6 +852,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.content = m.content.ResetViewMode()
 		m.content = m.content.SetShowTabs(m.hasScopeSelected())
 		m.content = m.content.SetScheduleGroups(msg.groups, msg.title, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
+		if msg.scopeNotes != nil {
+			m.content = m.content.SetScopeNotes(msg.scopeNotes)
+		}
 		return m, nil
 
 	case taskRenamedMsg:
@@ -1084,8 +1090,9 @@ type tasksLoadedMsg struct {
 	title          string
 	groupBy        string
 	hideScope      bool
-	preserveTaskID int64 // task ID to try to restore selection to
-	preserveIndex  int   // fallback index if task not found
+	preserveTaskID int64       // task ID to try to restore selection to
+	preserveIndex  int         // fallback index if task not found
+	scopeNotes     []note.Note // notes for the selected scope (if any)
 	err            error
 }
 
@@ -1102,8 +1109,9 @@ type scheduleTasksLoadedMsg struct {
 	groups         ScheduleGroups
 	title          string
 	hideScope      bool
-	preserveTaskID int64 // task ID to try to restore selection to
-	preserveIndex  int   // fallback index if task not found
+	preserveTaskID int64       // task ID to try to restore selection to
+	preserveIndex  int         // fallback index if task not found
+	scopeNotes     []note.Note // notes for the selected scope (if any)
 	err            error
 }
 
@@ -1237,9 +1245,26 @@ func (m Model) loadTasksForSelection() tea.Msg {
 	}
 	sortOpts, _ := task.ParseSort(sortStr)
 
+	// Load scope notes for project/area views
+	var scopeNotes []note.Note
+	if item.Type == "project" || item.Type == "area" {
+		entityType, entityUUID := m.resolveScopeEntity()
+		if entityUUID != "" {
+			scopeNotes, _ = m.app.ListNotes.Execute(noteusecases.ListOptions{
+				EntityType: entityType,
+				EntityUUID: entityUUID,
+			})
+		}
+	}
+
 	// Schedule grouping requires 4 separate queries
 	if groupBy == "schedule" {
-		return m.loadScheduleGroups(item, title, sortOpts, hideScope)
+		msg := m.loadScheduleGroups(item, title, sortOpts, hideScope)
+		if typedMsg, ok := msg.(scheduleTasksLoadedMsg); ok {
+			typedMsg.scopeNotes = scopeNotes
+			return typedMsg
+		}
+		return msg
 	}
 
 	// Build list options based on selection
@@ -1254,7 +1279,7 @@ func (m Model) loadTasksForSelection() tea.Msg {
 		return tasksLoadedMsg{err: err}
 	}
 
-	return tasksLoadedMsg{tasks: tasks, title: title, groupBy: groupBy, hideScope: hideScope}
+	return tasksLoadedMsg{tasks: tasks, title: title, groupBy: groupBy, hideScope: hideScope, scopeNotes: scopeNotes}
 }
 
 // buildListOptions creates ListOptions based on sidebar selection

@@ -165,7 +165,7 @@ func (d DetailPane) View() string {
 
 	// Build tab indicator
 	theme := d.styles.Theme
-	labels := [2]string{"Data", "Notes"}
+	labels := [2]string{"Data", fmt.Sprintf("Notes [%d]", len(d.notes))}
 	var parts [2]string
 	for i, label := range labels {
 		if DetailViewMode(i) == d.viewMode {

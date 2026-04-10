@@ -344,7 +344,10 @@ func (c Content) View() string {
 	var tabs string
 	if c.showTabs {
 		theme := c.styles.Theme
-		labels := [2]string{"Tasks", "Notes"}
+		labels := [2]string{
+			fmt.Sprintf("Tasks [%d]", len(c.displayTasks)),
+			fmt.Sprintf("Notes [%d]", len(c.scopeNotes)),
+		}
 		var parts [2]string
 		for i, label := range labels {
 			if ContentViewMode(i) == c.viewMode {
