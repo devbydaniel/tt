@@ -59,6 +59,7 @@ For non-interactive use, see ` + "`tt notes ls`, `tt notes add`, `tt notes searc
 	registerEntityFlagCompletions(cmd, deps)
 
 	cmd.AddCommand(newNotesListCmd(deps))
+	cmd.AddCommand(newNotesBrowseCmd(deps))
 	cmd.AddCommand(newNotesAddCmd(deps))
 	cmd.AddCommand(newNotesSearchCmd(deps))
 
@@ -128,6 +129,83 @@ With --before / --after, filter notes by date (YYYY-MM-DD, inclusive).`,
 	}
 	addEntityFlags(cmd, &taskID, &projectRef, &areaName)
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
+	cmd.Flags().StringVar(&beforeStr, "before", "", "Show notes on or before this date (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&afterStr, "after", "", "Show notes on or after this date (YYYY-MM-DD)")
+	registerEntityFlagCompletions(cmd, deps)
+	return cmd
+}
+
+func newNotesBrowseCmd(deps *Dependencies) *cobra.Command {
+	var taskID int64
+	var projectRef string
+	var areaName string
+	var beforeStr string
+	var afterStr string
+
+	cmd := &cobra.Command{
+		Use:   "browse",
+		Short: "Interactively browse notes with fzf and open in $EDITOR",
+		Long: `Browse notes interactively using fzf.
+
+Works exactly like "tt notes ls" but pipes results through fzf for
+fuzzy selection. The chosen note is opened in $EDITOR.
+
+With no entity flag, browses every note across all entities.
+With --task / --project / --area, browses only notes for that entity.
+With --before / --after, filter notes by date (YYYY-MM-DD, inclusive).`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts := noteusecases.ListOptions{}
+			showEntity := true
+
+			if taskID != 0 || projectRef != "" || areaName != "" {
+				ref, err := resolveEntityRef(deps, taskID, projectRef, areaName)
+				if err != nil {
+					return err
+				}
+				opts.EntityType = ref.entityType
+				opts.EntityUUID = ref.entityUUID
+				showEntity = false
+			}
+
+			if beforeStr != "" {
+				t, err := time.ParseInLocation("2006-01-02", beforeStr, time.Local)
+				if err != nil {
+					return fmt.Errorf("invalid --before date (expected YYYY-MM-DD): %w", err)
+				}
+				opts.Before = t
+			}
+			if afterStr != "" {
+				t, err := time.ParseInLocation("2006-01-02", afterStr, time.Local)
+				if err != nil {
+					return fmt.Errorf("invalid --after date (expected YYYY-MM-DD): %w", err)
+				}
+				opts.After = t
+			}
+
+			notes, err := deps.App.ListNotes.Execute(opts)
+			if err != nil {
+				return err
+			}
+
+			notes = enrichNotes(deps, notes)
+
+			if len(notes) == 0 {
+				fmt.Fprintln(os.Stderr, "No notes found.")
+				return nil
+			}
+
+			selectedPath, err := pickNoteWithFzf(notes, showEntity)
+			if err != nil {
+				return err
+			}
+			if selectedPath == "" {
+				return nil
+			}
+			return openInEditor(selectedPath)
+		},
+	}
+	addEntityFlags(cmd, &taskID, &projectRef, &areaName)
 	cmd.Flags().StringVar(&beforeStr, "before", "", "Show notes on or before this date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&afterStr, "after", "", "Show notes on or after this date (YYYY-MM-DD)")
 	registerEntityFlagCompletions(cmd, deps)
@@ -460,7 +538,7 @@ func runInteractiveNotes(deps *Dependencies, ref entityRef) error {
 		return nil
 	}
 
-	selectedPath, err := pickNoteWithFzf(notes)
+	selectedPath, err := pickNoteWithFzf(notes, false)
 	if err != nil {
 		return err
 	}
@@ -491,15 +569,24 @@ func shellQuote(s string) string {
 // pickNoteWithFzf displays notes in fzf and returns the absolute path of the
 // selection, or "" if the user canceled. Falls back to a numeric prompt if
 // fzf is not installed.
-func pickNoteWithFzf(notes []note.Note) (string, error) {
+func pickNoteWithFzf(notes []note.Note, showEntity bool) (string, error) {
 	if _, err := exec.LookPath("fzf"); err != nil {
-		return pickNoteFallback(notes)
+		return pickNoteFallback(notes, showEntity)
 	}
 
 	// Each line is "<display>\t<path>". --with-nth=1 hides the path column.
 	var input strings.Builder
 	for _, n := range notes {
-		display := fmt.Sprintf("%s  %s", n.Date.Format("2006-01-02"), n.Title)
+		var display string
+		if showEntity {
+			label := n.EntityName
+			if label == "" {
+				label = n.EntityUUID
+			}
+			display = fmt.Sprintf("%s  [%s] %s  %s", n.Date.Format("2006-01-02"), n.EntityType, label, n.Title)
+		} else {
+			display = fmt.Sprintf("%s  %s", n.Date.Format("2006-01-02"), n.Title)
+		}
 		input.WriteString(display)
 		input.WriteByte('\t')
 		input.WriteString(n.Path)
@@ -543,10 +630,18 @@ func pickNoteWithFzf(notes []note.Note) (string, error) {
 	return parts[1], nil
 }
 
-func pickNoteFallback(notes []note.Note) (string, error) {
+func pickNoteFallback(notes []note.Note, showEntity bool) (string, error) {
 	fmt.Fprintln(os.Stderr, "fzf not installed — falling back to numeric picker.")
 	for i, n := range notes {
-		fmt.Fprintf(os.Stderr, "  %2d  %s  %s\n", i+1, n.Date.Format("2006-01-02"), n.Title)
+		if showEntity {
+			label := n.EntityName
+			if label == "" {
+				label = n.EntityUUID
+			}
+			fmt.Fprintf(os.Stderr, "  %2d  %s  [%s] %s  %s\n", i+1, n.Date.Format("2006-01-02"), n.EntityType, label, n.Title)
+		} else {
+			fmt.Fprintf(os.Stderr, "  %2d  %s  %s\n", i+1, n.Date.Format("2006-01-02"), n.Title)
+		}
 	}
 	choice, err := promptLine("Select note number (empty to cancel): ")
 	if err != nil {
