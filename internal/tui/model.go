@@ -68,6 +68,7 @@ type Model struct {
 	detailVisible      bool // whether the detail pane is shown
 	notePreviewPane    NotePreviewPane
 	notePreviewVisible bool // whether the note preview pane is shown
+	followMode         bool // follow mode: detail auto-updates with selection
 
 	// Cached data
 	areas    []area.Area
@@ -393,6 +394,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Escape):
 			if m.focusArea == FocusDetail && m.notePreviewVisible {
 				// Close note preview pane, return to content
+				m.followMode = false
 				m.focusArea = FocusContent
 				m.notePreviewPane = m.notePreviewPane.SetFocused(false)
 				m.notePreviewVisible = false
@@ -402,6 +404,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if m.focusArea == FocusDetail {
 				// Close detail pane, return to content
+				m.followMode = false
 				m.focusArea = FocusContent
 				m.detailPane = m.detailPane.SetFocused(false)
 				m.detailVisible = false
@@ -411,9 +414,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
-				// If note preview is visible, close it first
-				if m.notePreviewVisible {
+				// If follow mode or note preview is visible, close it first
+				if m.followMode || m.notePreviewVisible {
+					m.followMode = false
 					m.notePreviewVisible = false
+					m.detailVisible = false
 					m = m.recalculateLayout()
 					return m, nil
 				}
@@ -447,6 +452,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
+				m.followMode = false
 				m.focusArea = FocusSidebar
 				m.sidebar = m.sidebar.SetFocused(true)
 				m.content = m.content.SetShowSelection(false)
@@ -465,6 +471,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
+				if m.followMode {
+					// Transition from follow mode to full detail mode
+					m.followMode = false
+					m.focusArea = FocusDetail
+					m.content = m.content.SetFocused(false)
+					m.content = m.content.SetShowSelection(true)
+					if m.notePreviewVisible {
+						m.notePreviewPane = m.notePreviewPane.SetFocused(true)
+					} else {
+						m.detailPane = m.detailPane.SetFocused(true)
+					}
+					return m, nil
+				}
 				// l from content opens detail pane (tasks view) or note preview (notes view)
 				if m.content.ViewMode() == ContentViewTasks {
 					return m.openDetailPane()
@@ -473,6 +492,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m.openNotePreview()
 				}
 				return m, nil
+			}
+
+		case key.Matches(msg, keys.Follow):
+			if m.focusArea == FocusContent {
+				m.followMode = !m.followMode
+				if m.followMode {
+					return m.activateFollowMode()
+				}
+				return m.deactivateFollowMode()
 			}
 
 		case key.Matches(msg, keys.Rename):
@@ -731,12 +759,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.hasScopeSelected() {
 					return m, nil
 				}
-				// Close note preview when switching views
-				if m.notePreviewVisible {
-					m.notePreviewVisible = false
-					m = m.recalculateLayout()
-				}
+				// Close current panes when switching views
+				m.notePreviewVisible = false
+				m.detailVisible = false
 				m.content = m.content.ToggleViewMode()
+				if m.followMode {
+					// Re-activate follow mode for the new view
+					m = m.recalculateLayout()
+					if m.content.ViewMode() == ContentViewNotes {
+						// Need to load notes first, then activate follow in scopeNotesLoadedMsg
+						return m, m.loadScopeNotes()
+					}
+					return m.activateFollowMode()
+				}
+				m = m.recalculateLayout()
 				if m.content.ViewMode() == ContentViewNotes {
 					return m, m.loadScopeNotes()
 				}
@@ -754,12 +790,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.hasScopeSelected() {
 					return m, nil
 				}
-				// Close note preview when switching views
-				if m.notePreviewVisible {
-					m.notePreviewVisible = false
-					m = m.recalculateLayout()
-				}
+				// Close current panes when switching views
+				m.notePreviewVisible = false
+				m.detailVisible = false
 				m.content = m.content.ToggleViewMode()
+				if m.followMode {
+					// Re-activate follow mode for the new view
+					m = m.recalculateLayout()
+					if m.content.ViewMode() == ContentViewNotes {
+						return m, m.loadScopeNotes()
+					}
+					return m.activateFollowMode()
+				}
+				m = m.recalculateLayout()
 				if m.content.ViewMode() == ContentViewNotes {
 					return m, m.loadScopeNotes()
 				}
@@ -789,6 +832,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				} else {
 					m.content = m.content.MoveUp()
+					if m.followMode && m.detailVisible {
+						if sel := m.content.SelectedTask(); sel != nil {
+							m.detailPane = m.detailPane.SetTask(sel)
+							return m, m.loadNotes(sel.UUID, sel.ID)
+						}
+					}
 				}
 				return m, nil
 			}
@@ -816,6 +865,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				} else {
 					m.content = m.content.MoveDown()
+					if m.followMode && m.detailVisible {
+						if sel := m.content.SelectedTask(); sel != nil {
+							m.detailPane = m.detailPane.SetTask(sel)
+							return m, m.loadNotes(sel.UUID, sel.ID)
+						}
+					}
 				}
 				return m, nil
 			}
@@ -934,11 +989,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		// ResetViewMode forces back to tasks view; close any note preview pane
+		m.notePreviewVisible = false
 		m.content = m.content.ResetViewMode()
 		m.content = m.content.SetShowTabs(m.hasScopeSelected())
 		m.content = m.content.SetTasks(msg.tasks, msg.title, msg.groupBy, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		if msg.scopeNotes != nil {
 			m.content = m.content.SetScopeNotes(msg.scopeNotes)
+		}
+		if m.followMode && m.focusArea == FocusContent {
+			if sel := m.content.SelectedTask(); sel != nil {
+				m.detailVisible = true
+				m.detailPane = m.detailPane.SetTask(sel)
+				m.detailPane = m.detailPane.SetFocused(false)
+				m = m.recalculateLayout()
+				return m, m.loadNotes(sel.UUID, sel.ID)
+			}
+			// No tasks available — deactivate follow mode
+			m.followMode = false
+			m.detailVisible = false
+			m = m.recalculateLayout()
 		}
 		return m, nil
 
@@ -947,11 +1017,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		// ResetViewMode forces back to tasks view; close any note preview pane
+		m.notePreviewVisible = false
 		m.content = m.content.ResetViewMode()
 		m.content = m.content.SetShowTabs(m.hasScopeSelected())
 		m.content = m.content.SetScheduleGroups(msg.groups, msg.title, msg.hideScope, msg.preserveTaskID, msg.preserveIndex)
 		if msg.scopeNotes != nil {
 			m.content = m.content.SetScopeNotes(msg.scopeNotes)
+		}
+		if m.followMode && m.focusArea == FocusContent {
+			if sel := m.content.SelectedTask(); sel != nil {
+				m.detailVisible = true
+				m.detailPane = m.detailPane.SetTask(sel)
+				m.detailPane = m.detailPane.SetFocused(false)
+				m = m.recalculateLayout()
+				return m, m.loadNotes(sel.UUID, sel.ID)
+			}
+			// No tasks available — deactivate follow mode
+			m.followMode = false
+			m.detailVisible = false
+			m = m.recalculateLayout()
 		}
 		return m, nil
 
@@ -1159,6 +1244,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.content = m.content.SetScopeNotes(msg.notes)
+		if m.followMode && !m.notePreviewVisible && m.focusArea == FocusContent {
+			// Activate follow mode now that notes are loaded (e.g. after Tab switch)
+			return m.activateFollowMode()
+		}
 		if m.notePreviewVisible {
 			return m, m.updateNotePreview()
 		}
@@ -1685,6 +1774,47 @@ func (m Model) openNotePreview() (tea.Model, tea.Cmd) {
 
 	// Load note content asynchronously
 	return m, m.loadNoteContent(selectedNote)
+}
+
+// activateFollowMode opens the detail/preview pane without moving focus from content
+func (m Model) activateFollowMode() (tea.Model, tea.Cmd) {
+	if m.content.ViewMode() == ContentViewTasks {
+		selectedTask := m.content.SelectedTask()
+		if selectedTask == nil {
+			m.followMode = false
+			return m, nil
+		}
+		m.detailVisible = true
+		m.notePreviewVisible = false
+		m.detailPane = m.detailPane.SetTask(selectedTask)
+		m.detailPane = m.detailPane.SetFocused(false)
+		m.content = m.content.SetShowSelection(true)
+		m = m.recalculateLayout()
+		return m, m.loadNotes(selectedTask.UUID, selectedTask.ID)
+	}
+	if m.content.ViewMode() == ContentViewNotes {
+		selectedNote := m.content.SelectedNote()
+		if selectedNote == nil {
+			m.followMode = false
+			return m, nil
+		}
+		m.notePreviewVisible = true
+		m.detailVisible = false
+		m.notePreviewPane = m.notePreviewPane.SetFocused(false)
+		m = m.recalculateLayout()
+		return m, m.updateNotePreview()
+	}
+	m.followMode = false
+	return m, nil
+}
+
+// deactivateFollowMode closes the detail/preview pane
+func (m Model) deactivateFollowMode() (tea.Model, tea.Cmd) {
+	m.detailVisible = false
+	m.notePreviewVisible = false
+	m.content = m.content.SetShowSelection(false)
+	m = m.recalculateLayout()
+	return m, nil
 }
 
 // noteContentMsg carries the loaded note content

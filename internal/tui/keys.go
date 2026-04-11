@@ -24,6 +24,7 @@ type keyMap struct {
 	SearchNotes  key.Binding
 	Delete       key.Binding
 	AISync       key.Binding
+	Follow       key.Binding
 	NextView     key.Binding
 	PrevView     key.Binding
 	Help         key.Binding
@@ -56,7 +57,7 @@ func (k sidebarProjectKeyMap) FullHelp() [][]key.Binding {
 type contentKeyMap struct{}
 
 func (k contentKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Someday, keys.Delete, keys.AISync, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.FocusSidebar, keys.Rename, keys.Move, keys.Planned, keys.Due, keys.Tags, keys.Add, keys.Toggle, keys.Someday, keys.Delete, keys.Follow, keys.AISync, keys.Quit}
 }
 
 func (k contentKeyMap) FullHelp() [][]key.Binding {
@@ -189,7 +190,7 @@ func (k detailNotesKeyMap) FullHelp() [][]key.Binding {
 type contentNotesKeyMap struct{}
 
 func (k contentNotesKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.FocusContent, keys.Add, keys.SearchNotes, keys.Delete, keys.Tab, keys.FocusSidebar, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.FocusContent, keys.Add, keys.SearchNotes, keys.Delete, keys.Follow, keys.Tab, keys.FocusSidebar, keys.Quit}
 }
 
 func (k contentNotesKeyMap) FullHelp() [][]key.Binding {
@@ -412,6 +413,10 @@ var keys = keyMap{
 	AISync: key.NewBinding(
 		key.WithKeys("!"),
 		key.WithHelp("!", "ai chat"),
+	),
+	Follow: key.NewBinding(
+		key.WithKeys("f"),
+		key.WithHelp("f", "follow"),
 	),
 	NextView: key.NewBinding(
 		key.WithKeys("ctrl+j"),
