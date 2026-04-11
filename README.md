@@ -307,6 +307,11 @@ tt notes ls                            # all notes everywhere
 tt notes ls --task 5
 tt notes ls --project Work --json
 
+# Browse notes interactively with fzf, open selection in $EDITOR
+tt notes browse                        # all notes everywhere
+tt notes browse --task 5               # scoped to one entity
+tt notes browse --after 2025-01-01     # date-filtered
+
 # Create a note non-interactively (prints the path)
 tt notes add --task 5 --title "Kickoff" --body "first thoughts"
 tt notes add --area Health --title "Retro" --body-file retro.md
