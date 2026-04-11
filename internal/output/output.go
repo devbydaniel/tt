@@ -9,6 +9,7 @@ import (
 
 	"github.com/devbydaniel/tt/internal/dateutil"
 	"github.com/devbydaniel/tt/internal/domain/area"
+	"github.com/devbydaniel/tt/internal/domain/note"
 	"github.com/devbydaniel/tt/internal/domain/task"
 	"github.com/devbydaniel/tt/internal/recurparse"
 )
@@ -751,6 +752,24 @@ func formatTagList(tags []string) string {
 		result += "#" + tag
 	}
 	return result
+}
+
+func (f *Formatter) NoteList(notes []note.Note, showEntity bool) {
+	if len(notes) == 0 {
+		fmt.Fprintln(f.w, "No notes")
+		return
+	}
+	for _, n := range notes {
+		if showEntity {
+			label := n.EntityName
+			if label == "" {
+				label = n.EntityUUID
+			}
+			fmt.Fprintf(f.w, "%s  [%s] %s  %s\n", n.Date.Format("2006-01-02"), n.EntityType, label, n.Title)
+		} else {
+			fmt.Fprintf(f.w, "%s  %s\n", n.Date.Format("2006-01-02"), n.Title)
+		}
+	}
 }
 
 func (f *Formatter) Error(msg string) {

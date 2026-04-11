@@ -1,10 +1,24 @@
 package usecases
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/devbydaniel/tt/internal/domain/note"
 )
+
+// parseDateFlag parses a YYYY-MM-DD string into a local-midnight time.Time.
+// Returns the zero value if value is empty.
+func ParseDateFlag(flag, value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	t, err := time.ParseInLocation("2006-01-02", value, time.Local)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid --%s date (expected YYYY-MM-DD): %w", flag, err)
+	}
+	return t, nil
+}
 
 // ListNotes returns notes for a given entity, or all notes if EntityType is empty.
 type ListNotes struct {
@@ -39,11 +53,10 @@ func (l *ListNotes) Execute(opts ListOptions) ([]note.Note, error) {
 	if !opts.Before.IsZero() || !opts.After.IsZero() {
 		filtered := notes[:0]
 		for _, n := range notes {
-			date := n.Date.Truncate(24 * time.Hour)
-			if !opts.After.IsZero() && date.Before(opts.After) {
+			if !opts.After.IsZero() && n.Date.Before(opts.After) {
 				continue
 			}
-			if !opts.Before.IsZero() && date.After(opts.Before) {
+			if !opts.Before.IsZero() && n.Date.After(opts.Before) {
 				continue
 			}
 			filtered = append(filtered, n)

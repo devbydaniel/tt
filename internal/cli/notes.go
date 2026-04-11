@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -97,19 +96,12 @@ With --before / --after, filter notes by date (YYYY-MM-DD, inclusive).`,
 				opts.EntityUUID = ref.entityUUID
 			}
 
-			if beforeStr != "" {
-				t, err := time.ParseInLocation("2006-01-02", beforeStr, time.Local)
-				if err != nil {
-					return fmt.Errorf("invalid --before date (expected YYYY-MM-DD): %w", err)
-				}
-				opts.Before = t
+			var err error
+			if opts.Before, err = noteusecases.ParseDateFlag("before", beforeStr); err != nil {
+				return err
 			}
-			if afterStr != "" {
-				t, err := time.ParseInLocation("2006-01-02", afterStr, time.Local)
-				if err != nil {
-					return fmt.Errorf("invalid --after date (expected YYYY-MM-DD): %w", err)
-				}
-				opts.After = t
+			if opts.After, err = noteusecases.ParseDateFlag("after", afterStr); err != nil {
+				return err
 			}
 
 			notes, err := deps.App.ListNotes.Execute(opts)
@@ -123,7 +115,8 @@ With --before / --after, filter notes by date (YYYY-MM-DD, inclusive).`,
 			if jsonOutput {
 				return output.WriteJSON(os.Stdout, notes)
 			}
-			printNotesTable(os.Stdout, notes, opts.EntityType == "")
+			f := output.NewFormatter(os.Stdout, nil)
+			f.NoteList(notes, opts.EntityType == "")
 			return nil
 		},
 	}
@@ -168,19 +161,12 @@ With --before / --after, filter notes by date (YYYY-MM-DD, inclusive).`,
 				showEntity = false
 			}
 
-			if beforeStr != "" {
-				t, err := time.ParseInLocation("2006-01-02", beforeStr, time.Local)
-				if err != nil {
-					return fmt.Errorf("invalid --before date (expected YYYY-MM-DD): %w", err)
-				}
-				opts.Before = t
+			var err error
+			if opts.Before, err = noteusecases.ParseDateFlag("before", beforeStr); err != nil {
+				return err
 			}
-			if afterStr != "" {
-				t, err := time.ParseInLocation("2006-01-02", afterStr, time.Local)
-				if err != nil {
-					return fmt.Errorf("invalid --after date (expected YYYY-MM-DD): %w", err)
-				}
-				opts.After = t
+			if opts.After, err = noteusecases.ParseDateFlag("after", afterStr); err != nil {
+				return err
 			}
 
 			notes, err := deps.App.ListNotes.Execute(opts)
@@ -704,22 +690,3 @@ func readBodyFile(path string) (string, error) {
 	return string(b), nil
 }
 
-// ----- output helpers -------------------------------------------------------
-
-func printNotesTable(w io.Writer, notes []note.Note, showEntity bool) {
-	if len(notes) == 0 {
-		fmt.Fprintln(w, "No notes")
-		return
-	}
-	for _, n := range notes {
-		if showEntity {
-			label := n.EntityName
-			if label == "" {
-				label = n.EntityUUID
-			}
-			fmt.Fprintf(w, "%s  [%s] %s  %s\n", n.Date.Format("2006-01-02"), n.EntityType, label, n.Title)
-		} else {
-			fmt.Fprintf(w, "%s  %s\n", n.Date.Format("2006-01-02"), n.Title)
-		}
-	}
-}
