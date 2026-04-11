@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -71,6 +72,8 @@ func newNotesListCmd(deps *Dependencies) *cobra.Command {
 	var projectRef string
 	var areaName string
 	var jsonOutput bool
+	var beforeStr string
+	var afterStr string
 
 	cmd := &cobra.Command{
 		Use:   "ls",
@@ -78,7 +81,8 @@ func newNotesListCmd(deps *Dependencies) *cobra.Command {
 		Long: `List notes.
 
 With no entity flag, lists every note across all entities.
-With --task / --project / --area, lists only notes for that entity.`,
+With --task / --project / --area, lists only notes for that entity.
+With --before / --after, filter notes by date (YYYY-MM-DD, inclusive).`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts := noteusecases.ListOptions{}
@@ -90,6 +94,21 @@ With --task / --project / --area, lists only notes for that entity.`,
 				}
 				opts.EntityType = ref.entityType
 				opts.EntityUUID = ref.entityUUID
+			}
+
+			if beforeStr != "" {
+				t, err := time.ParseInLocation("2006-01-02", beforeStr, time.Local)
+				if err != nil {
+					return fmt.Errorf("invalid --before date (expected YYYY-MM-DD): %w", err)
+				}
+				opts.Before = t
+			}
+			if afterStr != "" {
+				t, err := time.ParseInLocation("2006-01-02", afterStr, time.Local)
+				if err != nil {
+					return fmt.Errorf("invalid --after date (expected YYYY-MM-DD): %w", err)
+				}
+				opts.After = t
 			}
 
 			notes, err := deps.App.ListNotes.Execute(opts)
@@ -109,6 +128,8 @@ With --task / --project / --area, lists only notes for that entity.`,
 	}
 	addEntityFlags(cmd, &taskID, &projectRef, &areaName)
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
+	cmd.Flags().StringVar(&beforeStr, "before", "", "Show notes on or before this date (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&afterStr, "after", "", "Show notes on or after this date (YYYY-MM-DD)")
 	registerEntityFlagCompletions(cmd, deps)
 	return cmd
 }
