@@ -143,12 +143,4 @@ func (m CreateNoteModal) View() string {
 	)
 }
 
-var errNoteTitleRequired = &createNoteError{"Note title is required"}
-
-type createNoteError struct {
-	msg string
-}
-
-func (e *createNoteError) Error() string {
-	return e.msg
-}
+var errNoteTitleRequired = &modalError{"Note title is required"}

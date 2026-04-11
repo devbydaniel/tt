@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/sahilm/fuzzy"
 
 	"github.com/devbydaniel/tt/internal/domain/area"
 	"github.com/devbydaniel/tt/internal/domain/task"
@@ -131,26 +130,7 @@ func (m MoveModal) SetSize(width, height int) MoveModal {
 // filterItems filters items based on the current input using fuzzy matching
 func (m MoveModal) filterItems() []MoveItem {
 	query := strings.TrimSpace(m.input.Value())
-	if query == "" {
-		return m.allItems
-	}
-
-	// Build list of labels for fuzzy matching
-	labels := make([]string, len(m.allItems))
-	for i, item := range m.allItems {
-		labels[i] = item.Label
-	}
-
-	// Fuzzy match
-	matches := fuzzy.Find(query, labels)
-
-	// Return matched items in order of match quality
-	result := make([]MoveItem, len(matches))
-	for i, match := range matches {
-		result[i] = m.allItems[match.Index]
-	}
-
-	return result
+	return fuzzyFilterItems(query, m.allItems)
 }
 
 // Update handles input events

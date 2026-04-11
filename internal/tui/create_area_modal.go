@@ -128,12 +128,4 @@ func (m CreateAreaModal) View() string {
 }
 
 // Error messages
-var errAreaNameRequired = &createAreaError{"Area name is required"}
-
-type createAreaError struct {
-	msg string
-}
-
-func (e *createAreaError) Error() string {
-	return e.msg
-}
+var errAreaNameRequired = &modalError{"Area name is required"}

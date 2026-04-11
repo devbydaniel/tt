@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/sahilm/fuzzy"
 
 	"github.com/devbydaniel/tt/internal/domain/area"
 )
@@ -154,26 +153,7 @@ func (m CreateProjectModal) updateFocus() CreateProjectModal {
 // filterAreas filters areas based on the current input using fuzzy matching
 func (m CreateProjectModal) filterAreas() []MoveItem {
 	query := strings.TrimSpace(m.areaInput.Value())
-	if query == "" {
-		return m.allAreas
-	}
-
-	// Build list of labels for fuzzy matching
-	labels := make([]string, len(m.allAreas))
-	for i, item := range m.allAreas {
-		labels[i] = item.Label
-	}
-
-	// Fuzzy match
-	matches := fuzzy.Find(query, labels)
-
-	// Return matched items in order of match quality
-	result := make([]MoveItem, len(matches))
-	for i, match := range matches {
-		result[i] = m.allAreas[match.Index]
-	}
-
-	return result
+	return fuzzyFilterItems(query, m.allAreas)
 }
 
 // Update handles input events
@@ -371,12 +351,4 @@ func (m CreateProjectModal) renderAreaList() string {
 }
 
 // Error messages
-var errProjectNameRequired = &createProjectError{"Project name is required"}
-
-type createProjectError struct {
-	msg string
-}
-
-func (e *createProjectError) Error() string {
-	return e.msg
-}
+var errProjectNameRequired = &modalError{"Project name is required"}

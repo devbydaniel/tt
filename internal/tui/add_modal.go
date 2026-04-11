@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/sahilm/fuzzy"
 
 	"github.com/devbydaniel/tt/internal/dateparse"
 	"github.com/devbydaniel/tt/internal/domain/area"
@@ -255,26 +254,7 @@ func (m AddModal) updateFocus() AddModal {
 // filterScopes filters scopes based on the current input using fuzzy matching
 func (m AddModal) filterScopes() []MoveItem {
 	query := strings.TrimSpace(m.scopeInput.Value())
-	if query == "" {
-		return m.allScopes
-	}
-
-	// Build list of labels for fuzzy matching
-	labels := make([]string, len(m.allScopes))
-	for i, item := range m.allScopes {
-		labels[i] = item.Label
-	}
-
-	// Fuzzy match
-	matches := fuzzy.Find(query, labels)
-
-	// Return matched items in order of match quality
-	result := make([]MoveItem, len(matches))
-	for i, match := range matches {
-		result[i] = m.allScopes[match.Index]
-	}
-
-	return result
+	return fuzzyFilterItems(query, m.allScopes)
 }
 
 // Update handles input events
@@ -521,15 +501,7 @@ func (m AddModal) renderScopeList() string {
 
 // Error messages
 var (
-	errTitleRequired      = &addModalError{"Title is required"}
-	errInvalidPlannedDate = &addModalError{"Invalid planned date"}
-	errInvalidDueDate     = &addModalError{"Invalid due date"}
+	errTitleRequired      = &modalError{"Title is required"}
+	errInvalidPlannedDate = &modalError{"Invalid planned date"}
+	errInvalidDueDate     = &modalError{"Invalid due date"}
 )
-
-type addModalError struct {
-	msg string
-}
-
-func (e *addModalError) Error() string {
-	return e.msg
-}

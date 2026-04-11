@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -222,128 +223,9 @@ func (m Model) loadData() tea.Msg {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Route keys to add modal when active
-		if m.addModal.Active() {
-			var result *AddResult
-			m.addModal, result = m.addModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.createTask(result)
-			}
-			return m, nil
-		}
-
-		// Route keys to rename modal when active
-		if m.renameModal.Active() {
-			var result *RenameResult
-			m.renameModal, result = m.renameModal.Update(msg)
-			if result != nil && !result.Canceled {
-				// Rename was confirmed
-				if result.ItemType == "area" {
-					return m, m.renameArea(result.ItemKey, result.NewTitle)
-				}
-				return m, m.renameTask(result.TaskID, result.NewTitle)
-			}
-			return m, nil
-		}
-
-		// Route keys to move modal when active
-		if m.moveModal.Active() {
-			var result *MoveResult
-			m.moveModal, result = m.moveModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.moveTask(result.TaskID, result.ItemType, result.Name)
-			}
-			return m, nil
-		}
-
-		// Route keys to date modal when active
-		if m.dateModal.Active() {
-			var result *DateResult
-			m.dateModal, result = m.dateModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.setTaskDate(result.TaskID, result.Date, result.Mode)
-			}
-			return m, nil
-		}
-
-		// Route keys to tag modal when active
-		if m.tagModal.Active() {
-			var result *TagResult
-			m.tagModal, result = m.tagModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.setTaskTags(result.TaskID, result.Tags)
-			}
-			return m, nil
-		}
-
-		// Route keys to description modal when active
-		if m.descriptionModal.Active() {
-			var result *DescriptionResult
-			m.descriptionModal, result = m.descriptionModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.setTaskDescription(result.TaskID, result.Description)
-			}
-			return m, nil
-		}
-
-		// Route keys to confirm modal when active
-		if m.confirmModal.Active() {
-			var result *ConfirmResult
-			m.confirmModal, result = m.confirmModal.Update(msg)
-			if result != nil && result.Confirmed {
-				return m, m.deleteItem(result)
-			}
-			return m, nil
-		}
-
-		// Route keys to complete modal when active
-		if m.completeModal.Active() {
-			var result *CompleteResult
-			m.completeModal, result = m.completeModal.Update(msg)
-			if result != nil && result.Confirmed {
-				return m, m.completeProject(result)
-			}
-			return m, nil
-		}
-
-		// Route keys to create project modal when active
-		if m.createProjectModal.Active() {
-			var result *CreateProjectResult
-			m.createProjectModal, result = m.createProjectModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.createProject(result)
-			}
-			return m, nil
-		}
-
-		// Route keys to create area modal when active
-		if m.createAreaModal.Active() {
-			var result *CreateAreaResult
-			m.createAreaModal, result = m.createAreaModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.createArea(result)
-			}
-			return m, nil
-		}
-
-		// Route keys to create note modal when active
-		if m.createNoteModal.Active() {
-			var result *CreateNoteResult
-			m.createNoteModal, result = m.createNoteModal.Update(msg)
-			if result != nil && !result.Canceled {
-				return m, m.createAndOpenNote(result)
-			}
-			return m, nil
-		}
-
-		// Route keys to help modal when active
-		if m.helpModal.Active() {
-			var closed bool
-			m.helpModal, closed = m.helpModal.Update(msg)
-			if closed {
-				return m, nil
-			}
-			return m, nil
+		// Route keys to the first active modal (if any)
+		if mdl, cmd, handled := m.updateActiveModal(msg); handled {
+			return mdl, cmd
 		}
 
 		switch {
@@ -656,13 +538,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusArea == FocusContent && m.content.ViewMode() == ContentViewNotes {
 				entityType, entityUUID := m.resolveScopeEntity()
 				if entityUUID != "" {
-					notesDir := m.app.SearchNotes.Repo.EntityDir(entityType, entityUUID)
+					notesDir := m.app.GetNoteDir.Execute(entityType, entityUUID)
 					return m, launchNoteSearchScope(notesDir)
 				}
 			}
 			if m.focusArea == FocusDetail && m.detailPane.ViewMode() == DetailViewNotes {
 				if t := m.detailPane.Task(); t != nil {
-					notesDir := m.app.SearchNotes.Repo.EntityDir(note.EntityTask, t.UUID)
+					notesDir := m.app.GetNoteDir.Execute(note.EntityTask, t.UUID)
 					return m, launchNoteSearchTask(notesDir, t.ID, t.UUID)
 				}
 			}
@@ -881,91 +763,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-
-		// Reserve 1 row for help bar at the bottom
-		helpHeight := 1
-		availableHeight := m.height - helpHeight
-
-		// Calculate sidebar width: 1/4 of total, constrained between min/max
-		sidebarWidth := m.width / 4
-		minSidebar := 20
-		maxSidebar := 40
-
-		if sidebarWidth < minSidebar {
-			sidebarWidth = minSidebar
-		}
-		if sidebarWidth > maxSidebar {
-			sidebarWidth = maxSidebar
-		}
-
-		// Gap between panels (can be reduced for tight spaces)
-		gap := 1
-		minContentWidth := 20
-		minDetailWidth := 25
-
-		// Calculate widths based on whether detail pane is visible
-		var contentWidth, detailWidth int
-		if m.detailVisible {
-			// Three-column layout: sidebar | content | detail
-			remainingWidth := m.width - sidebarWidth - gap*2
-			// Split remaining between content (60%) and detail (40%)
-			contentWidth = remainingWidth * 60 / 100
-			detailWidth = remainingWidth - contentWidth
-
-			// Ensure minimum widths
-			if contentWidth < minContentWidth {
-				contentWidth = minContentWidth
-			}
-			if detailWidth < minDetailWidth {
-				detailWidth = minDetailWidth
-			}
-
-			// If we exceed available space, reduce proportionally
-			totalNeeded := sidebarWidth + contentWidth + detailWidth + gap*2
-			if totalNeeded > m.width {
-				// Reduce sidebar first
-				sidebarWidth = m.width - contentWidth - detailWidth - gap*2
-				if sidebarWidth < 10 {
-					sidebarWidth = 10
-					gap = 0
-					contentWidth = (m.width - sidebarWidth - minDetailWidth) * 60 / 100
-					detailWidth = m.width - sidebarWidth - contentWidth
-				}
-			}
-		} else {
-			// Two-column layout: sidebar | content
-			contentWidth = m.width - sidebarWidth - gap
-
-			// If content would be too small, shrink sidebar to give content more room
-			if contentWidth < minContentWidth {
-				sidebarWidth = m.width - minContentWidth - gap
-				if sidebarWidth < 10 { // Absolute minimum sidebar
-					sidebarWidth = 10
-					gap = 0 // Remove gap entirely when very tight
-					contentWidth = m.width - sidebarWidth
-				} else {
-					contentWidth = minContentWidth
-				}
-			}
-		}
-
-		// Ensure nothing goes negative
-		if sidebarWidth < 1 {
-			sidebarWidth = 1
-		}
-		if contentWidth < 1 {
-			contentWidth = 1
-		}
-
-		sidebarHeight := availableHeight
-
-		m.sidebar = m.sidebar.SetSize(sidebarWidth, sidebarHeight)
-		m.content = m.content.SetSize(contentWidth, sidebarHeight)
-		if m.detailVisible {
-			m.detailPane = m.detailPane.SetSize(detailWidth, sidebarHeight)
-		}
+		m = m.recalculateLayout()
 		m.help.Width = m.width
-		m.gap = gap // Store gap for View()
 		return m, nil
 
 	case loadDataMsg:
@@ -1045,6 +844,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		if msg.task == nil {
+			return m, m.loadTasksPreserveSelection
+		}
 		// Update detail pane if showing this task
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
@@ -1069,6 +871,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		if msg.task == nil {
+			return m, m.loadTasksPreserveSelection
+		}
 		// Update detail pane if showing this task
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
@@ -1084,6 +889,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
+		}
+		if msg.task == nil {
+			return m, m.loadTasksPreserveSelection
 		}
 		// Update detail pane if showing this task
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
@@ -1142,6 +950,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		if msg.task == nil {
+			return m, m.loadTasksPreserveSelection
+		}
 		// Update detail pane if showing this task
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
@@ -1158,6 +969,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		if msg.task == nil {
+			return m, m.loadDataAfterTagUpdatePreserveSelection
+		}
 		// Update detail pane if showing this task
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
 			m.detailPane = m.detailPane.UpdateTask(msg.task)
@@ -1173,6 +987,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
+		}
+		if msg.task == nil {
+			return m, m.loadTasksPreserveSelection
 		}
 		// Update detail pane if showing this task
 		if m.detailVisible && m.detailPane.Task() != nil && m.detailPane.Task().ID == msg.task.ID {
@@ -1603,6 +1420,8 @@ func (m Model) moveTask(taskID int64, itemType, name string) tea.Cmd {
 			updated, err = m.app.SetTaskProject.Execute(taskID, name)
 		case "area":
 			updated, err = m.app.SetTaskArea.Execute(taskID, name)
+		default:
+			return taskMovedMsg{task: nil, err: fmt.Errorf("unexpected item type: %s", itemType)}
 		}
 
 		return taskMovedMsg{task: updated, err: err}
@@ -1620,6 +1439,8 @@ func (m Model) setTaskDate(taskID int64, date *time.Time, mode DateModalMode) te
 			updated, err = m.app.SetPlannedDate.Execute(taskID, date)
 		case DateModalDue:
 			updated, err = m.app.SetDueDate.Execute(taskID, date)
+		default:
+			return taskDateUpdatedMsg{task: nil, err: fmt.Errorf("unexpected date modal mode: %d", mode)}
 		}
 
 		return taskDateUpdatedMsg{task: updated, err: err}
@@ -2127,15 +1948,8 @@ func (m Model) createAndOpenNote(result *CreateNoteResult) tea.Cmd {
 
 // openScopeNoteInEditor launches $EDITOR for a scope note
 func (m Model) openScopeNoteInEditor(path string) tea.Cmd {
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = os.Getenv("VISUAL")
-	}
-	if editor == "" {
-		editor = "vi"
-	}
-	fields := strings.Fields(editor)
-	c := exec.Command(fields[0], append(fields[1:], path)...)
+	editorBin, editorArgs := resolveEditor()
+	c := exec.Command(editorBin, append(editorArgs, path)...)
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return scopeNoteEditorFinishedMsg{err: err}
 	})
@@ -2149,15 +1963,8 @@ func (m Model) hasScopeSelected() bool {
 
 // openNoteInEditor launches $EDITOR for the given note path
 func (m Model) openNoteInEditor(path string, taskID int64, taskUUID string) tea.Cmd {
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = os.Getenv("VISUAL")
-	}
-	if editor == "" {
-		editor = "vi"
-	}
-	fields := strings.Fields(editor)
-	c := exec.Command(fields[0], append(fields[1:], path)...)
+	editorBin, editorArgs := resolveEditor()
+	c := exec.Command(editorBin, append(editorArgs, path)...)
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return noteEditorFinishedMsg{taskID: taskID, taskUUID: taskUUID, err: err}
 	})
@@ -2173,77 +1980,15 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
-	// Determine which help keys to show based on current state
-	var helpView string
-	switch {
-	case m.addModal.Active():
-		helpView = m.help.View(addKeys)
-	case m.renameModal.Active():
-		helpView = m.help.View(renameKeys)
-	case m.moveModal.Active():
-		helpView = m.help.View(moveKeys)
-	case m.dateModal.Active():
-		if m.dateModal.FocusInput() {
-			helpView = m.help.View(dateInputKeys)
-		} else {
-			helpView = m.help.View(datePickerKeys)
-		}
-	case m.tagModal.Active():
-		helpView = m.help.View(tagKeys)
-	case m.descriptionModal.Active():
-		helpView = m.help.View(descriptionKeys)
-	case m.confirmModal.Active():
-		helpView = m.help.View(confirmKeys)
-	case m.createProjectModal.Active():
-		helpView = m.help.View(createProjectKeys)
-	case m.createAreaModal.Active():
-		helpView = m.help.View(createAreaKeys)
-	case m.createNoteModal.Active():
-		helpView = m.help.View(createNoteKeys)
-	case m.helpModal.Active():
-		helpView = m.help.View(helpModalKeys)
-	default:
-		helpView = m.help.View(m.currentHelpKeys())
+	// If a modal is active, render it as a full-screen overlay with its help bar
+	if overlay, ok := m.renderModalOverlay(); ok {
+		return overlay
 	}
+
+	// No modal active — render the normal help bar
+	helpView := m.help.View(m.currentHelpKeys())
 	helpView = lipgloss.PlaceHorizontal(m.width, lipgloss.Center, helpView)
 
-	// Render modal if active (with help bar below)
-	if m.addModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.addModal.View(), helpView)
-	}
-	if m.renameModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.renameModal.View(), helpView)
-	}
-	if m.moveModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.moveModal.View(), helpView)
-	}
-	if m.dateModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.dateModal.View(), helpView)
-	}
-	if m.tagModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.tagModal.View(), helpView)
-	}
-	if m.descriptionModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.descriptionModal.View(), helpView)
-	}
-	if m.confirmModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.confirmModal.View(), helpView)
-	}
-	if m.completeModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.completeModal.View(), helpView)
-	}
-	if m.createProjectModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.createProjectModal.View(), helpView)
-	}
-	if m.createAreaModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.createAreaModal.View(), helpView)
-	}
-	if m.createNoteModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.createNoteModal.View(), helpView)
-	}
-	if m.helpModal.Active() {
-		return lipgloss.JoinVertical(lipgloss.Left, m.helpModal.View(), helpView)
-	}
 	// Render sidebar and content side by side (gap can be 0 for tight layouts)
 	contentView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.content.View())
 	var mainView string

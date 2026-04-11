@@ -13,11 +13,15 @@ import (
 // given directory. When the user selects a note, it opens in $EDITOR. On exit,
 // a scopeNoteEditorFinishedMsg is returned so notes are reloaded.
 func launchNoteSearchScope(notesDir string) tea.Cmd {
-	editor := resolveEditor()
+	editorBin, editorArgs := resolveEditor()
+	editorCmd := editorBin
+	if len(editorArgs) > 0 {
+		editorCmd = editorBin + " " + strings.Join(editorArgs, " ")
+	}
 	preview := resolvePreviewCmd()
 	script := fmt.Sprintf(
 		`selected=$(find %s -name '*.md' -type f 2>/dev/null | sort -r | fzf --preview '%s {}' --preview-window=right:60%%:wrap) && %s "$selected"`,
-		shellQuote(notesDir), preview, editor,
+		shellQuote(notesDir), preview, editorCmd,
 	)
 	c := exec.Command("sh", "-c", script)
 	return tea.ExecProcess(c, func(err error) tea.Msg {
@@ -28,11 +32,15 @@ func launchNoteSearchScope(notesDir string) tea.Cmd {
 // launchNoteSearchTask is the same as launchNoteSearchScope but returns a
 // noteEditorFinishedMsg so the detail pane reloads the task's notes.
 func launchNoteSearchTask(notesDir string, taskID int64, taskUUID string) tea.Cmd {
-	editor := resolveEditor()
+	editorBin, editorArgs := resolveEditor()
+	editorCmd := editorBin
+	if len(editorArgs) > 0 {
+		editorCmd = editorBin + " " + strings.Join(editorArgs, " ")
+	}
 	preview := resolvePreviewCmd()
 	script := fmt.Sprintf(
 		`selected=$(find %s -name '*.md' -type f 2>/dev/null | sort -r | fzf --preview '%s {}' --preview-window=right:60%%:wrap) && %s "$selected"`,
-		shellQuote(notesDir), preview, editor,
+		shellQuote(notesDir), preview, editorCmd,
 	)
 	c := exec.Command("sh", "-c", script)
 	return tea.ExecProcess(c, func(err error) tea.Msg {
@@ -40,15 +48,19 @@ func launchNoteSearchTask(notesDir string, taskID int64, taskUUID string) tea.Cm
 	})
 }
 
-// resolveEditor returns the user's preferred editor command.
-func resolveEditor() string {
-	if e := os.Getenv("EDITOR"); e != "" {
-		return e
+// resolveEditor returns the user's preferred editor binary and any extra
+// arguments. It splits $EDITOR / $VISUAL on whitespace so that values like
+// "code --wait" work correctly.
+func resolveEditor() (string, []string) {
+	raw := os.Getenv("EDITOR")
+	if raw == "" {
+		raw = os.Getenv("VISUAL")
 	}
-	if e := os.Getenv("VISUAL"); e != "" {
-		return e
+	if raw == "" {
+		raw = "vi"
 	}
-	return "vi"
+	fields := strings.Fields(raw)
+	return fields[0], fields[1:]
 }
 
 // resolvePreviewCmd returns "bat" with styling flags if available, otherwise "cat".
