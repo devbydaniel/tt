@@ -422,8 +422,11 @@ Shows scope-level notes for the selected project or area.
 |-----|--------|
 | `a` | Create new note |
 | `s` | Search notes with fzf |
+| `l` | Preview note with syntax-highlighted markdown |
 | `Enter` | Open note in `$EDITOR` |
 | `Backspace` | Delete note |
+
+In the preview pane, use `j/k` to scroll, `Enter` to open in `$EDITOR`, and `Esc` to close.
 
 #### Detail Pane
 

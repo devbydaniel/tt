@@ -63,9 +63,11 @@ type Model struct {
 	createNoteModal    CreateNoteModal
 	helpModal          HelpModal
 
-	help          help.Model
-	focusArea     FocusArea
-	detailVisible bool // whether the detail pane is shown
+	help               help.Model
+	focusArea          FocusArea
+	detailVisible      bool // whether the detail pane is shown
+	notePreviewPane    NotePreviewPane
+	notePreviewVisible bool // whether the note preview pane is shown
 
 	// Cached data
 	areas    []area.Area
@@ -86,6 +88,9 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 	helpModel.Styles.ShortDesc = theme.Muted
 	helpModel.Styles.ShortSeparator = theme.Muted
 
+	// Detect light theme for glamour markdown rendering
+	isLightTheme := cfg.Theme.Name == "solarized-light" || cfg.Theme.Name == "catppuccin-latte"
+
 	return Model{
 		app:                application,
 		config:             cfg,
@@ -94,6 +99,7 @@ func NewModel(application *app.App, theme *output.Theme, cfg *config.Config) Mod
 		sidebar:            NewSidebar(styles),
 		content:            NewContent(styles),
 		detailPane:         NewDetailPane(styles),
+		notePreviewPane:    NewNotePreviewPane(styles, isLightTheme),
 		renameModal:        NewRenameModal(styles),
 		moveModal:          NewMoveModal(styles),
 		dateModal:          NewDateModal(styles),
@@ -365,6 +371,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Enter from content opens detail pane
 				return m.openDetailPane()
 			}
+			if m.focusArea == FocusDetail && m.notePreviewVisible {
+				// Enter in note preview opens note in editor
+				if n := m.notePreviewPane.Note(); n != nil {
+					return m, m.openScopeNoteInEditor(n.Path)
+				}
+				return m, nil
+			}
 			if m.focusArea == FocusDetail {
 				if m.detailPane.ViewMode() == DetailViewNotes {
 					if n := m.detailPane.SelectedNote(); n != nil {
@@ -378,6 +391,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.Escape):
+			if m.focusArea == FocusDetail && m.notePreviewVisible {
+				// Close note preview pane, return to content
+				m.focusArea = FocusContent
+				m.notePreviewPane = m.notePreviewPane.SetFocused(false)
+				m.notePreviewVisible = false
+				m.content = m.content.SetFocused(true)
+				m = m.recalculateLayout()
+				return m, nil
+			}
 			if m.focusArea == FocusDetail {
 				// Close detail pane, return to content
 				m.focusArea = FocusContent
@@ -389,6 +411,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
+				// If note preview is visible, close it first
+				if m.notePreviewVisible {
+					m.notePreviewVisible = false
+					m = m.recalculateLayout()
+					return m, nil
+				}
 				m.focusArea = FocusSidebar
 				m.sidebar = m.sidebar.SetFocused(true)
 				m.content = m.content.SetShowSelection(false)
@@ -399,6 +427,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.FocusSidebar):
+			if m.focusArea == FocusDetail && m.notePreviewVisible {
+				// Close note preview and return to content
+				m.focusArea = FocusContent
+				m.notePreviewPane = m.notePreviewPane.SetFocused(false)
+				m.notePreviewVisible = false
+				m.content = m.content.SetFocused(true)
+				m = m.recalculateLayout()
+				return m, nil
+			}
 			if m.focusArea == FocusDetail {
 				// Always close detail pane and return to content
 				m.focusArea = FocusContent
@@ -415,6 +452,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.content = m.content.SetShowSelection(false)
 				m.content = m.content.SetFocused(false)
 				m.detailVisible = false
+				m.notePreviewVisible = false
 				m = m.recalculateLayout()
 				return m, nil
 			}
@@ -427,9 +465,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.focusArea == FocusContent {
-				// l from content opens detail pane (only in tasks view)
+				// l from content opens detail pane (tasks view) or note preview (notes view)
 				if m.content.ViewMode() == ContentViewTasks {
 					return m.openDetailPane()
+				}
+				if m.content.ViewMode() == ContentViewNotes {
+					return m.openNotePreview()
 				}
 				return m, nil
 			}
@@ -690,6 +731,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.hasScopeSelected() {
 					return m, nil
 				}
+				// Close note preview when switching views
+				if m.notePreviewVisible {
+					m.notePreviewVisible = false
+					m = m.recalculateLayout()
+				}
 				m.content = m.content.ToggleViewMode()
 				if m.content.ViewMode() == ContentViewNotes {
 					return m, m.loadScopeNotes()
@@ -708,6 +754,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.hasScopeSelected() {
 					return m, nil
 				}
+				// Close note preview when switching views
+				if m.notePreviewVisible {
+					m.notePreviewVisible = false
+					m = m.recalculateLayout()
+				}
 				m.content = m.content.ToggleViewMode()
 				if m.content.ViewMode() == ContentViewNotes {
 					return m, m.loadScopeNotes()
@@ -718,6 +769,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.Up):
+			if m.focusArea == FocusDetail && m.notePreviewVisible {
+				m.notePreviewPane = m.notePreviewPane.ScrollUp()
+				return m, nil
+			}
 			if m.focusArea == FocusDetail {
 				if m.detailPane.ViewMode() == DetailViewNotes {
 					m.detailPane = m.detailPane.PrevNote()
@@ -729,6 +784,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusArea == FocusContent {
 				if m.content.ViewMode() == ContentViewNotes {
 					m.content = m.content.NoteUp()
+					if m.notePreviewVisible {
+						return m, m.updateNotePreview()
+					}
 				} else {
 					m.content = m.content.MoveUp()
 				}
@@ -738,6 +796,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.loadTasksForSelection
 
 		case key.Matches(msg, keys.Down):
+			if m.focusArea == FocusDetail && m.notePreviewVisible {
+				m.notePreviewPane = m.notePreviewPane.ScrollDown()
+				return m, nil
+			}
 			if m.focusArea == FocusDetail {
 				if m.detailPane.ViewMode() == DetailViewNotes {
 					m.detailPane = m.detailPane.NextNote()
@@ -749,6 +811,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusArea == FocusContent {
 				if m.content.ViewMode() == ContentViewNotes {
 					m.content = m.content.NoteDown()
+					if m.notePreviewVisible {
+						return m, m.updateNotePreview()
+					}
 				} else {
 					m.content = m.content.MoveDown()
 				}
@@ -1094,12 +1159,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.content = m.content.SetScopeNotes(msg.notes)
+		if m.notePreviewVisible {
+			return m, m.updateNotePreview()
+		}
+		return m, nil
+
+	case noteContentMsg:
+		if msg.err != nil {
+			return m, nil
+		}
+		if n := m.content.SelectedNote(); n != nil && n.Path == msg.path {
+			m.notePreviewPane = m.notePreviewPane.SetNote(n, msg.content)
+		}
 		return m, nil
 
 	case scopeNoteEditorFinishedMsg:
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
+		}
+		// After editor closes, return focus to content notes list
+		if m.notePreviewVisible {
+			m.focusArea = FocusContent
+			m.notePreviewPane = m.notePreviewPane.SetFocused(false)
+			m.content = m.content.SetFocused(true)
 		}
 		return m, m.loadScopeNotes()
 
@@ -1585,6 +1668,50 @@ func (m Model) openDetailPane() (tea.Model, tea.Cmd) {
 	return m, m.loadNotes(selectedTask.UUID, selectedTask.ID)
 }
 
+// openNotePreview opens the note preview pane with the selected note
+func (m Model) openNotePreview() (tea.Model, tea.Cmd) {
+	selectedNote := m.content.SelectedNote()
+	if selectedNote == nil {
+		return m, nil
+	}
+
+	m.notePreviewVisible = true
+	m.focusArea = FocusDetail
+	m.content = m.content.SetFocused(false)
+	m.notePreviewPane = m.notePreviewPane.SetFocused(true)
+
+	// Recalculate layout for three-column mode
+	m = m.recalculateLayout()
+
+	// Load note content asynchronously
+	return m, m.loadNoteContent(selectedNote)
+}
+
+// noteContentMsg carries the loaded note content
+type noteContentMsg struct {
+	path    string
+	content string
+	err     error
+}
+
+// loadNoteContent reads a note file and returns a command
+func (m Model) loadNoteContent(n *note.Note) tea.Cmd {
+	path := n.Path
+	return func() tea.Msg {
+		data, err := os.ReadFile(path)
+		return noteContentMsg{path: path, content: string(data), err: err}
+	}
+}
+
+// updateNotePreview loads the currently selected note into the preview
+func (m Model) updateNotePreview() tea.Cmd {
+	selectedNote := m.content.SelectedNote()
+	if selectedNote == nil {
+		return nil
+	}
+	return m.loadNoteContent(selectedNote)
+}
+
 // recalculateLayout recalculates component sizes based on current state
 func (m Model) recalculateLayout() Model {
 	if m.width == 0 || m.height == 0 {
@@ -1613,7 +1740,7 @@ func (m Model) recalculateLayout() Model {
 	minDetailWidth := 25
 
 	var contentWidth, detailWidth int
-	if m.detailVisible {
+	if m.detailVisible || m.notePreviewVisible {
 		// Three-column layout
 		remainingWidth := m.width - sidebarWidth - gap*2
 		contentWidth = remainingWidth * 60 / 100
@@ -1664,6 +1791,9 @@ func (m Model) recalculateLayout() Model {
 	m.content = m.content.SetSize(contentWidth, sidebarHeight)
 	if m.detailVisible && detailWidth > 0 {
 		m.detailPane = m.detailPane.SetSize(detailWidth, sidebarHeight)
+	}
+	if m.notePreviewVisible && detailWidth > 0 {
+		m.notePreviewPane = m.notePreviewPane.SetSize(detailWidth, sidebarHeight)
 	}
 	m.gap = gap
 
@@ -1987,7 +2117,11 @@ func (m Model) View() string {
 	// Render sidebar and content side by side (gap can be 0 for tight layouts)
 	contentView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.content.View())
 	var mainView string
-	if m.detailVisible {
+	if m.notePreviewVisible {
+		// Three-column layout: sidebar | content | note preview
+		previewView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.notePreviewPane.View())
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView, previewView)
+	} else if m.detailVisible {
 		// Three-column layout: sidebar | content | detail
 		detailView := lipgloss.NewStyle().MarginLeft(m.gap).Render(m.detailPane.View())
 		mainView = lipgloss.JoinHorizontal(lipgloss.Top, m.sidebar.View(), contentView, detailView)
@@ -2013,6 +2147,9 @@ func (m Model) currentHelpKeys() help.KeyMap {
 		}
 		return sidebarKeys
 	case FocusDetail:
+		if m.notePreviewVisible {
+			return notePreviewKeys
+		}
 		switch m.detailPane.ViewMode() {
 		case DetailViewNotes:
 			return detailNotesKeys

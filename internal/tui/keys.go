@@ -189,10 +189,21 @@ func (k detailNotesKeyMap) FullHelp() [][]key.Binding {
 type contentNotesKeyMap struct{}
 
 func (k contentNotesKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.Add, keys.SearchNotes, keys.Delete, keys.Tab, keys.FocusSidebar, keys.Quit}
+	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.FocusContent, keys.Add, keys.SearchNotes, keys.Delete, keys.Tab, keys.FocusSidebar, keys.Quit}
 }
 
 func (k contentNotesKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
+// notePreviewKeyMap provides help bindings when the note preview pane is focused
+type notePreviewKeyMap struct{}
+
+func (k notePreviewKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{keys.Up, keys.Down, keys.Enter, keys.Escape}
+}
+
+func (k notePreviewKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
@@ -308,6 +319,7 @@ var (
 	addKeys            = addKeyMap{}
 	detailDataKeys     = detailDataKeyMap{}
 	detailNotesKeys    = detailNotesKeyMap{}
+	notePreviewKeys    = notePreviewKeyMap{}
 	descriptionKeys    = descriptionKeyMap{}
 	confirmKeys        = confirmKeyMap{}
 	createAreaKeys     = createAreaKeyMap{}
