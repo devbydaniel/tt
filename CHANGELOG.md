@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.6.0](https://github.com/devbydaniel/tt/compare/v0.5.0...v0.6.0) (2026-04-26)
+
+
+### Features
+
+* **cli:** add --before and --after date filters to notes ls ([4843e39](https://github.com/devbydaniel/tt/commit/4843e39d971551fcf5edab07545860a2e216957f))
+* **cli:** add notes browse command for interactive fzf selection ([cbd3d69](https://github.com/devbydaniel/tt/commit/cbd3d693f26cb568959627a0de8b33f6b1df6205))
+* **sync:** git-sync the notes directory from `tt sync` ([70da1e7](https://github.com/devbydaniel/tt/commit/70da1e7cfd0df8739c58faa004fd4db972810a92))
+* **tui:** add ! AI chat shortcut for projects and areas in sidebar ([e93893f](https://github.com/devbydaniel/tt/commit/e93893f5af175f10e14dae25e499c9e926591cc3))
+* **tui:** add ? key to show context-sensitive help modal ([d73e0d9](https://github.com/devbydaniel/tt/commit/d73e0d99d9f507a0bc9c3f04b75f9f15fb2e8ac3))
+* **tui:** add follow mode (F) for auto-updating detail pane on navigation ([8d4d730](https://github.com/devbydaniel/tt/commit/8d4d730b3e6bb63f5281ab076bfc4fdfe9cd8ca8))
+* **tui:** add note preview pane with markdown rendering ([fde9593](https://github.com/devbydaniel/tt/commit/fde9593bc848d266466494ffd2e35aa46fdb3d41))
+* **tui:** show entity counts in tab labels ([d29300b](https://github.com/devbydaniel/tt/commit/d29300b2472ac37d0d165512b4a6905c4322cc4f))
+
+
+### Bug Fixes
+
+* **cli:** fix date filtering bug and clean up notes output ([315eed4](https://github.com/devbydaniel/tt/commit/315eed435e90ba85a322a09357edbd8f79d5a6f8))
+* resolve pre-existing lint issues blocking CI ([75f6b3a](https://github.com/devbydaniel/tt/commit/75f6b3a5a3c01ff10d8825e3de9e3123b5260f94))
+* **tui:** use tagged switch to satisfy staticcheck QF1002 ([2be3877](https://github.com/devbydaniel/tt/commit/2be3877b4449fe4319e912e84c1bee9523be9747))
+
 ## [0.5.0](https://github.com/devbydaniel/tt/compare/v0.4.2...v0.5.0) (2026-04-10)
 
 
