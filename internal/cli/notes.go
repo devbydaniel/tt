@@ -39,8 +39,10 @@ func NewNotesCmd(deps *Dependencies) *cobra.Command {
 		Long: `Manage markdown notes attached to tasks, projects, and areas.
 
 Notes are plain markdown files stored on disk under the notes directory
-(default: <data_dir>/notes). They are not synced with the task database;
-sync them yourself with Syncthing/iCloud/Dropbox if needed.
+(default: <data_dir>/notes). To sync them across machines, run ` + "`git init`" + `
+in the notes directory and add a remote — ` + "`tt sync`" + ` will then auto-commit,
+pull, and push notes alongside its task sync. Syncthing/iCloud/Dropbox also
+work if you'd rather not use git.
 
 Running ` + "`tt notes --task <id>`" + ` (or --project / --area) opens an
 fzf picker over the matching notes and edits the selection in $EDITOR.

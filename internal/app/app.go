@@ -65,11 +65,12 @@ type App struct {
 	DeleteTag          *taskusecases.DeleteTag
 
 	// Note use cases (filesystem-backed, no DB)
-	ListNotes   *noteusecases.ListNotes
-	CreateNote  *noteusecases.CreateNote
-	DeleteNote  *noteusecases.DeleteNote
-	SearchNotes *noteusecases.SearchNotes
-	GetNoteDir  *noteusecases.GetNoteDir
+	ListNotes    *noteusecases.ListNotes
+	CreateNote   *noteusecases.CreateNote
+	DeleteNote   *noteusecases.DeleteNote
+	SearchNotes  *noteusecases.SearchNotes
+	GetNoteDir   *noteusecases.GetNoteDir
+	SyncNotesGit *noteusecases.SyncNotesGit
 
 	// Cross-domain enrichment
 	EnrichIndicators *taskusecases.EnrichIndicators
@@ -391,11 +392,12 @@ func New(db *database.DB, clientID string, syncCfg *SyncConfig, notesDir string)
 		DeleteTag:          deleteTag,
 
 		// Notes
-		ListNotes:   &noteusecases.ListNotes{Repo: noteRepo},
-		CreateNote:  &noteusecases.CreateNote{Repo: noteRepo},
-		DeleteNote:  &noteusecases.DeleteNote{Repo: noteRepo},
-		SearchNotes: &noteusecases.SearchNotes{Repo: noteRepo},
-		GetNoteDir:  &noteusecases.GetNoteDir{Repo: noteRepo},
+		ListNotes:    &noteusecases.ListNotes{Repo: noteRepo},
+		CreateNote:   &noteusecases.CreateNote{Repo: noteRepo},
+		DeleteNote:   &noteusecases.DeleteNote{Repo: noteRepo},
+		SearchNotes:  &noteusecases.SearchNotes{Repo: noteRepo},
+		GetNoteDir:   &noteusecases.GetNoteDir{Repo: noteRepo},
+		SyncNotesGit: &noteusecases.SyncNotesGit{Repo: noteRepo},
 
 		// Cross-domain enrichment
 		EnrichIndicators: &taskusecases.EnrichIndicators{

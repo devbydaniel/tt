@@ -12,37 +12,60 @@ import (
 func NewSyncCmd(deps *Dependencies) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Sync with remote server (bidirectional)",
+		Short: "Sync with remote server (bidirectional) and git-sync the notes directory",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if deps.App.SyncEvents == nil {
-				return fmt.Errorf("sync not configured: set sync.url and sync.api_key in config file")
-			}
+			eventConfigured := deps.App.SyncEvents != nil
 
-			fmt.Fprintln(os.Stdout, "Syncing with server...")
+			if eventConfigured {
+				fmt.Fprintln(os.Stdout, "Syncing with server...")
 
-			result, err := deps.App.SyncEvents.Execute()
-			if err != nil {
-				return fmt.Errorf("sync failed: %w", err)
-			}
-
-			if result.Pushed == 0 && result.Pulled == 0 && result.Rejected == 0 {
-				fmt.Fprintln(os.Stdout, "Already up to date.")
-				return nil
-			}
-
-			if result.Pushed > 0 {
-				fmt.Fprintf(os.Stdout, "Pushed %d event(s).\n", result.Pushed)
-			}
-
-			if result.Applied > 0 {
-				fmt.Fprintf(os.Stdout, "Applied %d change(s) from server.\n", result.Applied)
-			}
-
-			if result.Rejected > 0 {
-				fmt.Fprintf(os.Stderr, "%d event(s) were rejected:\n", result.Rejected)
-				for _, errMsg := range result.Errors {
-					fmt.Fprintln(os.Stderr, "  - "+errMsg)
+				result, err := deps.App.SyncEvents.Execute()
+				if err != nil {
+					return fmt.Errorf("sync failed: %w", err)
 				}
+
+				if result.Pushed == 0 && result.Pulled == 0 && result.Rejected == 0 {
+					fmt.Fprintln(os.Stdout, "Already up to date.")
+				}
+
+				if result.Pushed > 0 {
+					fmt.Fprintf(os.Stdout, "Pushed %d event(s).\n", result.Pushed)
+				}
+
+				if result.Applied > 0 {
+					fmt.Fprintf(os.Stdout, "Applied %d change(s) from server.\n", result.Applied)
+				}
+
+				if result.Rejected > 0 {
+					fmt.Fprintf(os.Stderr, "%d event(s) were rejected:\n", result.Rejected)
+					for _, errMsg := range result.Errors {
+						fmt.Fprintln(os.Stderr, "  - "+errMsg)
+					}
+				}
+			}
+
+			notesResult, err := deps.App.SyncNotesGit.Execute()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Notes sync failed: %v\n", err)
+				return err
+			}
+
+			if !eventConfigured && notesResult.Skipped {
+				return fmt.Errorf("nothing to sync: configure sync server (sync.url + sync.api_key in config), or run 'git init' in the notes directory")
+			}
+
+			if !notesResult.Skipped && (notesResult.Committed || notesResult.Pulled || notesResult.Pushed) {
+				var parts []string
+				if notesResult.Committed {
+					parts = append(parts, "committed")
+				}
+				if notesResult.Pulled {
+					parts = append(parts, "pulled")
+				}
+				if notesResult.Pushed {
+					parts = append(parts, "pushed")
+				}
+				fmt.Fprintf(os.Stdout, "Notes: %s.\n", strings.Join(parts, ", "))
 			}
 
 			return nil

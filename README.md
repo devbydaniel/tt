@@ -280,8 +280,11 @@ Attach markdown notes to any task, project, or area. Notes live as plain
 `.md` files on disk under the notes directory (default: `<data_dir>/notes`),
 organized as `<entity_type>/<entity_uuid>/YYYYMMDD--<slug>.md`.
 
-Notes are **not** synced with the task database. If you want them on multiple
-devices, point Syncthing/iCloud/Dropbox at the notes directory.
+Notes are not stored in the task database. To sync them across machines, the
+simplest option is git: run `git init` in the notes directory and add a remote,
+and `tt sync` will auto-commit, pull (rebased), and push notes alongside its
+task sync. See [Syncing](#syncing) for details. Syncthing, iCloud, or Dropbox
+pointed at the notes directory also work.
 
 **Interactive (fzf + `$EDITOR`)**
 
@@ -666,6 +669,11 @@ The sync command:
 - Pushes all local changes since last sync
 - Pulls changes from other clients
 - Applies remote changes to your local database
+- Auto-commits, pulls (rebased), and pushes the **notes** directory if it's a
+  git repository — opt in with `git init` + `git remote add origin <url>` +
+  `git push -u origin <branch>` inside the notes directory. If no `.git` is
+  present, the notes step is silently skipped. Auto-commits are stamped
+  `tt: auto-sync YYYY-MM-DD HH:MM`.
 
 ### Resetting Sync
 
