@@ -691,4 +691,3 @@ func readBodyFile(path string) (string, error) {
 	}
 	return string(b), nil
 }
-

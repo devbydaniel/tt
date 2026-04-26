@@ -51,7 +51,7 @@ func launchNoteSearchTask(notesDir string, taskID int64, taskUUID string) tea.Cm
 // resolveEditor returns the user's preferred editor binary and any extra
 // arguments. It splits $EDITOR / $VISUAL on whitespace so that values like
 // "code --wait" work correctly.
-func resolveEditor() (string, []string) {
+func resolveEditor() (bin string, args []string) {
 	raw := os.Getenv("EDITOR")
 	if raw == "" {
 		raw = os.Getenv("VISUAL")

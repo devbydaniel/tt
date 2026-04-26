@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/styles"
+	glamourstyles "github.com/charmbracelet/glamour/styles"
 
 	"github.com/devbydaniel/tt/internal/domain/note"
 )
@@ -41,14 +41,12 @@ func (p NotePreviewPane) SetNote(n *note.Note, rawContent string) NotePreviewPan
 	return p
 }
 
-// SetSize updates dimensions
+// SetSize updates dimensions. Re-rendering on resize would require keeping
+// the raw markdown around — for now the rendered content is only refreshed
+// when SetNote is called.
 func (p NotePreviewPane) SetSize(width, height int) NotePreviewPane {
 	p.width = width
 	p.height = height
-	// Re-render if note exists (width affects word wrap)
-	if p.note != nil {
-		// We'd need raw content to re-render; skip for now — only re-render on SetNote
-	}
 	return p
 }
 
@@ -124,11 +122,11 @@ func (p NotePreviewPane) maxScroll() int {
 	if viewHeight < 1 {
 		viewHeight = 1
 	}
-	max := len(lines) - viewHeight
-	if max < 0 {
+	maxOff := len(lines) - viewHeight
+	if maxOff < 0 {
 		return 0
 	}
-	return max
+	return maxOff
 }
 
 // renderMarkdown renders raw markdown through glamour
@@ -138,9 +136,9 @@ func (p NotePreviewPane) renderMarkdown(raw string) string {
 		wordWrap = 20
 	}
 
-	styleConfig := styles.DarkStyleConfig
+	styleConfig := glamourstyles.DarkStyleConfig
 	if p.isLight {
-		styleConfig = styles.LightStyleConfig
+		styleConfig = glamourstyles.LightStyleConfig
 	}
 
 	renderer, err := glamour.NewTermRenderer(
